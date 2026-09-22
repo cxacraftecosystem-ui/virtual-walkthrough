@@ -17,3 +17,8 @@ next-env.d.ts
 .data/
 .next-dev.log
 .next-start.log
+
+
+# Google OAuth client secrets — never commit
+client_secret_*.json
+*.apps.googleusercontent.com.json
