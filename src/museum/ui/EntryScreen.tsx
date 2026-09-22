@@ -123,6 +123,28 @@ export function EntryScreen() {
         </svg>
       </div>
 
+      <header className="ui-entry__brand" aria-label="Presented by">
+        {/* Plain <img>: tiny static brand marks from /public (next/image adds nothing here). */}
+        <img
+          className="ui-entry__logo ui-entry__logo--dc"
+          src="/brand/dc-handicrafts.png"
+          width={642}
+          height={240}
+          alt="DC Handicrafts — Indian Handicrafts, continuing tradition"
+          decoding="async"
+          draggable={false}
+        />
+        <img
+          className="ui-entry__logo ui-entry__logo--iit"
+          src="/brand/iit-kharagpur.svg"
+          width={268}
+          height={300}
+          alt="Indian Institute of Technology Kharagpur"
+          decoding="async"
+          draggable={false}
+        />
+      </header>
+
       <div className="ui-entry__inner">
         <Rosette className="ui-entry__ornament" />
         <div className="ui-kicker">{EXHIBITION_TITLE.kicker}</div>

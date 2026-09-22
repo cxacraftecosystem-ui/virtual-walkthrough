@@ -5,6 +5,7 @@
  */
 import { itemKey, useMuseum, type SelectionKind } from '../state/store'
 import { api, checkBackend, errorMessage, type User } from './client'
+import { googleSignedOut } from './google'
 
 let started = false
 
@@ -49,6 +50,16 @@ export async function signIn(email: string, password: string): Promise<string | 
   }
 }
 
+/** Sign in with a Google ID token (from the GIS button). */
+export async function signInWithGoogle(credential: string): Promise<string | null> {
+  try {
+    await onSignedIn(await api.auth.google(credential))
+    return null
+  } catch (e) {
+    return errorMessage(e)
+  }
+}
+
 export async function register(email: string, password: string, displayName: string): Promise<string | null> {
   try {
     await onSignedIn(await api.auth.register(email.trim(), password, displayName.trim()))
@@ -64,6 +75,7 @@ export async function signOut() {
   } catch {
     /* cookie may already be gone */
   }
+  googleSignedOut()
   const s = useMuseum.getState()
   s.setUser(null)
   if (s.drawer === 'favourites') s.setDrawer(null)

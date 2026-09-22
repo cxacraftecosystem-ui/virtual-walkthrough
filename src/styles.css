@@ -454,6 +454,56 @@ button {
   pointer-events: none;
 }
 
+/* Partner marks: DC Handicrafts (top-left), IIT Kharagpur (top-right) */
+.ui-entry__brand {
+  position: absolute;
+  top: calc(20px + var(--safe-t));
+  left: calc(24px + var(--safe-l));
+  right: calc(24px + var(--safe-r));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  pointer-events: none;
+  animation: ui-fade-in 1.2s var(--ease) 0.2s both;
+}
+
+.ui-entry__logo {
+  display: block;
+  width: auto;
+  max-width: 42vw;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.ui-entry__logo--dc {
+  height: 54px;
+}
+
+.ui-entry__logo--iit {
+  height: 64px;
+  opacity: 0.92;
+}
+
+@media (max-width: 640px) {
+  .ui-entry__brand {
+    top: calc(14px + var(--safe-t));
+    left: calc(16px + var(--safe-l));
+    right: calc(16px + var(--safe-r));
+  }
+  .ui-entry__logo--dc { height: 36px; }
+  .ui-entry__logo--iit { height: 44px; }
+  /* keep the centred title block clear of the marks on short phones */
+  .ui-entry { padding-top: calc(76px + var(--safe-t)); }
+}
+
+@media (max-height: 560px) {
+  .ui-entry__brand { top: calc(12px + var(--safe-t)); }
+  .ui-entry__logo--dc { height: 30px; }
+  .ui-entry__logo--iit { height: 36px; }
+}
+
 @media (max-height: 560px) {
   .ui-entry__ornament { display: none; }
   .ui-entry__rule { margin: 20px auto 18px; }
@@ -2147,6 +2197,32 @@ button {
   opacity: 0.85;
 }
 
+.ui-auth__google {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.ui-auth__or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ui-auth__or::before,
+.ui-auth__or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.25;
+}
+
 /* Social drawer (favourites / guestbook) ------------------------------- */
 
 .ui-drawer {
@@ -2509,10 +2585,59 @@ button {
   margin-left: auto;
 }
 
-@media (max-width: 1100px) {
+/* Tablet / desktop: keep the caption card clear of the floor plan (bottom-left), the
+   joystick (bottom-right on touch) and the item panel (right). Centred when there is room,
+   otherwise right-aligned beside the map. */
+@media (min-width: 641px) {
   .ui-tour {
-    width: min(520px, calc(100vw - 2 * var(--edge)));
-    bottom: calc(var(--edge) + var(--safe-b) + 54px);
+    /* floor-plan card width (see .ui-map__svg) or the collapsed "Map" pill */
+    --tour-map: 120px;
+    --tour-clear-l: calc(var(--edge) + var(--safe-l) + var(--tour-map) + 16px);
+    --tour-clear-r: calc(var(--edge) + var(--safe-r));
+    left: var(--tour-clear-l);
+    right: var(--tour-clear-r);
+    translate: none;
+    width: auto;
+    min-width: 0;
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: 0;
+  }
+  .ui-tour.has-map {
+    --tour-map: calc(min(380px, 30vw, calc((46vh - 40px) * 1.32)) + 22px);
+  }
+}
+
+@media (min-width: 641px) and (pointer: coarse) {
+  .ui-tour {
+    --tour-clear-r: calc(var(--edge) + var(--safe-r) + 150px);
+  }
+}
+
+@media (min-width: 1401px) {
+  .ui-tour {
+    --tour-side: max(var(--tour-clear-l), var(--tour-clear-r));
+    left: var(--tour-side);
+    right: var(--tour-side);
+    max-width: 540px;
+    margin-right: auto;
+  }
+  .ui-tour.has-panel {
+    --tour-side: max(var(--tour-clear-l), var(--tour-clear-r), calc(var(--edge) + var(--safe-r) + 416px));
+  }
+}
+
+/* Keep the tour controls usable (End / Pause) through the tour's own fade-teleports. */
+.ui-root:has(.ui-fade.is-on) .ui-tour {
+  z-index: 41;
+}
+
+/* The item panel takes the right-hand side: the tour holds the stop while it is open, so the
+   caption steps aside (it returns when the panel closes). */
+@media (min-width: 641px) and (max-width: 1400px) {
+  .ui-tour.has-panel {
+    visibility: hidden;
+    pointer-events: none;
   }
 }
 
@@ -2580,4 +2705,138 @@ button {
     flex-direction: column;
     gap: 10px;
   }
+}
+
+/* ================================================================== */
+/* Photo mode                                                          */
+/* ================================================================== */
+
+/* Everything but the photo controls (and the travel fade) steps out of the frame. */
+.ui-root.is-photo > :not(.ui-photo):not(.ui-fade):not(.ui-entry) {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transition: opacity 0.3s var(--ease), visibility 0s linear 0.3s;
+}
+
+.ui-photo {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.ui-photo__hint {
+  position: absolute;
+  top: calc(var(--edge) + var(--safe-t));
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 2 * var(--edge));
+  padding: 9px 16px 9px 13px;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
+}
+
+.ui-photo__hint.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.ui-photo__hint svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--accent);
+}
+
+.ui-photo__bar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--edge) + var(--safe-b));
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s var(--ease);
+}
+
+.ui-photo__bar.is-awake {
+  opacity: 0.94;
+  pointer-events: auto;
+}
+
+.ui-photo__shutter {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: 38px;
+  padding: 0 16px 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.ui-photo__shutter:hover {
+  filter: brightness(1.06);
+}
+
+.ui-photo__shutter span {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  box-shadow: inset 0 0 0 3px var(--accent), inset 0 0 0 8px currentColor;
+}
+
+.ui-photo__flash {
+  position: absolute;
+  inset: 0;
+  background: #fffdf8;
+  opacity: 0;
+  animation: ui-photo-flash 0.55s ease-out;
+}
+
+@keyframes ui-photo-flash {
+  0% { opacity: 0.75; }
+  100% { opacity: 0; }
+}
+
+@media (max-width: 640px) {
+  .ui-photo__hint {
+    left: calc(var(--edge) + var(--safe-l));
+    right: calc(var(--edge) + var(--safe-r));
+    translate: none;
+    width: fit-content;
+    max-width: none;
+    margin: 0 auto;
+    white-space: normal;
+    font-size: 12px;
+  }
+}
+
+/* HUD popovers read cleanly over whatever sits beneath them. */
+.ui-hud .ui-quality__menu.ui-panel {
+  background: var(--panel-solid);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-photo__flash { animation-duration: 0.01s; }
 }

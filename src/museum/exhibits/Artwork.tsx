@@ -45,6 +45,9 @@ function frameMaterial(frame: FrameStyle, m: Record<MaterialKey, THREE.Material>
   if (frame.material === 'paint') {
     return new THREE.MeshStandardMaterial({ color: frame.color, roughness: frame.roughness, metalness: 0 })
   }
+  if (frame.material === 'brass') {
+    return new THREE.MeshStandardMaterial({ color: frame.color, roughness: frame.roughness, metalness: 0.9, envMapIntensity: 1 })
+  }
   return m[FRAME_MATERIAL[frame.material] ?? 'oakFrame']
 }
 
@@ -83,7 +86,7 @@ export function ArtworkFrame({ layout, frame, texture, hovered }: { layout: Artw
       matMat.dispose()
       backingMat.dispose()
       imageMat.dispose()
-      if (mouldMat && frame.material === 'paint') mouldMat.dispose()
+      if (mouldMat && (frame.material === 'paint' || frame.material === 'brass')) mouldMat.dispose()
     },
     [matMat, backingMat, imageMat, mouldMat, frame.material],
   )
@@ -226,7 +229,7 @@ function ArtworkBody({ config, res }: { config: ArtworkConfig; res: LoadedArtwor
         <group onClick={onClick} onPointerOver={onOver} onPointerOut={onOut}>
           <ArtworkFrame layout={layout} frame={frame} texture={res.texture} hovered={hovered} />
         </group>
-        <WallLabel config={config} position={labelPos} />
+        {config.label !== false && <WallLabel config={config} position={labelPos} />}
       </group>
       {spot && <TrackSpot position={spot.mount} target={spot.target} intensity={spot.intensity} angle={spot.angle} />}
     </group>

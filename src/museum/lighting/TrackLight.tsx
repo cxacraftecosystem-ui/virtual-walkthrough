@@ -72,12 +72,14 @@ export function TrackSpot({ position, target, intensity, angle, penumbra = LIGHT
     return registerSpot({ position: [px, py, pz], target: [tx, ty, tz], intensity, angle, penumbra, color })
   }, [lit, px, py, pz, tx, ty, tz, intensity, angle, penumbra, color])
 
-  const stemLen = Math.max(0.02, RAIL_Y - 0.011 - py)
+  // Gallery heads hang from the track rail; heads mounted higher (taller wings) get a short monopoint stem.
+  const railTop = py < RAIL_Y - 0.02 ? RAIL_Y : py + 0.14
+  const stemLen = Math.max(0.02, railTop - 0.011 - py)
 
   return (
     <group>
       {/* stem from rail adapter to head pivot */}
-      <mesh position={[px, RAIL_Y - 0.026, pz]} geometry={adapterGeo} material={m.trackBlack} />
+      <mesh position={[px, railTop - 0.026, pz]} geometry={adapterGeo} material={m.trackBlack} />
       <mesh position={[px, py + stemLen / 2, pz]} scale={[1, stemLen / 0.09, 1]} geometry={stemGeo} material={m.trackBlack} />
       <group ref={head} position={position}>
         <mesh geometry={headGeo} material={m.trackBlack} position={[0, 0, 0.02]} castShadow={false} />

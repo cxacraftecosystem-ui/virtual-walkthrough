@@ -17,24 +17,30 @@ import { focusOn } from '../navigation/focus'
 import { useMuseum } from '../state/store'
 import { useAsyncTexture } from '../utils/useAsyncTexture'
 
-/** Exhibition title vinyl on the reveal wall's arrival face — the first focal plane. */
+/**
+ * Exhibition title vinyl on the reveal wall's arrival face — the first focal plane.
+ * v3 composition: the title occupies the LEFT ~40 % of the 7.6 m face; the large framed
+ * feature painting (artworks.ts 'feature-01', at x ≈ +1.4) fills the right-hand part.
+ */
+const REVEAL_TITLE = { left: -MUSEUM.revealWall.width / 2 + 0.1, width: 3.0 }
 export function RevealWallTitle() {
   const rw = MUSEUM.revealWall
-  const w = rw.width - 0.5
+  const w = REVEAL_TITLE.width
+  const cx = rw.offsetX + REVEAL_TITLE.left + w / 2
   const h = 2.3
-  const cy = 1.72
+  const cy = 1.78
   const tex = useAsyncTexture(() => createTitleWallTexture(w, h, { bottomY: cy - h / 2 }), [EXHIBITION_TITLE.title])
-  const p = surfacePoint('reveal-south', rw.offsetX, cy, 0.002)
+  const p = surfacePoint('reveal-south', cx, cy, 0.002)
   const spots = useMemo(
     () =>
-      [-0.95, 0.95].map((dx) => {
-        const x = rw.offsetX + dx
+      [-0.7, 0.7].map((dx) => {
+        const x = cx + dx
         const mount = mountFor('reveal-south', x)
         const target: Vec3 = [x, 1.75, KEY.revealSouthZ]
         const dist = Math.hypot(mount[1] - target[1], mount[2] - target[2])
         return { mount, target, angle: coverAngle(2.3, 2.6, dist), intensity: LIGHTING.track.artworkIntensity * 0.45 * (dist / 2.2) ** 2 }
       }),
-    [rw.offsetX],
+    [cx],
   )
   return (
     <group>

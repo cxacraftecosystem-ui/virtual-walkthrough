@@ -9,7 +9,7 @@
  * (or call `fail`) for 4xx/5xx; the body is always `{ error }`.
  */
 import 'server-only'
-import { requireAdminUser, requireUser, type User, userFromRequest } from './auth'
+import { requireRoleUser, requireUser, type Role, type User, userFromRequest } from './auth'
 import { config } from './config'
 import { services, type Services } from './services'
 import { fail, HttpError } from './util'
@@ -25,7 +25,14 @@ export interface Call<P> extends Services {
   ip: string
   user(): Promise<User | null>
   requireUser(): Promise<User>
+  /** 401 signed out / 403 below `min` (visitor < curator < admin < master). */
+  requireRole(min: Role): Promise<User>
+  /** Content + media editing. */
+  requireCurator(): Promise<User>
+  /** Moderation, analytics, users. */
   requireAdmin(): Promise<User>
+  /** Access list. */
+  requireMaster(): Promise<User>
   /** Parse the JSON body (application/json; text/plain only when `allowText`). */
   json(opts?: { allowText?: boolean; maxBytes?: number }): Promise<unknown>
 }
@@ -80,7 +87,10 @@ export function route<P = Record<string, never>>(
         ip: clientIp(req),
         user: () => (userP ??= userFromRequest(svc.db, req)),
         requireUser: async () => requireUser(await call.user()),
-        requireAdmin: async () => requireAdminUser(await call.user()),
+        requireRole: async (min) => requireRoleUser(await call.user(), min),
+        requireCurator: async () => requireRoleUser(await call.user(), 'curator'),
+        requireAdmin: async () => requireRoleUser(await call.user(), 'admin'),
+        requireMaster: async () => requireRoleUser(await call.user(), 'master'),
         async json({ allowText = false, maxBytes = 1024 * 1024 } = {}) {
           const ct = req.headers.get('content-type') ?? ''
           const isJson = ct.includes('application/json') || ct.includes('+json')

@@ -12,8 +12,10 @@ export type FrameStyleId =
   | 'white'
   | 'natural-wood'
   | 'dark-wood'
+  | 'brass-slim'
+  | 'float-walnut'
 
-export type FrameMaterialKind = 'none' | 'paint' | 'oak' | 'walnut'
+export type FrameMaterialKind = 'none' | 'paint' | 'oak' | 'walnut' | 'brass'
 
 export interface FrameStyle {
   /** Visible moulding face width. 0 = frameless. */
@@ -104,6 +106,32 @@ export const FRAME_STYLES: Record<FrameStyleId, FrameStyle> = {
     color: '#4a3326',
     roughness: 0.5,
     matColor: '#f4efe5',
+    backingDepth: 0.01,
+    backingColor: '#e8e2d6',
+  },
+  /** Slim brushed-brass moulding with a wide warm mat — for small precious studies. */
+  'brass-slim': {
+    frameWidth: 0.018,
+    frameDepth: 0.03,
+    matWidth: 0.08,
+    recess: 0.01,
+    material: 'brass',
+    color: '#b08d57',
+    roughness: 0.38,
+    matColor: '#f5f1e8',
+    backingDepth: 0.01,
+    backingColor: '#e8e2d6',
+  },
+  /** Deep walnut shadow-box: the textile floats on a linen board well behind the frame face. */
+  'float-walnut': {
+    frameWidth: 0.028,
+    frameDepth: 0.075,
+    matWidth: 0.06,
+    recess: 0.05,
+    material: 'walnut',
+    color: '#4a3326',
+    roughness: 0.5,
+    matColor: '#e9e1d2',
     backingDepth: 0.01,
     backingColor: '#e8e2d6',
   },

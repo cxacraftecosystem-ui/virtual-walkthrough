@@ -14,7 +14,8 @@ const COLLECTIONS: { id: ContentCollection; label: string }[] = [
 type Tab = ContentCollection | 'texts'
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/
 
-export function ContentPage() {
+/** `canReset`: admins only (curators edit items but cannot bulk-reset). */
+export function ContentPage({ canReset = false }: { canReset?: boolean }) {
   const [tab, setTab] = useState<Tab>('artworks')
   const [counts, setCounts] = useState<Partial<Record<ContentCollection, number>>>({})
   const [version, setVersion] = useState<number | null>(null)
@@ -57,7 +58,7 @@ export function ContentPage() {
           <p className="muted">Changes are live for new museum visits as soon as they are saved{version !== null ? ` · content version ${version}` : ''}.</p>
         </div>
         <div className="spacer" />
-        <button className="btn danger small" onClick={reset}>Reset to bundled defaults…</button>
+        {canReset && <button className="btn danger small" onClick={reset}>Reset to bundled defaults…</button>}
       </div>
       <nav className="tabs subtabs" aria-label="Collections">
         {COLLECTIONS.map((c) => (

@@ -1,0 +1,126 @@
+# Push-to-deploy on Vercel (prebuilt): main → production, pull requests → preview.
+#
+# Repository secrets (Settings → Secrets and variables → Actions):
+#   VERCEL_TOKEN       a scoped token from https://vercel.com/account/tokens
+#   VERCEL_ORG_ID      .vercel/project.json → orgId       (after `vercel link`)
+#   VERCEL_PROJECT_ID  .vercel/project.json → projectId
+#   DATABASE_URL       Supabase SESSION pooler / direct URL (port 5432) — used only for migrations
+# Runtime configuration (DATABASE_URL pooled, S3, ADMIN_*, GOOGLE_*) lives in the Vercel project env.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  VERCEL_CLI: vercel@59
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  verify:
+    name: typecheck + lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+
+  migrate:
+    name: database migrations (production)
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    concurrency: db-migrate-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: npm run db:migrate (schema only; the app seeds content/admin on first request)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_ENV: production
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "::error::DATABASE_URL secret is not set"; exit 1; fi
+          npm run db:migrate -- --schema-only
+
+  production:
+    name: deploy production
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [verify, migrate]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: vercel-production
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx --yes $VERCEL_CLI pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - run: npx --yes $VERCEL_CLI build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - id: deploy
+        run: |
+          url="$(npx --yes $VERCEL_CLI deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Production: $url" >> "$GITHUB_STEP_SUMMARY"
+      - name: smoke test
+        run: |
+          for i in 1 2 3 4 5; do
+            if curl -fsS "${{ steps.deploy.outputs.url }}/api/health" | tee /dev/stderr | grep -q '"db":"postgres"'; then exit 0; fi
+            sleep 5
+          done
+          echo "::warning::health check did not report db=postgres"
+
+  preview:
+    name: deploy preview
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: verify
+    runs-on: ubuntu-latest
+    concurrency:
+      group: vercel-preview-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx --yes $VERCEL_CLI pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+      - run: npx --yes $VERCEL_CLI build --token=${{ secrets.VERCEL_TOKEN }}
+      - id: deploy
+        run: |
+          url="$(npx --yes $VERCEL_CLI deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview: $url" >> "$GITHUB_STEP_SUMMARY"
+      - name: comment preview URL
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `Preview deployment: ${{ steps.deploy.outputs.url }}`,
+            })

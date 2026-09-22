@@ -18,13 +18,13 @@ import { useMuseum } from '../state/store'
 const DEG = Math.PI / 180
 
 /** Unit vector pointing TOWARD the sun. Azimuth: 0 = north(-z), 90 = east(+x). */
-export function sunDirection(elevationDeg = LIGHTING.sun.elevationDeg, azimuthDeg = LIGHTING.sun.azimuthDeg) {
+export function sunDirection(elevationDeg: number = LIGHTING.sun.elevationDeg, azimuthDeg: number = LIGHTING.sun.azimuthDeg) {
   const el = elevationDeg * DEG
   const az = azimuthDeg * DEG
   return new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)).normalize()
 }
 
-const SUN_TARGET = new THREE.Vector3(0, 0, (KEY.gzNorth + 4.8) / 2)
+const SUN_TARGET = new THREE.Vector3(0, 0, KEY.gzNorth / 2)
 
 function useSky() {
   return useMemo(() => {
@@ -60,6 +60,7 @@ export function SkyAndSun() {
   const light = useRef<THREE.DirectionalLight>(null)
   const gl = useThree((s) => s.gl)
   const dir = useMemo(() => sunDirection(), [])
+  const timeOfDay = useMuseum((s) => s.timeOfDay)
   const target = useMemo(() => {
     const o = new THREE.Object3D()
     o.position.copy(SUN_TARGET)
@@ -90,6 +91,24 @@ export function SkyAndSun() {
     gl.shadowMap.needsUpdate = true
   }, [preset.shadowMapSize, target, gl])
 
+  // Time of day: move the sun (direction, colour, intensity) and re-tune the atmosphere.
+  useEffect(() => {
+    const p = LIGHTING.timeOfDay[timeOfDay]
+    dir.copy(sunDirection(p.elevationDeg, p.azimuthDeg))
+    const u = (sky.material as THREE.ShaderMaterial).uniforms
+    u.sunPosition.value.copy(dir)
+    u.turbidity.value = p.turbidity
+    u.rayleigh.value = p.rayleigh
+    u.skyExposure.value = p.skyExposure
+    const l = light.current
+    if (l) {
+      l.intensity = p.intensity
+      l.color.set(kelvinToHex(p.colorK))
+      l.position.copy(dir.clone().multiplyScalar(45).add(target.position))
+    }
+    requestShadowRefresh(4)
+  }, [timeOfDay, dir, sky, target])
+
   // The shadow frustum (30 m square) follows the wing the visitor is in, so every wing
   // gets crisp sun shadows without an enormous shadow map. Re-rendered only on change.
   const currentZone = useRef<string>('')
@@ -104,6 +123,18 @@ export function SkyAndSun() {
       const c = main || !zone ? SUN_TARGET : new THREE.Vector3((zone.rect.minX + zone.rect.maxX) / 2, 0, (zone.rect.minZ + zone.rect.maxZ) / 2)
       target.position.copy(c)
       target.updateMatrixWorld()
+      // Size the orthographic shadow frustum to the space (+ margin for the oblique sun).
+      const l = light.current
+      if (l) {
+        const rect = zone?.rect ?? { minX: -KEY.gx, maxX: KEY.gx, minZ: KEY.gzNorth, maxZ: 0 }
+        const half = main ? Math.max(KEY.gx, -KEY.gzNorth / 2) + 6 : Math.max(rect.maxX - rect.minX, rect.maxZ - rect.minZ) / 2 + 6
+        const cam = l.shadow.camera
+        cam.left = -half
+        cam.right = half
+        cam.top = half
+        cam.bottom = -half
+        cam.updateProjectionMatrix()
+      }
       light.current?.position.copy(dir.clone().multiplyScalar(45).add(c))
       requestShadowRefresh()
     }

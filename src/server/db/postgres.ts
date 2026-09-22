@@ -43,9 +43,21 @@ export class PostgresDb implements Db {
 
   constructor(opts: PgOptions) {
     const local = /@(localhost|127\.0\.0\.1)[:/]/.test(opts.connectionString)
-    const sslMode = opts.ssl ?? (local ? 'disable' : 'require')
+    // pg-connection-string maps `sslmode=require` to full certificate verification (which fails on
+    // Supabase's chain), so the URL's sslmode is taken out and applied by us instead.
+    let connectionString = opts.connectionString
+    let urlSslMode: string | undefined
+    try {
+      const u = new URL(connectionString)
+      urlSslMode = u.searchParams.get('sslmode') ?? undefined
+      for (const k of ['sslmode', 'uselibpqcompat']) u.searchParams.delete(k)
+      connectionString = u.toString()
+    } catch {
+      /* not a URL (key=value DSN) → leave as is */
+    }
+    const sslMode = opts.ssl || (urlSslMode && ['disable', 'verify-full'].includes(urlSslMode) ? urlSslMode : undefined) || (local && !urlSslMode ? 'disable' : 'require')
     this.pool = new pg.Pool({
-      connectionString: opts.connectionString,
+      connectionString,
       // Supabase presents a certificate chain not in Node's default store; encryption is still enforced.
       ssl: sslMode === 'disable' ? false : { rejectUnauthorized: sslMode === 'verify-full' },
       max: opts.max ?? 5,

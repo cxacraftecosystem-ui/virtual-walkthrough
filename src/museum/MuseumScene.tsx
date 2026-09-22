@@ -8,12 +8,16 @@ import { ExteriorGround, Floor } from './architecture/Floor'
 import { Reception } from './architecture/Reception'
 import { Wall } from './architecture/Wall'
 import { Wings } from './architecture/Wings'
+import { WallDecor } from './architecture/WallDecor'
 import { ARTWORKS } from './config/artworks'
 import { EXHIBITS } from './config/exhibits'
-import { WALLS } from './config/layout'
+import { SURFACES, WALLS } from './config/layout'
+import { INFOGRAPHICS } from './config/infographics'
 import { DebugScene } from './debug/DebugScene'
 import { PostFX } from './effects/PostFX'
 import { Precompile } from './effects/Precompile'
+import { StaticMerge } from './effects/StaticMerge'
+import { ZoneCuller, ZoneGroup } from './navigation/zoneCulling'
 import { Artwork } from './exhibits/Artwork'
 import { Exhibit } from './exhibits/Exhibit'
 import { ProductWall, RevealWallTitle } from './exhibits/WallGraphics'
@@ -37,18 +41,22 @@ const occlude = () => {}
 function Architecture() {
   return (
     <group onClick={occlude} onPointerOver={occlude}>
-      {WALLS.filter((w) => w.render !== false).map((w) => (
-        <Wall key={w.id} wall={w} />
-      ))}
+      {/* static shell: merged into one mesh per material (a handful of draw calls) */}
+      <StaticMerge name="shell">
+        {WALLS.filter((w) => w.render !== false).map((w) => (
+          <Wall key={w.id} wall={w} />
+        ))}
+        <CeilingAndRoof />
+        <Reception />
+        {RAILS.map((r) => (
+          <TrackRail key={r.id} rail={r} />
+        ))}
+        <Benches />
+      </StaticMerge>
       <Wings />
+      <WallDecor />
       <Floor />
       <ExteriorGround />
-      <CeilingAndRoof />
-      <Reception />
-      {RAILS.map((r) => (
-        <TrackRail key={r.id} rail={r} />
-      ))}
-      <Benches />
     </group>
   )
 }
@@ -57,15 +65,23 @@ function Content() {
   return (
     <group>
       {ARTWORKS.map((a) => (
-        <Artwork key={a.id} config={a} />
+        <ZoneGroup key={a.id} zones={[SURFACES[a.placement.surface]?.zone ?? 'reveal']}>
+          <Artwork config={a} />
+        </ZoneGroup>
       ))}
       {EXHIBITS.map((e) => (
-        <ErrorBoundary key={e.id} fallback={null}>
-          <Exhibit exhibit={e} />
-        </ErrorBoundary>
+        <ZoneGroup key={e.id} zones={[SURFACES[e.placement.surface]?.zone ?? 'reveal']}>
+          <ErrorBoundary fallback={null}>
+            <Exhibit exhibit={e} />
+          </ErrorBoundary>
+        </ZoneGroup>
       ))}
-      <RevealWallTitle />
-      <ProductWall />
+      <ZoneGroup zones={['reveal', 'passage', 'reception']}>
+        <RevealWallTitle />
+      </ZoneGroup>
+      <ZoneGroup zones={[...new Set(INFOGRAPHICS.map((i) => SURFACES[i.placement.surface]?.zone ?? 'reveal'))]}>
+        <ProductWall />
+      </ZoneGroup>
     </group>
   )
 }
@@ -75,6 +91,7 @@ export function MuseumScene() {
   return (
     <>
       <VisitorController />
+      <ZoneCuller />
       <Lighting />
       <Architecture />
       <Suspense fallback={null}>

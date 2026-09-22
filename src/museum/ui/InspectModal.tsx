@@ -225,8 +225,8 @@ export function InspectModal() {
   const obj = shown.type === 'object' ? shown.obj : null
   const artwork = ex ? getArtwork(ex.artworkId) : undefined
   const isPlaceholder = ex ? !!ex.placeholder || !ex.model : !!obj?.placeholder
-  const ZONE: Record<SceneObjectConfig['zone'], string> = { atrium: 'Grand Atrium', theatre: 'Immersive Theatre', workshop: 'Craft Workshop', courtyard: 'Dye Garden' }
-  const eyebrow = ex ? ex.tradition : obj ? ZONE[obj.zone] : ''
+  const ZONE: Partial<Record<SceneObjectConfig['zone'], string>> = { atrium: 'Grand Atrium', theatre: 'Immersive Theatre', workshop: 'Craft Workshop', courtyard: 'Dye Garden', reveal: 'Craft Court', 'gallery-d': 'Gallery D' }
+  const eyebrow = ex ? ex.tradition : obj ? (ZONE[obj.zone] ?? '') : ''
   const title = ex?.title ?? obj?.title ?? ''
   const description = ex?.description ?? obj?.description
   const facts: [string, string | undefined][] = ex

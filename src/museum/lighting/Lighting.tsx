@@ -104,7 +104,7 @@ export function Lighting() {
           <AreaLight position={[KEY.gx - covInset, H - 0.06, galleryMidZ]} dir={[0.8, -1, 0]} lengthAxis={ALONG_Z} width={0.16} height={-KEY.gzNorth - 0.4} intensity={LIGHTING.cove.intensity * 6} color={COVE} />
           <AreaLight position={[0, H - 0.06, KEY.gzNorth + covInset]} dir={[0, -1, -0.8]} lengthAxis={ALONG_X} width={0.16} height={KEY.gx * 2 - 0.4} intensity={LIGHTING.cove.intensity * 6} color={COVE} />
           {/* Reception: soft luminous ceiling */}
-          <AreaLight position={[0, MUSEUM.reception.ceilingHeight - 0.02, KEY.rzNorth + MUSEUM.reception.length / 2]} dir={SKY_DOWN} lengthAxis={ALONG_Z} width={1.2} height={3.2} intensity={3.2} color={kelvinToHex(3000, 0.35)} />
+          <AreaLight position={[0, MUSEUM.reception.ceilingHeight - 0.02, KEY.rzNorth + MUSEUM.reception.length / 2]} dir={SKY_DOWN} lengthAxis={ALONG_Z} width={MUSEUM.reception.width * 0.45} height={MUSEUM.reception.length * 0.7} intensity={3.2} color={kelvinToHex(3000, 0.35)} />
         </>
       )}
     </>

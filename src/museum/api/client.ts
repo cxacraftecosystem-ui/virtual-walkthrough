@@ -14,7 +14,8 @@ import type { ContentCollection, ExhibitionText, MuseumContent } from '../conten
 /* Types                                                               */
 /* ------------------------------------------------------------------ */
 
-export type Role = 'visitor' | 'admin'
+/** visitor < curator (content + media) < admin (+ moderation, analytics, users) < master (+ access list) */
+export type Role = 'visitor' | 'curator' | 'admin' | 'master'
 
 export interface User {
   id: string
@@ -183,6 +184,8 @@ export const api = {
     register: (email: string, password: string, displayName: string) =>
       request<User>('POST', '/auth/register', { email, password, displayName }),
     login: (email: string, password: string) => request<User>('POST', '/auth/login', { email, password }),
+    /** Exchange a Google Identity Services ID token for a session. */
+    google: (credential: string) => request<User>('POST', '/auth/google', { credential }),
     logout: () => request<{ ok: true }>('POST', '/auth/logout'),
     /** Current user, or null when not signed in (uses /auth/session: always 200, no console error). */
     me: async (): Promise<User | null> => {

@@ -11,6 +11,9 @@ import { useAmbientAudio } from './audio'
 import { AuthModal } from './AuthModal'
 import { SocialDrawer } from './Social'
 import { TourOverlay } from '../tour/TourOverlay'
+import { tour, useTour } from '../tour/engine'
+import { PhotoMode, capturePhoto, exitPhotoMode, togglePhotoMode, usePhoto } from './PhotoMode'
+import { cycleTimeOfDay, useTimeOfDayPersistence } from './timeOfDay'
 import { initSocial } from '../api/social'
 import { startAnalytics } from '../analytics/tracker'
 import { isCoarsePointer } from './HelpOverlay'
@@ -31,10 +34,23 @@ function useShortcuts() {
       // The 3D inspection viewer owns the keyboard while open.
       if (s.inspecting) return
 
+      // Photo mode: only its own keys (walking / looking keep working).
+      if (usePhoto.getState().on) {
+        if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') exitPhotoMode()
+        else if (e.key === 'Enter') void capturePhoto()
+        else if (e.key === 't' || e.key === 'T') cycleTimeOfDay()
+        else return
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      }
+
       switch (e.key) {
         case 'Escape':
+          // Innermost first: help → item panel → guided tour.
           if (s.helpOpen) s.setHelpOpen(false)
           else if (s.selection) s.select(null)
+          else if (useTour.getState().active) tour.exit()
           else return
           break
         case 'h':
@@ -50,6 +66,14 @@ function useShortcuts() {
         case 'L':
           if (isCoarsePointer()) return
           s.setMouseLook(!s.mouseLook)
+          break
+        case 'p':
+        case 'P':
+          togglePhotoMode()
+          break
+        case 't':
+        case 'T':
+          cycleTimeOfDay()
           break
         case 'e':
         case 'E':
@@ -88,14 +112,16 @@ function Crosshair() {
 export function UIOverlay() {
   useAmbientAudio()
   useShortcuts()
+  useTimeOfDayPersistence()
   usePointerLockSync()
   useEffect(() => {
     // Backend probe → social features; anonymous analytics (both no-ops on a static host).
     void initSocial()
     startAnalytics()
   }, [])
+  const photo = usePhoto((s) => s.on)
   return (
-    <div className="ui-root">
+    <div className={`ui-root${photo ? ' is-photo' : ''}`}>
       <HUD />
       <Minimap />
       <ProximityPrompt />
@@ -106,6 +132,7 @@ export function UIOverlay() {
       <HelpOverlay />
       <Crosshair />
       <AuthModal />
+      <PhotoMode />
       <TravelFade />
       <EntryScreen />
     </div>

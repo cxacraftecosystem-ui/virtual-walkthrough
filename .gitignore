@@ -22,3 +22,6 @@ next-env.d.ts
 # Google OAuth client secrets — never commit
 client_secret_*.json
 *.apps.googleusercontent.com.json
+
+# Supabase CLI local state
+supabase/.temp/

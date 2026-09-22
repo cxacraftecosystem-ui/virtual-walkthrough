@@ -123,7 +123,14 @@ function SkylightLantern() {
     return out
   }, [len])
 
-  const paneGeo = useMemo(() => new THREE.BoxGeometry(paneW, 0.012, len), [paneW, len])
+  // Glass is a single plane lifted clear of the glazing bars (a thin box intersecting the
+  // bars z-fought and flickered when visitors looked up).
+  const paneGeo = useMemo(() => {
+    const g = new THREE.PlaneGeometry(paneW, len)
+    g.rotateX(-Math.PI / 2)
+    return g
+  }, [paneW, len])
+  const GLASS_LIFT = 0.045
   const barGeo = useMemo(() => new THREE.BoxGeometry(paneW, 0.05, 0.04), [paneW])
   const ridgeGeo = useMemo(() => new THREE.BoxGeometry(0.06, 0.06, len), [len])
   const beamGeo = useMemo(() => new THREE.BoxGeometry(sk.width + wellT * 2, 0.2, 0.08), [])
@@ -143,7 +150,7 @@ function SkylightLantern() {
           key={side}
           geometry={paneGeo}
           material={m.glass}
-          position={[(side * SW) / 2, top + rise / 2, midZ]}
+          position={[(side * SW) / 2, top + rise / 2 + GLASS_LIFT, midZ]}
           rotation={[0, 0, -side * slope]}
           renderOrder={5}
           raycast={() => null}

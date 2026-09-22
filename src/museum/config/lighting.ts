@@ -23,6 +23,16 @@ export const LIGHTING = {
     colorK: 5600,
   },
 
+  /**
+   * Time-of-day presets (visitor-selectable). Each overrides the sun and part of the sky;
+   * `midday` equals the defaults above.
+   */
+  timeOfDay: {
+    morning: { elevationDeg: 22, azimuthDeg: 96, intensity: 3.3, colorK: 4400, turbidity: 4.2, rayleigh: 1.6, skyExposure: 0.5 },
+    midday: { elevationDeg: 58, azimuthDeg: 118, intensity: 4.4, colorK: 5600, turbidity: 3.2, rayleigh: 1.05, skyExposure: 0.55 },
+    golden: { elevationDeg: 11, azimuthDeg: 252, intensity: 3.1, colorK: 3200, turbidity: 6.5, rayleigh: 2.6, skyExposure: 0.46 },
+  },
+
   sky: {
     turbidity: 3.2,
     rayleigh: 1.05,

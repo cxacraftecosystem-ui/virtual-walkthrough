@@ -186,6 +186,22 @@ export const IconNarration = (p: P) => (
 )
 
 /** Stylised carved-block rosette used as an ornament. */
+/** Time of day: a sun. */
+export const IconSun = (p: P) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="3.6" />
+    <path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6L18 18M6 18l1.4-1.4M16.6 7.4L18 6" />
+  </Svg>
+)
+
+/** Photo mode: a camera. */
+export const IconCamera = (p: P) => (
+  <Svg {...p}>
+    <path d="M4 8.5h3.2l1.6-2.3h6.4l1.6 2.3H20v10H4z" />
+    <circle cx="12" cy="13.3" r="3.3" />
+  </Svg>
+)
+
 export const Rosette = (p: P) => (
   <Svg viewBox="0 0 48 48" strokeWidth={1} {...p}>
     <circle cx="24" cy="24" r="21" />

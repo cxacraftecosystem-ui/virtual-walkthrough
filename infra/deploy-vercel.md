@@ -4,7 +4,10 @@ The app is a standard Next.js (App Router) project: the museum and `/admin` are 
 `/api/*` endpoint and `/media/*` are Route Handlers running as Vercel Node.js functions.
 No `vercel.json` is required (function limits are set per route with `export const maxDuration`).
 
-> Nothing here has been run. `vercel link`, `vercel env add` and `vercel deploy` change cloud state — confirm first.
+> `vercel link`, `vercel env add` and `vercel deploy` change cloud state — confirm first. The project
+> `hand-block-museum` has been created and linked, and its env vars are set; CI deploys via
+> `.github/workflows/deploy.yml` (prebuilt: `vercel pull` → `vercel build` → `vercel deploy --prebuilt`).
+> A new CLI-created project defaults to framework "Other": `vercel.json` pins `framework: nextjs` and region `bom1`.
 
 ## Prerequisites
 
@@ -19,6 +22,9 @@ No `vercel.json` is required (function limits are set per route with `export con
 | `DATABASE_URL` | yes | Supabase *transaction pooler* URI (port 6543) |
 | `ADMIN_EMAIL` | yes | first admin; created on first request |
 | `ADMIN_PASSWORD` | yes | re-synced on cold start when both admin vars are set |
+| `MASTER_ADMIN_EMAILS` | recommended | comma-separated master admins (manage the access list); fallback `MASTER_ADMIN_EMAIL`, then `ADMIN_EMAIL` |
+| `GOOGLE_CLIENT_ID` | no | enables "Sign in with Google" (add the production origin to the OAuth client's *Authorised JavaScript origins*) |
+| `GOOGLE_CLIENT_SECRET` | no | unused by the ID-token flow; kept for a future code flow |
 | `S3_BUCKET` | yes | `hbp-museum-media` |
 | `AWS_REGION` | yes | `ap-south-1` |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | yes | least-privilege IAM user from `setup-s3.sh` |

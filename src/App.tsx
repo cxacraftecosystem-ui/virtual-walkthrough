@@ -1,10 +1,10 @@
 import { PerformanceMonitor } from '@react-three/drei'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
 import { useEffect, useState } from 'react'
 import * as THREE from 'three'
 import { LIGHTING } from './museum/config/lighting'
 import { MUSEUM } from './museum/config/museum'
-import { QUALITY_ORDER, QUALITY_PRESETS, withDevOverrides } from './museum/config/quality'
+import { autoCeiling, QUALITY_ORDER, QUALITY_PRESETS, withDevOverrides } from './museum/config/quality'
 import { DebugOverlay } from './museum/debug/DebugOverlay'
 import { MuseumScene } from './museum/MuseumScene'
 import { useMuseum } from './museum/state/store'
@@ -17,30 +17,57 @@ import { ErrorBoundary } from './museum/utils/ErrorBoundary'
 // Small automation/debug handle (used by scripts/screenshots.mjs and handy in the console).
 declare global {
   interface Window {
-    __museum?: { teleport: typeof teleport; visitor: typeof visitor; store: typeof useMuseum }
+    __museum?: { teleport: typeof teleport; visitor: typeof visitor; store: typeof useMuseum; gl?: THREE.WebGLRenderer }
   }
 }
 window.__museum = { teleport, visitor, store: useMuseum }
 
-/** In "auto" quality, step down a tier when the frame rate stays low after entering. */
+/**
+ * Adaptive quality ("auto"):
+ *  • continuous resolution scaling inside the tier's DPR range (no reload, every ~1 s),
+ *  • step UP a tier when the device holds the display's refresh rate with headroom,
+ *  • step DOWN when it can't hold ~32 fps.
+ * Tier changes rebuild the renderer (~1–2 s), so they are rationed: at most 3 per session,
+ * never above the device-class ceiling, and never back up after a step down (no ping-pong).
+ */
+const adaptive = { changes: 0, declined: false }
+
 function AdaptiveQuality() {
   const quality = useMuseum((s) => s.quality)
   const phase = useMuseum((s) => s.phase)
+  const tier = useMuseum((s) => s.tier)
+  const setDpr = useThree((s) => s.setDpr)
   const [armed, setArmed] = useState(false)
   useEffect(() => {
     if (phase !== 'entered') return
-    const t = setTimeout(() => setArmed(true), 4000)
+    const t = setTimeout(() => setArmed(true), 5000)
     return () => clearTimeout(t)
-  }, [phase])
+  }, [phase, tier])
   if (quality !== 'auto' || !armed) return null
+  const [lo, hi] = QUALITY_PRESETS[tier].dpr
+  const deviceMax = Math.min(hi, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
   return (
     <PerformanceMonitor
-      bounds={() => [32, 58]}
-      flipflops={2}
+      ms={400}
+      iterations={6}
+      bounds={(refresh) => [Math.min(34, refresh * 0.55), Math.max(55, refresh * 0.95)]}
+      flipflops={4}
+      onChange={({ factor }) => setDpr(Math.round((lo + (Math.max(lo, deviceMax) - lo) * factor) * 20) / 20)}
+      onIncline={() => {
+        const st = useMuseum.getState()
+        const i = QUALITY_ORDER.indexOf(st.tier)
+        const ceiling = QUALITY_ORDER.indexOf(autoCeiling())
+        if (adaptive.declined || adaptive.changes >= 3 || i >= ceiling) return
+        adaptive.changes++
+        st.setTier(QUALITY_ORDER[i + 1])
+      }}
       onDecline={() => {
-        const { tier, setTier } = useMuseum.getState()
-        const i = QUALITY_ORDER.indexOf(tier)
-        if (i > 0) setTier(QUALITY_ORDER[i - 1])
+        const st = useMuseum.getState()
+        const i = QUALITY_ORDER.indexOf(st.tier)
+        if (i <= 0 || adaptive.changes >= 3) return
+        adaptive.changes++
+        adaptive.declined = true
+        st.setTier(QUALITY_ORDER[i - 1])
       }}
     />
   )
@@ -93,6 +120,7 @@ export default function App() {
             }}
             camera={{ fov: MUSEUM.visitor.fov, near: 0.05, far: 3000, position: [s.x, MUSEUM.visitor.eyeHeight, s.z] }}
             onCreated={({ gl }) => {
+              if (window.__museum) window.__museum.gl = gl
               const canvas = gl.domElement
               let restored = false
               canvas.addEventListener('webglcontextrestored', () => {

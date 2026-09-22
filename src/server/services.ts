@@ -4,7 +4,7 @@
  * reloads and warm serverless invocations reuse them.
  */
 import 'server-only'
-import { purgeExpiredSessions, seedAdmin } from './auth'
+import { purgeExpiredSessions, seedAdmin, syncMasterEntries, syncStaffRoles } from './auth'
 import { config } from './config'
 import { isSeeded, readSeed, seedContent } from './contentStore'
 import { type Db, getDb, migratePostgres } from './db'
@@ -15,7 +15,7 @@ export interface Services {
   storage: StorageDriver
 }
 
-const g = globalThis as { __museumStorage?: StorageDriver; __museumReady?: Promise<void> }
+const g = globalThis as { __museumStorage?: StorageDriver; __museumReady?: Promise<void>; __museumReadyDb?: Db }
 
 export function getStorage(): StorageDriver {
   g.__museumStorage ??= config.s3Bucket
@@ -42,6 +42,8 @@ async function bootstrap(db: Db) {
       if (v !== null) log(`seeded content from bundled config (version ${v})`)
     }
     await seedAdmin(db, log)
+    await syncMasterEntries(db)
+    await syncStaffRoles(db)
     await purgeExpiredSessions(db)
   } catch (err) {
     const msg = (err as Error).message
@@ -55,7 +57,8 @@ async function bootstrap(db: Db) {
 /** Resolves once bootstrap has finished; a failed bootstrap is retried on the next call. */
 export async function services(): Promise<Services> {
   const db = getDb()
-  if (!g.__museumReady) {
+  if (!g.__museumReady || g.__museumReadyDb !== db) {
+    g.__museumReadyDb = db
     g.__museumReady = bootstrap(db)
     g.__museumReady.catch((err) => {
       console.error('[museum] bootstrap failed:', (err as Error).message)

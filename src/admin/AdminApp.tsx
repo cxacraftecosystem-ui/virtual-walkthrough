@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { api, ApiError, type User } from './api'
+import { googleSignedOut } from '../museum/api/google'
+import { api, ApiError, can, ROLE_LABEL, type Role, type User } from './api'
+import { AccessPage } from './pages/AccessPage'
 import { AnalyticsPage } from './pages/AnalyticsPage'
 import { CommentsPage } from './pages/CommentsPage'
 import { ContentPage } from './pages/ContentPage'
@@ -9,13 +11,15 @@ import { LoginPage } from './pages/LoginPage'
 import { MediaPage } from './pages/MediaPage'
 import { ToastProvider } from './ui'
 
-const PAGES = [
-  { id: 'content', label: 'Content' },
-  { id: 'media', label: 'Media' },
-  { id: 'analytics', label: 'Analytics' },
-  { id: 'comments', label: 'Comments' },
-] as const
-type PageId = (typeof PAGES)[number]['id']
+/** Sections and the minimum role that sees them (the server enforces the same rules). */
+const PAGES: { id: PageId; label: string; min: Role; masterLabel?: string }[] = [
+  { id: 'content', label: 'Content', min: 'curator' },
+  { id: 'media', label: 'Media', min: 'curator' },
+  { id: 'analytics', label: 'Analytics', min: 'admin' },
+  { id: 'comments', label: 'Comments', min: 'admin' },
+  { id: 'access', label: 'Users', min: 'admin', masterLabel: 'Access' },
+]
+type PageId = 'content' | 'media' | 'analytics' | 'comments' | 'access'
 
 function pageFromHash(): PageId {
   const h = window.location.hash.replace(/^#\/?/, '').split('/')[0]
@@ -49,6 +53,7 @@ export function AdminApp() {
 
   const logout = useCallback(async () => {
     await api.logout().catch(() => undefined)
+    googleSignedOut()
     setUser(null)
   }, [])
 
@@ -58,13 +63,14 @@ export function AdminApp() {
       <LoginPage onLogin={setUser} notice={bootError} />
     </ToastProvider>
   )
-  if (user.role !== 'admin') {
+  if (!can(user, 'curator')) {
     return (
       <div className="adm-center">
         <div className="card narrow">
-          <h1 className="display">Not an administrator</h1>
+          <h1 className="display">No staff access</h1>
           <p className="muted">
-            You are signed in as {user.email}, which is a visitor account. Sign in with an admin account to manage the museum.
+            You are signed in as {user.email}, which is a visitor account. Ask the museum&apos;s master admin to add your email (or your
+            organisation&apos;s domain) to the access list, then sign in again — with Google, so your address is verified.
           </p>
           <div className="row">
             <button className="btn" onClick={logout}>Sign out</button>
@@ -75,6 +81,10 @@ export function AdminApp() {
     )
   }
 
+  const visible = PAGES.filter((p) => can(user, p.min))
+  const current = visible.find((p) => p.id === page)?.id ?? 'content'
+  const isMaster = user.role === 'master'
+
   return (
     <ToastProvider>
       <div className="adm">
@@ -84,23 +94,26 @@ export function AdminApp() {
             <span className="display">Museum Admin</span>
           </div>
           <nav className="tabs" aria-label="Sections">
-            {PAGES.map((p) => (
-              <a key={p.id} href={`#/${p.id}`} className={page === p.id ? 'tab active' : 'tab'} aria-current={page === p.id ? 'page' : undefined}>
-                {p.label}
+            {visible.map((p) => (
+              <a key={p.id} href={`#/${p.id}`} className={current === p.id ? 'tab active' : 'tab'} aria-current={current === p.id ? 'page' : undefined}>
+                {isMaster && p.masterLabel ? p.masterLabel : p.label}
               </a>
             ))}
           </nav>
           <div className="who">
             <a className="btn ghost small" href="/" target="_blank" rel="noreferrer">Open museum ↗</a>
-            <span className="muted small" title={user.email}>{user.displayName}</span>
+            <span className="muted small" title={user.email}>
+              {user.displayName} · <span className={`badge role-${user.role}`}>{ROLE_LABEL[user.role]}</span>
+            </span>
             <button className="btn ghost small" onClick={logout}>Sign out</button>
           </div>
         </header>
         <main className="adm-main">
-          {page === 'content' && <ContentPage />}
-          {page === 'media' && <MediaPage />}
-          {page === 'analytics' && <AnalyticsPage />}
-          {page === 'comments' && <CommentsPage />}
+          {current === 'content' && <ContentPage canReset={can(user, 'admin')} />}
+          {current === 'media' && <MediaPage />}
+          {current === 'analytics' && <AnalyticsPage />}
+          {current === 'comments' && <CommentsPage />}
+          {current === 'access' && <AccessPage me={user} canManageAccess={isMaster} />}
         </main>
       </div>
     </ToastProvider>

@@ -132,19 +132,25 @@ export function HelpOverlay() {
 }
 
 function HintStrip({ entered, coarse, suppressed }: { entered: boolean; coarse: boolean; suppressed: boolean }) {
-  const [visible, setVisible] = useState(false)
+  // 'wait' → 'on' (1.3 s after entering) → 'done'. The display countdown only runs while the
+  // strip is actually visible, so entering straight into the guided tour (or next to an item)
+  // postpones the hint until the visitor takes over instead of silently losing it.
+  const [stage, setStage] = useState<'wait' | 'on' | 'done'>('wait')
 
   useEffect(() => {
     if (!entered) return
-    const a = window.setTimeout(() => setVisible(true), 1300)
-    const b = window.setTimeout(() => setVisible(false), 1300 + HINT_MS)
-    return () => {
-      window.clearTimeout(a)
-      window.clearTimeout(b)
-    }
+    const a = window.setTimeout(() => setStage((v) => (v === 'wait' ? 'on' : v)), 1300)
+    return () => window.clearTimeout(a)
   }, [entered])
 
-  const shown = visible && !suppressed
+  useEffect(() => {
+    if (stage !== 'on' || suppressed) return
+    const b = window.setTimeout(() => setStage('done'), HINT_MS)
+    return () => window.clearTimeout(b)
+  }, [stage, suppressed])
+
+  const shown = entered && stage === 'on' && !suppressed
+  const setVisible = (v: boolean) => setStage(v ? 'on' : 'done')
 
   const items = coarse
     ? [

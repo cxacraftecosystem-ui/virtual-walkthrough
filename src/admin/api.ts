@@ -1,7 +1,39 @@
 /** Admin API client (same-origin; session cookie). Contract: docs/API.md. */
 import type { ContentCollection, ExhibitionText, MuseumContent } from '../museum/content/types'
 
-export type Role = 'visitor' | 'admin'
+/** visitor < curator (content + media) < admin (+ comments, analytics, users) < master (+ access list) */
+export type Role = 'visitor' | 'curator' | 'admin' | 'master'
+const RANK: Record<Role, number> = { visitor: 0, curator: 1, admin: 2, master: 3 }
+/** Mirrors the server check (the server is authoritative; this only hides UI). */
+export const can = (user: Pick<User, 'role'> | null | undefined, min: Role) => !!user && (RANK[user.role] ?? 0) >= RANK[min]
+export const ROLE_LABEL: Record<Role, string> = { visitor: 'Visitor', curator: 'Curator', admin: 'Admin', master: 'Master admin' }
+export type ManualRole = 'visitor' | 'curator' | 'admin'
+export type AccessRole = 'curator' | 'admin'
+
+export interface AdminUser {
+  id: string
+  email: string
+  displayName: string
+  role: Role
+  manualRole: ManualRole | null
+  accessRole: AccessRole | null
+  emailVerified: boolean
+  google: boolean
+  hasPassword: boolean
+  isMaster: boolean
+  createdAt: string
+  lastLoginAt: string | null
+}
+export interface AccessEntry {
+  pattern: string
+  kind: 'email' | 'domain'
+  role: AccessRole
+  note: string
+  createdBy: string | null
+  createdAt: string
+  updatedAt: string
+  users: number
+}
 export interface User {
   id: string
   email: string
@@ -74,6 +106,7 @@ async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
 export const api = {
   me: () => req<User>('GET', '/api/auth/me'),
   login: (email: string, password: string) => req<User>('POST', '/api/auth/login', { email, password }),
+  google: (credential: string) => req<User>('POST', '/api/auth/google', { credential }),
   logout: () => req<{ ok: true }>('POST', '/api/auth/logout'),
 
   content: () => req<MuseumContent>('GET', '/api/content'),
@@ -93,6 +126,15 @@ export const api = {
   deleteComment: (id: string) => req<{ ok: true }>('DELETE', `/api/admin/comments/${id}`),
 
   summary: (days: number) => req<AnalyticsSummary>('GET', `/api/admin/analytics/summary?days=${days}`),
+
+  users: () => req<AdminUser[]>('GET', '/api/admin/users'),
+  setUserRole: (id: string, role: ManualRole) => req<AdminUser>('PATCH', `/api/admin/users/${encodeURIComponent(id)}`, { role }),
+
+  access: () => req<{ masters: string[]; entries: AccessEntry[] }>('GET', '/api/admin/access'),
+  putAccess: (pattern: string, role: AccessRole, note = '') => req<AccessEntry>('POST', '/api/admin/access', { pattern, role, note }),
+  patchAccess: (pattern: string, patch: { role?: AccessRole; note?: string }) =>
+    req<AccessEntry>('PATCH', `/api/admin/access/${encodeURIComponent(pattern)}`, patch),
+  deleteAccess: (pattern: string) => req<{ ok: true }>('DELETE', `/api/admin/access/${encodeURIComponent(pattern)}`),
 }
 
 /** XHR upload with progress (fetch has no upload progress). */

@@ -127,8 +127,35 @@ export function detectInitialTier(): QualityTier {
   const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory
   if (coarse && small) return 'low'
   if (coarse || (mem !== undefined && mem <= 4)) return 'medium'
+  const cls = gpuClass()
   // Integrated / mobile GPUs: start at Medium (measured ~55-60 fps on Iris Xe vs ~20 on High).
-  if (isIntegratedGPU()) return 'medium'
+  if (cls === 'integrated') return 'medium'
+  if (cls === 'flagship') return 'ultra'
+  return 'high'
+}
+
+export type GpuClass = 'integrated' | 'discrete' | 'flagship' | 'unknown'
+
+/** Coarse GPU class from the WebGL renderer string (used for the starting tier and the auto ceiling). */
+export function gpuClass(): GpuClass {
+  const r = gpuRenderer()
+  if (!r) return 'unknown'
+  if (/rtx\s?(20[6-9]0|30\d0|40\d0|50\d0)|rx\s?(6[7-9]\d0|7[6-9]\d0|9\d{3})|radeon pro w\d|apple m\d\s?(pro|max|ultra)|arc a7/i.test(r)) return 'flagship'
+  if (/nvidia|geforce|quadro|rtx|radeon rx|radeon pro|arc a|apple m\d/i.test(r)) return 'discrete'
+  if (isIntegratedGPU()) return 'integrated'
+  return 'unknown'
+}
+
+/**
+ * Highest tier "auto" may climb to on this device class. With vsync the frame rate
+ * saturates at the display refresh, so "holding 60 fps" says nothing about headroom on
+ * weak GPUs — integrated GPUs therefore stay at their starting tier (measured: Iris Xe
+ * holds 60 fps on Medium but ~20 fps on High), only discrete GPUs may climb.
+ */
+export function autoCeiling(): QualityTier {
+  const c = gpuClass()
+  if (c === 'flagship' || c === 'discrete') return 'ultra'
+  if (c === 'integrated') return 'medium'
   return 'high'
 }
 

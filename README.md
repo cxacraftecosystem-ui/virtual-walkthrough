@@ -235,7 +235,7 @@ same Next.js app also hosts a backend: editable content, a media library, visito
 ```bash
 npm install
 npm run dev            # http://localhost:3000        museum
-                       # http://localhost:3000/admin  admin (content, media, analytics, comments)
+                       # http://localhost:3000/admin  admin (content, media, analytics, comments, users/access)
 ```
 
 No configuration is needed locally: on the first API request the server creates
@@ -245,6 +245,47 @@ No configuration is needed locally: on the first API request the server creates
 the default `admin@museum.local` / `admin12345` is created and a warning is logged. When both are
 set, the account is created on first start and its password is re-synchronised from the env var on
 every (cold) start. In production (`NODE_ENV=production`) no default admin is ever created.
+
+### Roles & access list
+
+| Role | Admin sections | Can |
+|---|---|---|
+| visitor | — | favourites, guestbook/comments |
+| curator | Content, Media | create/edit/delete artworks, exhibits, infographics, videos, objects, exhibition & welcome text; upload/delete images, video, GLB |
+| admin | + Analytics, Comments, Users | + comment moderation, analytics, manual roles, reset content to bundled defaults |
+| master | + Access | + the access list. The emails in `MASTER_ADMIN_EMAILS` (comma-separated; fallback `MASTER_ADMIN_EMAIL`, then `ADMIN_EMAIL`) |
+
+Every admin Route Handler enforces the minimum role server-side (`c.requireCurator()` /
+`requireAdmin()` / `requireMaster()` in `src/server/http.ts`; 401 signed out, 403 too low); the admin UI
+only hides what the role cannot use.
+
+**Access list** (admin → *Access*, master only): emails (`person@iitkgp.ac.in`) or whole domains
+(`@iitkgp.ac.in`) with the role they grant (curator / admin). Unlisted people are visitors.
+The effective role is recomputed on every sign-in and whenever the list changes:
+`master` for a `MASTER_ADMIN_EMAILS` address, else **max(access-list role, manual role set on the Users page)**.
+The master addresses are mirrored into the access list (role `master`, read-only in the UI) on every
+start / `db:migrate`; removing an address from the env var removes its master row and rights.
+Production masters: `ankits1802@gmail.com`, `priyadarshi1@yahoo.com`, `priyadarshi.p@gmail.com` — they get
+master rights by signing in with Google (`ADMIN_EMAIL` = the first one also has a password login).
+Access-list roles only apply to **verified** addresses — people who signed in with Google (or the
+env-seeded admin) — because password sign-up does not verify email ownership. Staff should
+therefore sign in with Google at least once; afterwards password sign-in keeps the role too.
+
+### Google sign-in
+
+"Sign in with Google" (Google Identity Services) appears on `/admin` and in the museum's sign-in
+dialog when `GOOGLE_CLIENT_ID` is set (`GET /api/auth/providers`). The browser receives an ID token and
+posts it to `POST /api/auth/google`; the server verifies it against Google's JWKS with `jose`
+(signature, issuer, audience = client id, expiry, `email_verified`), finds or creates the user, sets
+the session cookie and applies the access list.
+
+Creating the OAuth client (manual — cannot be scripted without gcloud):
+1. Google Cloud Console → *APIs & Services* → *OAuth consent screen*: app name, support email,
+   audience *External* (or *Internal* for a Workspace org); scopes `openid`, `email`, `profile`.
+2. *Credentials* → *Create credentials* → *OAuth client ID* → type **Web application**.
+3. *Authorised JavaScript origins*: `http://localhost:3000` and every production origin, e.g.
+   `https://hand-block-museum.vercel.app` (+ custom domains). Redirect URIs are not needed (popup flow).
+4. Put the client id in `GOOGLE_CLIENT_ID` (`.env.local` and Vercel). Origins take a few minutes to apply.
 
 ### Two modes
 
@@ -257,9 +298,17 @@ every (cold) start. In production (`NODE_ENV=production`) no default admin is ev
 The mode is picked per concern: `DATABASE_URL` switches the database, `S3_BUCKET` switches storage.
 All variables are documented in `.env.example` (copy to `.env.local`).
 
+Production credentials can live in `.env.local` as `REMOTE_DATABASE_URL`, `REMOTE_S3_BUCKET`,
+`REMOTE_ADMIN_PASSWORD`, … — they are ignored unless `USE_REMOTE=1`, so `npm run dev` keeps using
+SQLite + local disk (important when several people share one dev server). Do **not** run
+`vercel env pull .env.local`: it would overwrite the file with plain `DATABASE_URL` etc. and switch
+local dev to the production database.
+
 ```bash
 npm run db:migrate     # apply supabase/migrations/*.sql to DATABASE_URL (or create the SQLite DB),
-                       # then seed content + admin if empty
+                       # then seed content + admin if empty and re-sync staff roles
+USE_REMOTE=1 npm run db:migrate          # same, against the REMOTE_* (production) settings
+npm run db:migrate -- --schema-only      # migrations only (CI)
 ```
 
 Setup guides (review before running — they create cloud resources):
@@ -274,9 +323,10 @@ app/admin/              admin page (client app in src/admin/)
 src/server/
   db/                   Db interface + PostgresDb (pg) + SqliteDb (node:sqlite) + migrations runner
   storage.ts            StorageDriver: LocalDiskStorage, S3Storage (presigned PUT)
-  auth.ts               scrypt passwords, DB-backed sessions (SHA-256 token hash), cookie helpers
+  auth.ts               scrypt passwords, DB-backed sessions (SHA-256 token hash), cookie helpers,
+                        roles (visitor < curator < admin < master), access-list role resolution
   contentStore.ts       content rows (JSON/jsonb) + version, seeding from bundledContent()
-  handlers/             content, auth, favorites, comments, analytics, media
+  handlers/             content, auth (+ Google), favorites, comments, analytics, media, users (+ access list)
   http.ts               route() wrapper: JSON errors, same-origin check, auth helpers
 supabase/migrations/    Postgres schema (used by `supabase db push` and `npm run db:migrate`)
 .data/                  local SQLite DB + uploaded media (git-ignored)
@@ -290,6 +340,15 @@ defaults** in the admin re-seeds from `src/museum/config`.
 
 - **Vercel** (recommended): set the env vars from `infra/deploy-vercel.md`, `vercel deploy --prod`.
   Uploads go browser → S3 via presigned URLs, so large videos never pass through a function.
+- **GitHub Actions** (`.github/workflows/deploy.yml`): every push to `main` runs typecheck + lint,
+  applies migrations (`npm run db:migrate -- --schema-only` with the `DATABASE_URL` secret) and deploys a
+  prebuilt production build; pull requests get a preview deployment (note: previews use the same
+  database). Repo secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `DATABASE_URL`.
+
+Provisioned resources (no secrets here; values live in Vercel env vars and the git-ignored `.env.local`):
+Supabase project `hand-block-museum` (ref `pnawtnmgvsvfxtkdbott`, ap-south-1), S3 bucket
+`hand-block-museum-media-626159998512` (ap-south-1, public-read objects, CORS for uploads) with the
+least-privilege IAM user `hand-block-museum-app`, Vercel project `hand-block-museum` (functions in `bom1`).
 - **Single Node process** (VM / container): `npm run build && npm start` with `DATABASE_URL`
   (or leave it unset to keep SQLite on a persistent disk) and optionally `S3_BUCKET`. Put it behind
   HTTPS (the session cookie is `Secure` when `NODE_ENV=production`; set `COOKIE_SECURE=0` only for
@@ -305,5 +364,9 @@ defaults** in the admin re-seeds from `src/museum/config`.
   limit, random file names, `nosniff`; no HTML/SVG can be uploaded.
 - Supabase: RLS is enabled with no policies on every table, so the public anon key cannot read
   users, sessions or analytics — only the server (database owner connection) can.
+- Roles are enforced server-side on every admin route. Access-list elevation requires a verified
+  email (Google); linking Google to an unverified password account with the same email clears that
+  password and revokes its sessions (pre-registration takeover defence). Google ID tokens are
+  verified locally against Google's rotating JWKS (`jose`), `aud` pinned to `GOOGLE_CLIENT_ID`.
 - Analytics store a random session id only — no IPs, user agents or accounts.
 - Always set `ADMIN_EMAIL` / `ADMIN_PASSWORD` for any shared deployment; never commit `.env*` files.

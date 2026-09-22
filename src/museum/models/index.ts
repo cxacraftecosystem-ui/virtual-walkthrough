@@ -8,6 +8,9 @@ import { Column, GrandDesk, Planter, SpeakerPlaceholder, TextileBanner, TheatreS
 import { DryingLine, GardenBench, PlantBed, Tree, WaterChannel } from './courtyard'
 import { Crate, Stool, Vessel } from './props'
 import type { ModelProps } from './types'
+import { Centrepiece } from './centrepiece'
+import { Pedestal, Vitrine } from './display'
+import { MapWall } from './mapWall'
 import { BlockShelf, CarvingBench, DyeVat, FabricRolls, PigmentStation, PrintingTable, WashTank } from './workshop'
 
 export type { ModelProps } from './types'
@@ -34,4 +37,8 @@ export const PROCEDURAL_MODELS: Record<ProceduralModelId, ComponentType<ModelPro
   vessel: Vessel,
   stool: Stool,
   crate: Crate,
+  centrepiece: Centrepiece,
+  'map-wall': MapWall,
+  vitrine: Vitrine,
+  pedestal: Pedestal,
 }

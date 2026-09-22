@@ -203,3 +203,13 @@
   .adm-main { padding: 16px; }
   .adm-top .who { margin-left: 0; }
 }
+
+/* ---------- sign-in / roles / access ---------- */
+.google-login { display: flex; flex-direction: column; gap: 12px; }
+.or-divider { display: flex; align-items: center; gap: 10px; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+.or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--line-strong); }
+.badge.role-curator { background: rgba(61, 107, 69, 0.1); color: var(--ok); border-color: rgba(61, 107, 69, 0.25); }
+.badge.role-admin { background: var(--accent-soft); color: var(--accent); border-color: rgba(138, 90, 59, 0.3); }
+.badge.role-master { background: var(--ink); color: #fbf7f0; border-color: var(--ink); }
+.access-add { display: grid; grid-template-columns: minmax(0, 2fr) 140px minmax(0, 1.5fr) auto; gap: 10px; align-items: end; }
+@media (max-width: 900px) { .access-add { grid-template-columns: 1fr; } }

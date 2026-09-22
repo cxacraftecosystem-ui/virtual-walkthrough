@@ -1,0 +1,16 @@
+{
+  "name": "Hand Block Printing — Virtual Exhibition",
+  "short_name": "Block Printing",
+  "description": "Carved wood, natural dye and cloth — a virtual museum of Indian hand block printing.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "theme_color": "#efe9df",
+  "background_color": "#efe9df",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

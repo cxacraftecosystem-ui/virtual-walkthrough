@@ -4,6 +4,7 @@ import { TOUR_STOPS } from '../config/tour'
 import { useMuseum } from '../state/store'
 import { IconClose, IconInfo, IconNarration, IconNext, IconPause, IconPlay, IconPrev } from '../ui/icons'
 import { narrationSupported, tour, useTour } from './engine'
+import { usePhoto } from '../ui/PhotoMode'
 
 export function TourOverlay() {
   const active = useTour((s) => s.active)
@@ -16,6 +17,8 @@ export function TourOverlay() {
   const entered = useMuseum((s) => s.phase === 'entered')
   const inspecting = useMuseum((s) => !!s.inspecting)
   const select = useMuseum((s) => s.select)
+  const mapOpen = useMuseum((s) => s.mapOpen)
+  const panelOpen = useMuseum((s) => !!s.selection)
 
   // Leaving the museum view (e.g. hot reload back to entry) ends the tour.
   useEffect(() => {
@@ -28,7 +31,7 @@ export function TourOverlay() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
-      if (e.ctrlKey || e.metaKey || e.altKey || useMuseum.getState().inspecting) return
+      if (e.ctrlKey || e.metaKey || e.altKey || useMuseum.getState().inspecting || usePhoto.getState().on) return
       if (e.key === ' ' && !(t instanceof HTMLButtonElement)) {
         e.preventDefault()
         tour.toggle()
@@ -47,13 +50,17 @@ export function TourOverlay() {
   const total = TOUR_STOPS.length
 
   return (
-    <section className={`ui-tour ui-panel${walking ? ' is-walking' : ''}`} aria-label="Guided tour" aria-live="polite">
+    <section
+      className={`ui-tour ui-panel${walking ? ' is-walking' : ''}${mapOpen ? ' has-map' : ''}${panelOpen ? ' has-panel' : ''}`}
+      aria-label="Guided tour"
+      aria-live="polite"
+    >
       <div className="ui-tour__top">
         <span className="ui-kicker">
           Guided tour · {Math.min(index + 1, total)} / {total}
           <span className="ui-tour__place"> · {stop.place}</span>
         </span>
-        <button type="button" className="ui-icon-btn ui-tour__exit" aria-label="End the tour" data-tip="End tour" onClick={() => tour.exit()}>
+        <button type="button" className="ui-icon-btn ui-tour__exit" aria-label="End the tour (Esc)" data-tip="End tour · Esc" onClick={() => tour.exit()}>
           <IconClose />
         </button>
       </div>

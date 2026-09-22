@@ -23,15 +23,19 @@ interface Former {
 /** Panels roughly matching the real room: skylight strip, warm plaster walls, timber ceiling, oak floor. */
 const GX = KEY.gx
 const GW = GX * 2
+const GL = -KEY.gzNorth
+const GZ = KEY.gzNorth / 2
+const CH = MUSEUM.gallery.ceilingHeight
 const SKY_W = MUSEUM.skylight.width
+const SKY_L = MUSEUM.skylight.startZ - MUSEUM.skylight.endZ
 const FORMERS: Former[] = [
-  { color: '#eef5fb', intensity: 6, position: [0, 6, -9], rotation: [Math.PI / 2, 0, 0], size: [SKY_W, 17.4] },
-  { color: '#efe4d4', intensity: 0.9, position: [-GX, 2, -9], rotation: [0, Math.PI / 2, 0], size: [18, 4] },
-  { color: '#efe4d4', intensity: 0.9, position: [GX, 2, -9], rotation: [0, -Math.PI / 2, 0], size: [18, 4] },
-  { color: '#efe4d4', intensity: 0.7, position: [0, 2, -18], size: [GW, 4] },
-  { color: '#efe4d4', intensity: 0.5, position: [0, 2, 1], rotation: [0, Math.PI, 0], size: [GW, 4] },
-  { color: '#d9b48a', intensity: 0.35, position: [0, 4.8, -9], rotation: [Math.PI / 2, 0, 0], size: [GW, 18] },
-  { color: '#d6b690', intensity: 1.0, position: [0, -0.5, -9], rotation: [-Math.PI / 2, 0, 0], size: [GW, 18] },
+  { color: '#eef5fb', intensity: 6, position: [0, CH + 1.4, GZ], rotation: [Math.PI / 2, 0, 0], size: [SKY_W, SKY_L] },
+  { color: '#efe4d4', intensity: 0.9, position: [-GX, 2.2, GZ], rotation: [0, Math.PI / 2, 0], size: [GL, 4.4] },
+  { color: '#efe4d4', intensity: 0.9, position: [GX, 2.2, GZ], rotation: [0, -Math.PI / 2, 0], size: [GL, 4.4] },
+  { color: '#efe4d4', intensity: 0.7, position: [0, 2.2, KEY.gzNorth], size: [GW, 4.4] },
+  { color: '#efe4d4', intensity: 0.5, position: [0, 2.2, 1], rotation: [0, Math.PI, 0], size: [GW, 4.4] },
+  { color: '#d9b48a', intensity: 0.35, position: [0, CH + 0.2, GZ], rotation: [Math.PI / 2, 0, 0], size: [GW, GL] },
+  { color: '#d6b690', intensity: 1.0, position: [0, -0.5, GZ], rotation: [-Math.PI / 2, 0, 0], size: [GW, GL] },
 ]
 
 export function GalleryEnvironment() {
@@ -54,7 +58,7 @@ export function GalleryEnvironment() {
     }
     const pmrem = new THREE.PMREMGenerator(gl)
     // Probe from roughly the visitor's eye position in the centre of the gallery.
-    const target = pmrem.fromScene(env, 0.02, 0.1, 100, { position: new THREE.Vector3(0, 1.6, -9) })
+    const target = pmrem.fromScene(env, 0.02, 0.1, 100, { position: new THREE.Vector3(0, 1.6, GZ) })
     pmrem.dispose()
     plane.dispose()
     mats.forEach((m) => m.dispose())

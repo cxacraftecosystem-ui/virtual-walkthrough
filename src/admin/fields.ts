@@ -106,7 +106,7 @@ export const FIELDS: Record<ContentCollection, FieldDef[]> = {
     num('modelScale', 'Model scale', 'Media', 0.01),
     { path: 'position', label: 'Position [x, y, z] (m)', type: 'vec3', group: 'Placement' },
     num('rotationDeg', 'Rotation (°)', 'Placement', 1),
-    { path: 'zone', label: 'Zone', type: 'select', group: 'Placement', options: ['atrium', 'theatre', 'workshop', 'courtyard'] },
+    { path: 'zone', label: 'Zone', type: 'select', group: 'Placement', options: ['atrium', 'reception', 'passage', 'reveal', 'gallery-a', 'gallery-b', 'gallery-c', 'gallery-d', 'theatre', 'workshop', 'courtyard'] },
     { path: 'interactive', label: 'Clickable (info panel)', type: 'checkbox', group: 'Flags' },
     { path: 'inspectable', label: 'Inspectable in 3D viewer', type: 'checkbox', group: 'Flags' },
     placeholder,

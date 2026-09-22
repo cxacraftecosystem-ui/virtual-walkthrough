@@ -171,6 +171,12 @@ export function InfoPanel() {
 
   const vm = shown ? resolve(shown) : null
   const open = entered && !!selection && !!vm
+
+  // A selection that resolves to nothing (item removed from the content, stale tour stop…)
+  // would leave an invisible "open" panel that hides the joystick, map and prompts: drop it.
+  useEffect(() => {
+    if (selection && !resolve(selection)) select(null)
+  }, [selection, select])
   const fav = useMuseum((s) => (shown ? s.favorites.includes(itemKey(shown.kind, shown.id)) : false))
   const [playing, setPlaying] = useVideoPlaying(vm?.videoId)
 

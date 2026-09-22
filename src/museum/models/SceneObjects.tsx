@@ -9,6 +9,8 @@
  *  - inspectable → the information panel offers the 3D viewer: inspect('object:<id>').
  */
 import type { ThreeEvent } from '@react-three/fiber'
+import { ZoneGroup } from '../navigation/zoneCulling'
+import { ZONES, type ZoneId } from '../config/layout'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -21,6 +23,7 @@ import { ErrorBoundary } from '../utils/ErrorBoundary'
 import { GLTFModel, preloadModel } from './GLTFModel'
 import { PROCEDURAL_MODELS } from './index'
 import { ModelClock } from './modelMaterials'
+import { InMuseumScene } from './sceneContext'
 import { num } from './types'
 
 /** Prefix used with `inspect()` to open a scene object (rather than an exhibit) in the 3D viewer. */
@@ -66,7 +69,7 @@ export function ObjectModel({ config }: { config: SceneObjectConfig }) {
 /* ------------------------------------------------------------------ */
 
 function wingCentre(zone: SceneObjectConfig['zone']): [number, number] {
-  const w = MUSEUM.wings[zone]
+  const w = ZONES.find((z) => z.id === zone)?.rect ?? MUSEUM.wings.atrium
   return [(w.minX + w.maxX) / 2, (w.minZ + w.maxZ) / 2]
 }
 
@@ -239,11 +242,15 @@ export function SceneObjects() {
     }
   }, [])
   return (
-    <group name="scene-objects" ref={root}>
-      <ModelClock />
-      {SCENE_OBJECTS.map((o) => (
-        <SceneObject key={o.id} config={o} />
-      ))}
-    </group>
+    <InMuseumScene.Provider value={true}>
+      <group name="scene-objects" ref={root}>
+        <ModelClock />
+        {SCENE_OBJECTS.map((o) => (
+          <ZoneGroup key={o.id} zones={[o.zone as ZoneId]}>
+            <SceneObject config={o} />
+          </ZoneGroup>
+        ))}
+      </group>
+    </InMuseumScene.Provider>
   )
 }

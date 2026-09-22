@@ -37,7 +37,7 @@ const RAIL_W = 0.018
 
 const texCache = new Map<string, THREE.CanvasTexture>()
 
-function woodGrainTexture(kind: 'teak' | 'cradle'): THREE.CanvasTexture {
+export function woodGrainTexture(kind: 'teak' | 'cradle'): THREE.CanvasTexture {
   const key = `grain:${kind}`
   const hit = texCache.get(key)
   if (hit) return hit
@@ -80,7 +80,7 @@ function woodGrainTexture(kind: 'teak' | 'cradle'): THREE.CanvasTexture {
 }
 
 /** Mottled ink-on-wood texture for the relief tops (worn, patchy ink traces). */
-function inkTraceTexture(inkColor: string): THREE.CanvasTexture {
+export function inkTraceTexture(inkColor: string): THREE.CanvasTexture {
   const key = `ink:${inkColor}`
   const hit = texCache.get(key)
   if (hit) return hit

@@ -16,12 +16,16 @@ import { surfacePoint } from '../config/layout'
 import { kelvinToHex, LIGHTING } from '../config/lighting'
 import { MUSEUM, type Vec3 } from '../config/museum'
 import { withDevOverrides, QUALITY_PRESETS } from '../config/quality'
+import { SCENE_OBJECTS } from '../config/objects'
 import { registerSpot } from '../lighting/SpotPool'
 import { createMeterBoxGeometry } from '../materials/geometry'
 import { useMaterials } from '../materials/materials'
 import { createTitleWallTexture } from '../materials/wallGraphics'
 import { useMuseum } from '../state/store'
 import { useAsyncTexture } from '../utils/useAsyncTexture'
+import { StaticMerge } from '../effects/StaticMerge'
+import { ZoneGroup } from '../navigation/zoneCulling'
+import { Landscape } from './Landscape'
 
 const W = MUSEUM.wings
 const T = MUSEUM.walls.exteriorThickness
@@ -99,8 +103,9 @@ function RoofLight({ r, y, well, glass, plaster }: { r: Rect; y: number; well: n
       <Box min={[r.maxX, y, r.minZ - t]} max={[r.maxX + t, top, r.maxZ + t]} material={plaster} />
       <Box min={[r.minX, y, r.minZ - t]} max={[r.maxX, top, r.minZ]} material={plaster} />
       <Box min={[r.minX, y, r.maxZ]} max={[r.maxX, top, r.maxZ + t]} material={plaster} />
-      <mesh position={[(r.minX + r.maxX) / 2, top, (r.minZ + r.maxZ) / 2]} material={glass} renderOrder={5} raycast={() => null}>
-        <boxGeometry args={[r.maxX - r.minX, 0.012, r.maxZ - r.minZ]} />
+      {/* glass lid: a single plane resting 3 cm ABOVE the well tops (a box coplanar with them z-fought) */}
+      <mesh position={[(r.minX + r.maxX) / 2, top + 0.03, (r.minZ + r.maxZ) / 2]} rotation={[-Math.PI / 2, 0, 0]} material={glass} renderOrder={5} raycast={() => null}>
+        <planeGeometry args={[r.maxX - r.minX + 2 * t, r.maxZ - r.minZ + 2 * t]} />
       </mesh>
     </group>
   )
@@ -184,10 +189,17 @@ function Atrium() {
   }, [m.stone])
   const openings = useMemo<Rect[]>(() => {
     const out: Rect[] = []
-    for (const cx of [-5.6, 0, 5.6])
-      for (const cz of [8.4, 13.9]) out.push({ minX: cx - 1.7, maxX: cx + 1.7, minZ: cz - 1.7, maxZ: cz + 1.7 })
+    const w = a.maxX - a.minX
+    const d = a.maxZ - a.minZ
+    const half = Math.min(w / 6, d / 4) * 0.62
+    for (const fx of [1 / 6, 3 / 6, 5 / 6])
+      for (const fz of [0.28, 0.72]) {
+        const cx = a.minX + w * fx
+        const cz = a.minZ + d * fz
+        out.push({ minX: cx - half, maxX: cx + half, minZ: cz - half, maxZ: cz + half })
+      }
     return out
-  }, [])
+  }, [a])
   const outer = useMemo<Rect>(() => ({ minX: a.minX, maxX: a.maxX, minZ: a.minZ, maxZ: a.maxZ }), [a])
   return (
     <group>
@@ -282,6 +294,23 @@ function Pendant({ x, z, drop }: { x: number; z: number; drop: number }) {
   )
 }
 
+function pendantSpots(): [number, number][] {
+  const out: [number, number][] = []
+  for (const o of SCENE_OBJECTS) {
+    if (o.zone !== 'workshop' || !o.interactive || !o.footprint) continue
+    const [x, , z] = o.position
+    const long = Math.max(o.footprint[0], o.footprint[1])
+    if (long > 3) {
+      const r = (((o.rotationDeg ?? 0) * Math.PI) / 180) as number
+      const ax = Math.cos(r)
+      const az = -Math.sin(r)
+      const off = long / 4
+      out.push([x - ax * off, z - az * off], [x + ax * off, z + az * off])
+    } else out.push([x, z])
+  }
+  return out.slice(0, 14)
+}
+
 function Workshop() {
   const m = useMaterials()
   const ws = W.workshop
@@ -293,7 +322,11 @@ function Workshop() {
   }, [m.stone])
   const lights = useMemo<Rect[]>(() => {
     const out: Rect[] = []
-    for (const cz of [-2.6, 3.4, 9.4, 14.6]) out.push({ minX: ws.minX + 1.4, maxX: ws.maxX - 1.4, minZ: cz - 0.8, maxZ: cz + 0.8 })
+    const n = 4
+    for (let i = 0; i < n; i++) {
+      const cz = ws.minZ + ((ws.maxZ - ws.minZ) * (i + 0.5)) / n
+      out.push({ minX: ws.minX + 1.6, maxX: ws.maxX - 1.6, minZ: cz - 0.9, maxZ: cz + 0.9 })
+    }
     return out
   }, [ws])
   const trussZ = useMemo(() => {
@@ -317,19 +350,9 @@ function Workshop() {
           <Box min={[ws.minX, ws.height - 0.32, z - 0.012]} max={[ws.maxX, ws.height - 0.04, z + 0.012]} material={m.trackBlack} />
         </group>
       ))}
-      {/* pendants over the printing tables & stations */}
-      {[
-        [14.3, 7.6],
-        [14.3, 12.0],
-        [20.9, 7.6],
-        [20.9, 12.0],
-        [17.6, -0.6],
-        [17.6, 3.8],
-        [22.4, -2.0],
-        [12.0, -2.6],
-        [22.6, 15.8],
-      ].map(([x, z]) => (
-        <Pendant key={`${x}-${z}`} x={x} z={z} drop={2.9} />
+      {/* pendants over the workshop's interactive installations (long tables get two) */}
+      {pendantSpots().map(([x, z]) => (
+        <Pendant key={`${x.toFixed(2)}-${z.toFixed(2)}`} x={x} z={z} drop={ws.height - 3.4} />
       ))}
     </group>
   )
@@ -350,10 +373,54 @@ function Courtyard() {
   return (
     <group>
       <Box min={[c.minX, -0.1, c.minZ]} max={[c.maxX, 0, c.maxZ + 0.3]} material={gravel} cast={false} />
-      {/* wall copings */}
-      <Box min={[c.minX - T - 0.03, c.wallHeight, c.minZ - T - 0.03]} max={[c.minX + 0.03, c.wallHeight + 0.06, c.maxZ]} material={m.stone} />
-      <Box min={[c.maxX - 0.03, c.wallHeight, c.minZ - T - 0.03]} max={[c.maxX + T + 0.03, c.wallHeight + 0.06, c.maxZ]} material={m.stone} />
-      <Box min={[c.minX - T - 0.03, c.wallHeight, c.minZ - T - 0.03]} max={[c.maxX + T + 0.03, c.wallHeight + 0.06, c.minZ + 0.03]} material={m.stone} />
+    </group>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Gallery D — regional gallery (west, north row)                      */
+/* ------------------------------------------------------------------ */
+
+function GalleryD() {
+  const m = useMaterials()
+  const g = W.galleryD
+  const lights = useMemo<Rect[]>(() => {
+    const out: Rect[] = []
+    const cx = (g.minX + g.maxX) / 2
+    const n = 3
+    for (let i = 0; i < n; i++) {
+      const cz = g.minZ + ((g.maxZ - g.minZ) * (i + 0.5)) / n
+      out.push({ minX: cx - 3.2, maxX: cx + 3.2, minZ: cz - 2.6, maxZ: cz + 2.6 })
+    }
+    return out
+  }, [g])
+  const outer = useMemo<Rect>(() => ({ minX: g.minX, maxX: g.maxX, minZ: g.minZ, maxZ: g.maxZ }), [g])
+  return (
+    <group>
+      <Box min={[g.minX, -0.1, g.minZ]} max={[g.maxX, 0, g.maxZ]} material={m.oakFloor} cast={false} />
+      <Slab outer={outer} openings={lights} y={g.height} thickness={ROOF_T} material={m.plasterCeiling} />
+      {lights.map((r, i) => (
+        <RoofLight key={i} r={r} y={g.height} well={1.1} glass={m.glass} plaster={m.plasterCeiling} />
+      ))}
+      {/* shadow-gap skirting around the room */}
+      <Box min={[g.minX, 0, g.minZ]} max={[g.maxX, 0.022, g.minZ + 0.004]} material={m.shadowGap} cast={false} />
+      <Box min={[g.minX, 0, g.minZ]} max={[g.minX + 0.004, 0.022, g.maxZ]} material={m.shadowGap} cast={false} />
+    </group>
+  )
+}
+
+/** Continuous stone coping on the 10 m perimeter: the compound reads as one pure cuboid. */
+function ShellCoping() {
+  const m = useMaterials()
+  const s = W.shell
+  const y = s.height
+  const t = T + 0.06
+  return (
+    <group>
+      <Box min={[s.minX - t, y, s.minZ - t]} max={[s.maxX + t, y + 0.12, s.minZ + 0.06]} material={m.stone} />
+      <Box min={[s.minX - t, y, s.maxZ - 0.06]} max={[s.maxX + t, y + 0.12, s.maxZ + t]} material={m.stone} />
+      <Box min={[s.minX - t, y, s.minZ - t]} max={[s.minX + 0.06, y + 0.12, s.maxZ + t]} material={m.stone} />
+      <Box min={[s.maxX - 0.06, y, s.minZ - t]} max={[s.maxX + t, y + 0.12, s.maxZ + t]} material={m.stone} />
     </group>
   )
 }
@@ -398,11 +465,38 @@ export function Wings() {
   const preset = withDevOverrides(QUALITY_PRESETS[tier])
   return (
     <group>
-      <Atrium />
-      <Theatre />
-      <Workshop />
-      <Courtyard />
-      <Forecourt />
+      <ZoneGroup zones={['atrium', 'reception', 'theatre', 'workshop']}>
+        <StaticMerge name="atrium">
+          <Atrium />
+          <Forecourt />
+        </StaticMerge>
+      </ZoneGroup>
+      <ZoneGroup zones={['theatre']}>
+        <StaticMerge name="theatre">
+          <Theatre />
+        </StaticMerge>
+      </ZoneGroup>
+      <ZoneGroup zones={['workshop', 'courtyard']}>
+        <StaticMerge name="workshop">
+          <Workshop />
+        </StaticMerge>
+      </ZoneGroup>
+      <ZoneGroup zones={['courtyard']}>
+        <StaticMerge name="courtyard">
+          <Courtyard />
+        </StaticMerge>
+      </ZoneGroup>
+      <ZoneGroup zones={['gallery-d', 'theatre']}>
+        <StaticMerge name="gallery-d">
+          <GalleryD />
+        </StaticMerge>
+      </ZoneGroup>
+      <ZoneGroup zones={['atrium', 'courtyard']}>
+        <Landscape />
+      </ZoneGroup>
+      <StaticMerge name="coping">
+        <ShellCoping />
+      </StaticMerge>
       {preset.areaLights && <WingAreaLights />}
     </group>
   )

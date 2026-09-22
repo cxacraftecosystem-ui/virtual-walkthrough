@@ -1,7 +1,8 @@
 /** Minimal sign-in / create-account dialog (only reachable when the backend is online). */
 import { useEffect, useRef, useState } from 'react'
 import { useMuseum } from '../state/store'
-import { register, signIn } from '../api/social'
+import { register, signIn, signInWithGoogle } from '../api/social'
+import { GoogleSignInButton } from './GoogleSignInButton'
 import { IconClose } from './icons'
 
 export function AuthModal() {
@@ -54,6 +55,15 @@ export function AuthModal() {
     }
   }
 
+  const google = async (credential: string) => {
+    setBusy(true)
+    setError(null)
+    const err = await signInWithGoogle(credential)
+    setBusy(false)
+    if (err) setError(err)
+    else closeAuth()
+  }
+
   return (
     <div
       className="ui-help ui-auth"
@@ -73,6 +83,12 @@ export function AuthModal() {
           {isRegister ? 'Create an account' : 'Welcome back'}
         </h2>
         <p className="ui-auth__lede">{auth.reason ?? 'Save favourite works and sign the guestbook.'}</p>
+
+        <GoogleSignInButton className="ui-auth__google" onCredential={(c) => void google(c)} onError={setError}>
+          <div className="ui-auth__or" aria-hidden="true">
+            <span>or with email</span>
+          </div>
+        </GoogleSignInButton>
 
         <form
           className="ui-auth__form"

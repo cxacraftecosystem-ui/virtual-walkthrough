@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import { useMuseum } from '../state/store'
 import { visitor } from '../state/visitor'
+import { usePhoto } from './PhotoMode'
 
 const DEADZONE = 0.08
 
@@ -20,7 +21,8 @@ function useCoarsePointer() {
 export function TouchJoystick() {
   const coarse = useCoarsePointer()
   const entered = useMuseum((s) => s.phase === 'entered')
-  const hidden = useMuseum((s) => !!s.inspecting || s.helpOpen || !!s.selection)
+  const photo = usePhoto((s) => s.on)
+  const hidden = useMuseum((s) => !!s.inspecting || s.helpOpen || !!s.selection) || photo
   const rootRef = useRef<HTMLDivElement>(null)
   const knobRef = useRef<HTMLDivElement>(null)
   const pointerId = useRef<number | null>(null)

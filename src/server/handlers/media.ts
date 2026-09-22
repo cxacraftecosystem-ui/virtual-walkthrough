@@ -95,7 +95,7 @@ async function record(db: Db, storage: StorageDriver, folder: string, storedName
 
 /** GET /api/admin/media/config — tells the admin UI which upload flow to use. */
 export const mediaConfig = route(async (c) => {
-  await c.requireAdmin()
+  await c.requireCurator()
   return {
     driver: c.storage.kind,
     directUpload: typeof c.storage.presignPut === 'function',
@@ -111,7 +111,7 @@ export const mediaConfig = route(async (c) => {
  * long-running servers; on Vercel use the presigned flow (request bodies are capped ~4.5 MB).
  */
 export const uploadMedia = route(async (c) => {
-  await c.requireAdmin()
+  await c.requireCurator()
   const ct = c.req.headers.get('content-type') ?? ''
   if (!ct.startsWith('multipart/form-data')) return fail(415, 'Expected multipart/form-data')
   if (!c.req.body) return fail(400, 'Empty body')
@@ -181,7 +181,7 @@ export const uploadMedia = route(async (c) => {
 
 /** POST /api/admin/media/presign — direct-to-S3 upload URL (serverless-safe, up to 500 MB). */
 export const presignMedia = route(async (c) => {
-  await c.requireAdmin()
+  await c.requireCurator()
   if (!c.storage.presignPut) return fail(501, 'Direct upload not supported by local storage; use multipart POST /api/admin/media')
   const b = await c.json()
   if (!isRecord(b) || typeof b.filename !== 'string' || !b.filename) return fail(400, 'Body must be { filename, size, folder? }')
@@ -195,7 +195,7 @@ export const presignMedia = route(async (c) => {
 
 /** POST /api/admin/media/complete — record an object uploaded via /presign. */
 export const completeMedia = route(async (c) => {
-  await c.requireAdmin()
+  await c.requireCurator()
   const b = await c.json()
   if (!isRecord(b) || typeof b.key !== 'string' || typeof b.filename !== 'string') return fail(400, 'Body must be { key, filename }')
   const m = KEY_RE.exec(b.key)
@@ -214,14 +214,14 @@ export const completeMedia = route(async (c) => {
 
 /** GET /api/admin/media */
 export const listMedia = route(async (c) => {
-  await c.requireAdmin()
+  await c.requireCurator()
   const rows = await c.db.query<MediaRow>('SELECT * FROM media ORDER BY created_at DESC')
   return rows.map((r) => toRecord(c.storage, r))
 })
 
 /** DELETE /api/admin/media/:id */
 export const deleteMedia = route<{ id: string }>(async (c) => {
-  await c.requireAdmin()
+  await c.requireCurator()
   const row = await c.db.one<MediaRow>('SELECT * FROM media WHERE id = $1', [c.params.id])
   if (!row) return fail(404, 'Media not found')
   await c.storage.remove(`${row.folder}/${row.stored_name}`)

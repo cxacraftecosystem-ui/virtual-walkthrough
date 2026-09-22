@@ -50,13 +50,47 @@ const MIGRATIONS: string[] = [
   CREATE INDEX analytics_t ON analytics_events(t);
   CREATE INDEX analytics_session ON analytics_events(session_id, t);
   `,
+  // #2 RBAC + access list + Google sign-in (supabase/migrations/20260923010000_rbac_access_list.sql).
+  // SQLite cannot alter a CHECK constraint, so users is rebuilt (foreign keys are off during migrations).
+  `
+  CREATE TABLE users_new (
+    id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'visitor' CHECK (role IN ('visitor','curator','admin','master')),
+    password_hash TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
+    manual_role TEXT CHECK (manual_role IS NULL OR manual_role IN ('visitor','curator','admin')),
+    email_verified INTEGER NOT NULL DEFAULT 0, google_sub TEXT, last_login_at TEXT
+  );
+  INSERT INTO users_new (id, email, display_name, role, password_hash, created_at, manual_role)
+    SELECT id, email, display_name, role, password_hash, created_at, CASE WHEN role = 'admin' THEN 'admin' END FROM users;
+  DROP TABLE users;
+  ALTER TABLE users_new RENAME TO users;
+  CREATE UNIQUE INDEX users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL;
+  CREATE TABLE access_list (
+    pattern TEXT PRIMARY KEY, role TEXT NOT NULL CHECK (role IN ('curator','admin')),
+    note TEXT NOT NULL DEFAULT '', created_by TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  );
+  `,
+  // #3 several master admins mirrored into the access list (supabase/migrations/20260923020000_master_admins.sql)
+  `
+  CREATE TABLE access_list_new (
+    pattern TEXT PRIMARY KEY, role TEXT NOT NULL CHECK (role IN ('curator','admin','master')),
+    note TEXT NOT NULL DEFAULT '', created_by TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  );
+  INSERT INTO access_list_new SELECT pattern, role, note, created_by, created_at, updated_at FROM access_list;
+  DROP TABLE access_list;
+  ALTER TABLE access_list_new RENAME TO access_list;
+  `,
 ]
+
+/** Schema version of this code (a dev-server singleton opened by older code is reopened). */
+export const SQLITE_SCHEMA_VERSION = MIGRATIONS.length
 
 /** `$1` → `?1` (SQLite numbered parameters bind positionally). */
 const toSqlite = (sql: string) => sql.replace(/\$(\d+)/g, '?$1')
 
 export class SqliteDb implements Db {
   readonly dialect = 'sqlite' as const
+  readonly schemaVersion = SQLITE_SCHEMA_VERSION
   private readonly db: DatabaseSync
   /** Pending transaction: other statements wait so they never run inside someone else's tx. */
   private active: Promise<void> | null = null
@@ -85,18 +119,26 @@ export class SqliteDb implements Db {
 
   private migrate() {
     let v = (this.db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
+    if (v >= MIGRATIONS.length) return
+    // Table rebuilds must not cascade: foreign keys off (only effective outside a transaction),
+    // then verified with foreign_key_check before committing each step.
+    this.db.exec('PRAGMA foreign_keys = OFF')
     while (v < MIGRATIONS.length) {
       this.db.exec('BEGIN')
       try {
         this.db.exec(MIGRATIONS[v])
+        const broken = this.db.prepare('PRAGMA foreign_key_check').all()
+        if (broken.length) throw new Error(`sqlite migration ${v + 1} broke ${broken.length} foreign key(s)`)
         this.db.exec(`PRAGMA user_version = ${v + 1}`)
         this.db.exec('COMMIT')
       } catch (err) {
         this.db.exec('ROLLBACK')
+        this.db.exec('PRAGMA foreign_keys = ON')
         throw err
       }
       v++
     }
+    this.db.exec('PRAGMA foreign_keys = ON')
   }
 
   private async idle() {

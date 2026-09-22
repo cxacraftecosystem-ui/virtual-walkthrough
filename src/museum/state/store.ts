@@ -9,6 +9,7 @@ export interface Selection {
 }
 
 export type Phase = 'loading' | 'ready' | 'entered'
+export type TimeOfDay = 'morning' | 'midday' | 'golden'
 
 /** Social side panels (only available when the backend is reachable). */
 export type Drawer = 'favourites' | 'guestbook'
@@ -55,6 +56,8 @@ interface MuseumState {
   sceneCompiled: boolean
   /** Pointer-lock "mouse look": mouse movement turns the view, clicks hit the centre crosshair. */
   mouseLook: boolean
+  /** Sun position preset for the skylight daylight. */
+  timeOfDay: TimeOfDay
 
   setPhase: (p: Phase) => void
   setQuality: (q: QualitySetting) => void
@@ -68,6 +71,7 @@ interface MuseumState {
   setHovered: (h: Selection | null) => void
   setSceneCompiled: (v: boolean) => void
   setMouseLook: (v: boolean) => void
+  setTimeOfDay: (t: TimeOfDay) => void
 
   // ── Social (backend) — see src/museum/api/social.ts ───────────────
   /** Backend reachable? null = still probing, false = static site (all social UI hidden). */
@@ -125,6 +129,8 @@ export const useMuseum = create<MuseumState>((set) => ({
   setSceneCompiled: (sceneCompiled) => set({ sceneCompiled }),
   mouseLook: false,
   setMouseLook: (mouseLook) => set({ mouseLook }),
+  timeOfDay: 'midday',
+  setTimeOfDay: (timeOfDay) => set({ timeOfDay }),
 
   online: null,
   user: null,

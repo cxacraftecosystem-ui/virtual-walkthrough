@@ -9,7 +9,10 @@ import { requestAmbientStart } from './audio'
 import { AccountMenu } from './Social'
 import { isCoarsePointer } from './HelpOverlay'
 import { tour, useTour } from '../tour/engine'
+import { enterPhotoMode } from './PhotoMode'
+import { TIME_OPTIONS, timeLabel } from './timeOfDay'
 import {
+  IconCamera,
   IconFullscreen,
   IconFullscreenExit,
   IconHelp,
@@ -19,6 +22,7 @@ import {
   IconReset,
   IconSoundOff,
   IconSoundOn,
+  IconSun,
   IconTour,
 } from './icons'
 
@@ -64,13 +68,10 @@ function useFullscreen() {
   return { supported, on, toggle }
 }
 
-function QualityMenu() {
-  const quality = useMuseum((s) => s.quality)
-  const tier = useMuseum((s) => s.tier)
-  const setQuality = useMuseum((s) => s.setQuality)
+/** Close a HUD popover on outside press or Esc. */
+function usePopover() {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
-
   useEffect(() => {
     if (!open) return
     const onDown = (e: PointerEvent) => {
@@ -89,6 +90,56 @@ function QualityMenu() {
       window.removeEventListener('keydown', onKey, true)
     }
   }, [open])
+  return { open, setOpen, rootRef }
+}
+
+function TimeMenu() {
+  const time = useMuseum((s) => s.timeOfDay)
+  const setTime = useMuseum((s) => s.setTimeOfDay)
+  const { open, setOpen, rootRef } = usePopover()
+  return (
+    <div className="ui-quality ui-time" ref={rootRef}>
+      <button
+        type="button"
+        className="ui-icon-btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Time of day: ${timeLabel(time)} (T)`}
+        data-tip={open ? undefined : `${timeLabel(time)} · T`}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <IconSun />
+      </button>
+      {open && (
+        <div className="ui-quality__menu ui-panel" role="menu" aria-label="Time of day">
+          <div className="ui-kicker ui-quality__menu-title">Time of day</div>
+          {TIME_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              role="menuitemradio"
+              aria-checked={time === o.value}
+              className="ui-quality__opt"
+              onClick={() => {
+                setTime(o.value)
+                setOpen(false)
+              }}
+            >
+              <span>{o.label}</span>
+              {time !== o.value ? <small>{o.note}</small> : null}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function QualityMenu() {
+  const quality = useMuseum((s) => s.quality)
+  const tier = useMuseum((s) => s.tier)
+  const setQuality = useMuseum((s) => s.setQuality)
+  const { open, setOpen, rootRef } = usePopover()
 
   const tierLabel = withDevOverrides(QUALITY_PRESETS[tier]).label
   const label = quality === 'auto' ? `Auto · ${tierLabel}` : tierLabel
@@ -192,6 +243,10 @@ export function HUD() {
             <IconMouseLook />
           </button>
         )}
+        <TimeMenu />
+        <button type="button" className="ui-icon-btn" aria-label="Photo mode (P)" data-tip="Photo mode · P" onClick={enterPhotoMode}>
+          <IconCamera />
+        </button>
         <button
           type="button"
           className="ui-icon-btn"

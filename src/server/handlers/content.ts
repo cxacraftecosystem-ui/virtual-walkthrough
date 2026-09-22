@@ -25,7 +25,7 @@ export const publicContent = route(async ({ db }) => getContent(db))
 
 /** PUT /api/admin/content/exhibition */
 export const putExhibition = route(async (c) => {
-  await c.requireAdmin()
+  await c.requireCurator()
   const b = await c.json()
   if (!isRecord(b)) return fail(400, 'Body must be an object')
   const text: Record<string, string> = {}
@@ -39,7 +39,7 @@ export const putExhibition = route(async (c) => {
 
 /** PUT /api/admin/content/welcome */
 export const putWelcome = route(async (c) => {
-  await c.requireAdmin()
+  await c.requireCurator()
   const b = await c.json()
   if (!isRecord(b) || typeof b.title !== 'string' || typeof b.body !== 'string') return fail(400, 'Body must be { title: string, body: string }')
   const welcome = { title: b.title, body: b.body }
@@ -47,7 +47,7 @@ export const putWelcome = route(async (c) => {
   return welcome
 })
 
-/** POST /api/admin/content/reset */
+/** POST /api/admin/content/reset — admin (bulk, destructive) */
 export const resetContent = route(async (c) => {
   await c.requireAdmin()
   await seedContent(c.db, readSeed())
@@ -56,7 +56,7 @@ export const resetContent = route(async (c) => {
 
 /** GET /api/admin/content/:collection */
 export const listCollection = route<{ collection: string }>(async (c) => {
-  await c.requireAdmin()
+  await c.requireCurator()
   const { collection } = c.params
   if (!isCollection(collection)) return fail(404, `Unknown collection "${collection}"`)
   return listItems(c.db, collection)
@@ -64,7 +64,7 @@ export const listCollection = route<{ collection: string }>(async (c) => {
 
 /** PUT /api/admin/content/:collection/:id */
 export const putContentItem = route<{ collection: string; id: string }>(async (c) => {
-  await c.requireAdmin()
+  await c.requireCurator()
   const { collection } = c.params
   const id = decodeURIComponent(c.params.id)
   if (!isCollection(collection)) return fail(404, `Unknown collection "${collection}"`)
@@ -80,7 +80,7 @@ export const putContentItem = route<{ collection: string; id: string }>(async (c
 
 /** DELETE /api/admin/content/:collection/:id */
 export const deleteContentItem = route<{ collection: string; id: string }>(async (c) => {
-  await c.requireAdmin()
+  await c.requireCurator()
   const { collection } = c.params
   if (!isCollection(collection)) return fail(404, `Unknown collection "${collection}"`)
   if (!(await deleteItem(c.db, collection, decodeURIComponent(c.params.id)))) return fail(404, 'Item not found')

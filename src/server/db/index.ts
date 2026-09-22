@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { config } from '../config'
 import { PostgresDb } from './postgres'
-import { SqliteDb } from './sqlite'
+import { SQLITE_SCHEMA_VERSION, SqliteDb } from './sqlite'
 import type { Db } from './types'
 
 export type { Db, Queryable, Param, Row } from './types'
@@ -14,6 +14,13 @@ const g = globalThis as { __museumDb?: Db }
 
 /** Process-wide singleton (survives Next dev hot reloads and warm serverless invocations). */
 export function getDb(): Db {
+  // Next dev keeps globalThis across hot reloads: a SQLite handle opened by older code (older
+  // schema) is replaced so the new migrations run without restarting the dev server.
+  const cur = g.__museumDb as (Db & { schemaVersion?: number }) | undefined
+  if (cur && cur.dialect === 'sqlite' && cur.schemaVersion !== SQLITE_SCHEMA_VERSION) {
+    void cur.close().catch(() => undefined)
+    g.__museumDb = undefined
+  }
   g.__museumDb ??= config.databaseUrl
     ? new PostgresDb({ connectionString: config.databaseUrl, ssl: config.databaseSsl, max: config.databasePoolMax })
     : new SqliteDb(config.dbPath) // migrates itself on open

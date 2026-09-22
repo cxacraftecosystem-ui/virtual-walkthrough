@@ -43,6 +43,10 @@ export const INFOGRAPHICS: InfographicConfig[] = [
     height: 1.95,
     placeholder: true,
   },
+  // Key panel for the salon hang in Gallery A-south (the seven studies carry no individual labels).
+  { id: 'info-salon', kicker: 'Salon', title: 'Seven Studies', body: PENDING, icon: 'block', placement: { surface: 'gallery-a-partition', at: -1.75, centerHeight: 1.45 }, width: 0.56, height: 0.75, placeholder: true },
+  // Gallery D introduction, on the east wall just north of the doorway from Gallery A.
+  { id: 'info-gallery-d', kicker: 'Gallery D', title: 'Regional Gallery', body: PENDING, icon: 'map', placement: { surface: 'gallery-d-east', at: -12.4 }, width: 1.2, height: 1.62, placeholder: true },
 ]
 
 /** Wall text on the reveal wall — the first focal plane of the exhibition. */
@@ -56,5 +60,5 @@ export const EXHIBITION_TITLE = {
 
 export const RECEPTION_WELCOME = {
   title: 'Welcome',
-  body: 'Follow the central passage to the galleries. Galleries A, B and C open either side of the reveal wall; the craft product wall lies beyond it.',
+  body: 'Follow the central passage to the galleries. Galleries A, B and C open either side of it, the craft court lies beyond the reveal wall, and doorways lead on to Gallery D and the dye-garden courtyard.',
 }

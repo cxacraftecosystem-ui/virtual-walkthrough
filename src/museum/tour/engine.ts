@@ -307,11 +307,15 @@ export const tour = {
     run.raf = requestAnimationFrame(tick)
     goStop(Math.max(0, Math.min(TOUR_STOPS.length - 1, index)))
   },
+  /** Idempotent: safe to call at any point (mid-walk, mid-fade, while narrating, twice). */
   exit() {
-    run.travelToken++
+    run.travelToken++ // cancels pending fade-arrivals and the jumpTo fallback
     cancelAnimationFrame(run.raf)
+    run.raf = 0
     stopSpeaking()
     clearWalk()
+    run.view = null
+    run.elapsed = 0
     set({ active: false, paused: false, pauseReason: null, phase: 'walking', progress: 0 })
   },
   pause() {
