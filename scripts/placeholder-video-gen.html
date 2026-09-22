@@ -1,0 +1,1011 @@
+<!doctype html>
+<!--
+  PLACEHOLDER FILM generator page (dev tool only — not part of the app build).
+  Served by the Vite dev server so the TypeScript motif library can be imported directly.
+  Driven by scripts/generate-placeholder-videos.mjs.
+
+  Renders each film OFFLINE, frame by frame (deterministic, faster than real time):
+    canvas 2D → WebCodecs VideoEncoder (VP9)       ┐
+    OfflineAudioContext → WebCodecs AudioEncoder   ├─► tiny WebM muxer below → .webm bytes
+      (Opus; 5.1 is written as a 4-stream Opus     ┘
+       multistream, channel-mapping family 1)
+  Everything drawn is a generic, procedurally generated stand-in — no documented design.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Placeholder film generator</title>
+    <style>
+      body { margin: 0; padding: 16px; background: #1b1916; color: #f5f1e8; font: 13px system-ui, sans-serif; }
+      canvas { max-width: 100%; height: auto; display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="log"></div>
+    <script type="module">
+      import '@fontsource/cormorant-garamond/400.css'
+      import '@fontsource/cormorant-garamond/500.css'
+      import '@fontsource/inter/300.css'
+      import '@fontsource/inter/400.css'
+      import { drawMotif, paintCottonGround, mulberry32, hashString } from '/src/museum/exhibits/motifs.ts'
+
+      const C = {
+        indigo: '#2c3f6b', indigoDeep: '#1a2644', indigoNight: '#0f1628',
+        madder: '#9b3326', madderDeep: '#7d2a20', ochre: '#b7862f',
+        black: '#2a2522', ecru: '#efe6d3', cream: '#f3ead8', natural: '#e8dcc3',
+      }
+      const SERIF = "'Cormorant Garamond', Georgia, serif"
+      const SANS = "Inter, system-ui, sans-serif"
+
+      /* ======================================================================= */
+      /* Drawing helpers                                                         */
+      /* ======================================================================= */
+
+      const canvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c }
+      const clamp01 = (x) => Math.max(0, Math.min(1, x))
+      const smooth = (x) => { x = clamp01(x); return x * x * (3 - 2 * x) }
+      /** 0→1→0 envelope over [t0, t1] with `f` second fades. */
+      const window01 = (t, t0, t1, f = 1) => smooth((t - t0) / f) * smooth((t1 - t) / f)
+
+      function stamp2(ctx, motif, x, y, size, rot, st, rng) {
+        const j = () => (rng() - 0.5) * 1.6
+        const common = { rng, voids: 0.5, mottle: 0.5, grain: 0.55, bleed: Math.max(0.5, size / 260), composite: 'multiply', rotation: rot + (rng() - 0.5) * 0.012 }
+        if (st.fill) drawMotif(ctx, motif, x + 1.5 + j(), y + 1 + j(), size, st.fill, { ...common, layer: 'fill', alpha: (st.fillAlpha ?? 0.9) * (0.86 + rng() * 0.14) })
+        if (st.outline) drawMotif(ctx, motif, x, y, size, st.outline, { ...common, layer: 'outline', alpha: 0.93 })
+      }
+
+      /** A printed cloth: cotton ground + half-drop repeat. */
+      function cloth(w, h, seed, ground, motif, cell, st, opts = {}) {
+        const rng = mulberry32(hashString(seed))
+        const cv = canvas(w, h)
+        const ctx = cv.getContext('2d')
+        paintCottonGround(ctx, w, h, ground, rng, { threadPx: 2.2, unevenness: 1, noise: 6 })
+        if (opts.empty) return cv
+        const cols = Math.ceil(w / cell) + 1
+        const rows = Math.ceil(h / cell) + 2
+        for (let c = -1; c <= cols; c++) {
+          const drop = c % 2 ? cell / 2 : 0
+          for (let r = -1; r <= rows; r++) {
+            const rot = opts.alternate && c % 2 ? Math.PI : 0
+            stamp2(ctx, motif, cell * (c + 0.5), cell * (r + 0.5) + drop, cell * (opts.scale ?? 0.9), rot, st, rng)
+          }
+        }
+        if (opts.filler) for (let c = 0; c <= cols; c++) for (let r = 0; r <= rows; r++) stamp2(ctx, 'rosette', cell * c, cell * r + (c % 2 ? 0 : cell / 2), cell * 0.13, 0, { fill: opts.filler, fillAlpha: 0.8 }, rng)
+        return cv
+      }
+
+      /** Indigo resist cloth (motifs left pale where paste resisted the dye). */
+      function resistCloth(w, h, seed, dye, motif, cell) {
+        const rng = mulberry32(hashString(seed))
+        const cv = canvas(w, h)
+        const ctx = cv.getContext('2d')
+        paintCottonGround(ctx, w, h, C.ecru, rng, { threadPx: 2.2, unevenness: 1, noise: 6 })
+        const d = canvas(w, h)
+        const dc = d.getContext('2d')
+        dc.fillStyle = dye
+        dc.fillRect(0, 0, w, h)
+        for (let i = 0; i < 50; i++) {
+          const bx = rng() * w, by = rng() * h, br = Math.max(w, h) * (0.05 + rng() * 0.25)
+          const g = dc.createRadialGradient(bx, by, 0, bx, by, br)
+          const a = 0.05 + rng() * 0.1
+          g.addColorStop(0, rng() < 0.5 ? `rgba(255,255,255,${a})` : `rgba(0,0,20,${a})`)
+          g.addColorStop(1, 'rgba(0,0,0,0)')
+          dc.fillStyle = g
+          dc.fillRect(bx - br, by - br, br * 2, br * 2)
+        }
+        const cols = Math.ceil(w / cell) + 1, rows = Math.ceil(h / cell) + 2
+        for (let c = -1; c <= cols; c++) for (let r = -1; r <= rows; r++) {
+          const x = cell * (c + 0.5), y = cell * (r + 0.5) + (c % 2 ? cell / 2 : 0)
+          const o = { rng, voids: 0.25, mottle: 0.35, grain: 0.3, rotation: (rng() - 0.5) * 0.012 }
+          drawMotif(dc, motif, x, y, cell * 0.92, '#000', { ...o, layer: 'all', composite: 'destination-out', alpha: 0.35, bleed: cell / 120 })
+          drawMotif(dc, motif, x, y, cell * 0.9, '#000', { ...o, layer: 'all', composite: 'destination-out', alpha: 0.9, bleed: cell / 500 })
+        }
+        ctx.globalCompositeOperation = 'multiply'
+        ctx.drawImage(d, 0, 0)
+        ctx.globalCompositeOperation = 'source-over'
+        return cv
+      }
+
+      function vignette(w, h, strength = 0.55) {
+        const v = canvas(w, h)
+        const g = v.getContext('2d')
+        const grad = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.hypot(w, h) * 0.58)
+        grad.addColorStop(0, 'rgba(0,0,0,0)')
+        grad.addColorStop(1, `rgba(0,0,0,${strength})`)
+        g.fillStyle = grad
+        g.fillRect(0, 0, w, h)
+        return v
+      }
+
+      /** Draw `src` covering the frame with a slow Ken-Burns move. */
+      function kenBurns(ctx, src, w, h, t, dur, from, to) {
+        const k = smooth(t / dur)
+        const s = from.s + (to.s - from.s) * k
+        const cx = from.x + (to.x - from.x) * k
+        const cy = from.y + (to.y - from.y) * k
+        const rot = (from.r ?? 0) + ((to.r ?? 0) - (from.r ?? 0)) * k
+        // (cx, cy) in 0..1 of the source; scale s = frame px per source px
+        ctx.save()
+        ctx.translate(w / 2, h / 2)
+        ctx.rotate(rot)
+        ctx.scale(s, s)
+        ctx.drawImage(src, -cx * src.width, -cy * src.height)
+        ctx.restore()
+      }
+
+      function lightSweep(ctx, w, h, t, period = 14, alpha = 0.1) {
+        const p = ((t / period) % 1) * 1.8 - 0.4
+        const g = ctx.createLinearGradient(w * p - w * 0.5, 0, w * p + w * 0.5, h)
+        g.addColorStop(0, 'rgba(255,245,225,0)')
+        g.addColorStop(0.5, `rgba(255,245,225,${alpha})`)
+        g.addColorStop(1, 'rgba(255,245,225,0)')
+        ctx.save()
+        ctx.globalCompositeOperation = 'soft-light'
+        ctx.fillStyle = g
+        ctx.fillRect(0, 0, w, h)
+        ctx.restore()
+      }
+
+      function titleCard(ctx, w, h, a, title, sub, opts = {}) {
+        if (a <= 0.001) return
+        ctx.save()
+        ctx.globalAlpha = a * (opts.scrim ?? 0.55)
+        const g = ctx.createLinearGradient(0, h * 0.25, 0, h * 0.75)
+        g.addColorStop(0, 'rgba(12,10,8,0)')
+        g.addColorStop(0.5, 'rgba(12,10,8,1)')
+        g.addColorStop(1, 'rgba(12,10,8,0)')
+        ctx.fillStyle = g
+        ctx.fillRect(0, 0, w, h)
+        ctx.globalAlpha = a
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillStyle = '#f3ecdf'
+        ctx.font = `400 ${Math.round(h * (opts.size ?? 0.085))}px ${SERIF}`
+        ctx.fillText(title, w / 2, h * 0.47, w * 0.86)
+        if (sub) {
+          ctx.fillStyle = 'rgba(243,236,223,0.75)'
+          ctx.font = `300 ${Math.round(h * 0.026)}px ${SANS}`
+          spaced(ctx, sub.toUpperCase(), w / 2, h * 0.56, h * 0.006)
+        }
+        ctx.strokeStyle = 'rgba(214,190,150,0.55)'
+        ctx.lineWidth = Math.max(1, h / 720)
+        ctx.beginPath()
+        ctx.moveTo(w / 2 - h * 0.05, h * 0.395)
+        ctx.lineTo(w / 2 + h * 0.05, h * 0.395)
+        ctx.stroke()
+        ctx.restore()
+      }
+
+      function spaced(ctx, text, x, y, spacing) {
+        const chars = [...text]
+        const widths = chars.map((c) => ctx.measureText(c).width)
+        const total = widths.reduce((a, b) => a + b, 0) + spacing * (chars.length - 1)
+        let cx = x - total / 2
+        const align = ctx.textAlign
+        ctx.textAlign = 'left'
+        chars.forEach((c, i) => { ctx.fillText(c, cx, y); cx += widths[i] + spacing })
+        ctx.textAlign = align
+      }
+
+      const PLACEHOLDER_LINE = 'Placeholder film — footage to be supplied by the workshop'
+      function endCard(ctx, w, h, a, title) {
+        titleCard(ctx, w, h, a, PLACEHOLDER_LINE, title, { scrim: 0.72, size: 0.052 })
+      }
+
+      function caption(ctx, w, h, text) {
+        ctx.save()
+        ctx.fillStyle = 'rgba(243,236,223,0.42)'
+        ctx.font = `300 ${Math.round(h * 0.017)}px ${SANS}`
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'alphabetic'
+        let x = w * 0.045
+        for (const c of text.toUpperCase()) { ctx.fillText(c, x, h * 0.94); x += ctx.measureText(c).width + h * 0.003 }
+        ctx.restore()
+      }
+
+      function fadeBlack(ctx, w, h, a) {
+        if (a <= 0.001) return
+        ctx.save()
+        ctx.globalAlpha = a
+        ctx.fillStyle = '#080706'
+        ctx.fillRect(0, 0, w, h)
+        ctx.restore()
+      }
+
+      /* ======================================================================= */
+      /* Audio helpers (OfflineAudioContext)                                     */
+      /* ======================================================================= */
+
+      const NOTE = (n) => 440 * Math.pow(2, (n - 69) / 12)
+
+      /** Soft analogue-style pad: detuned saws → slow low-pass → long envelopes. */
+      function pad(ctx, dest, chords, { level = 0.08, cutoff = 900, detune = 7, seed = 'pad' } = {}) {
+        const rng = mulberry32(hashString(seed))
+        for (const ch of chords) {
+          for (const n of ch.notes) {
+            const f = NOTE(n)
+            const g = ctx.createGain()
+            g.gain.setValueAtTime(0, ch.t0)
+            g.gain.linearRampToValueAtTime(level, ch.t0 + (ch.attack ?? 2.5))
+            g.gain.setValueAtTime(level, Math.max(ch.t0 + (ch.attack ?? 2.5), ch.t1 - (ch.release ?? 3)))
+            g.gain.linearRampToValueAtTime(0, ch.t1)
+            const lp = ctx.createBiquadFilter()
+            lp.type = 'lowpass'
+            lp.frequency.value = cutoff
+            lp.Q.value = 0.5
+            const lfo = ctx.createOscillator()
+            lfo.frequency.value = 0.05 + rng() * 0.08
+            const lfoG = ctx.createGain()
+            lfoG.gain.value = cutoff * 0.35
+            lfo.connect(lfoG).connect(lp.frequency)
+            lfo.start(ch.t0)
+            lfo.stop(ch.t1)
+            for (const d of [-detune, detune * 0.6]) {
+              const o = ctx.createOscillator()
+              o.type = n < 50 ? 'sine' : 'sawtooth'
+              o.frequency.value = f
+              o.detune.value = d + (rng() - 0.5) * 3
+              o.connect(lp)
+              o.start(ch.t0)
+              o.stop(ch.t1)
+            }
+            lp.connect(g).connect(dest)
+          }
+        }
+      }
+
+      function bell(ctx, dest, t, f, level = 0.12, decay = 1.1) {
+        for (const [m, a] of [[1, 1], [2.01, 0.35], [3.03, 0.14], [4.2, 0.05]]) {
+          const o = ctx.createOscillator()
+          o.frequency.value = f * m
+          const g = ctx.createGain()
+          g.gain.setValueAtTime(0, t)
+          g.gain.linearRampToValueAtTime(level * a, t + 0.012)
+          g.gain.exponentialRampToValueAtTime(0.0001, t + decay / m ** 0.3)
+          o.connect(g).connect(dest)
+          o.start(t)
+          o.stop(t + decay + 0.1)
+        }
+      }
+
+      let noiseBuf = null
+      function noise(ctx) {
+        if (noiseBuf && noiseBuf.sampleRate === ctx.sampleRate) return noiseBuf
+        const rng = mulberry32(7)
+        noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate)
+        const d = noiseBuf.getChannelData(0)
+        for (let i = 0; i < d.length; i++) d[i] = rng() * 2 - 1
+        return noiseBuf
+      }
+
+      /** Block hitting padded cloth: low thump + short muffled noise. */
+      function thump(ctx, dest, t, level = 0.35) {
+        const o = ctx.createOscillator()
+        o.frequency.setValueAtTime(120, t)
+        o.frequency.exponentialRampToValueAtTime(55, t + 0.12)
+        const g = ctx.createGain()
+        g.gain.setValueAtTime(0, t)
+        g.gain.linearRampToValueAtTime(level, t + 0.004)
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28)
+        o.connect(g).connect(dest)
+        o.start(t)
+        o.stop(t + 0.3)
+        const n = ctx.createBufferSource()
+        n.buffer = noise(ctx)
+        const bp = ctx.createBiquadFilter()
+        bp.type = 'lowpass'
+        bp.frequency.value = 700
+        const ng = ctx.createGain()
+        ng.gain.setValueAtTime(level * 0.5, t)
+        ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.09)
+        n.connect(bp).connect(ng).connect(dest)
+        n.start(t, Math.random())
+        n.stop(t + 0.1)
+      }
+
+      /** Slow filtered-noise swells (water / breath). */
+      function wash(ctx, dest, t0, t1, { level = 0.05, freq = 500, rate = 0.12 } = {}) {
+        const n = ctx.createBufferSource()
+        n.buffer = noise(ctx)
+        n.loop = true
+        const bp = ctx.createBiquadFilter()
+        bp.type = 'bandpass'
+        bp.frequency.value = freq
+        bp.Q.value = 0.7
+        const lfo = ctx.createOscillator()
+        lfo.frequency.value = rate
+        const lg = ctx.createGain()
+        lg.gain.value = level * 0.6
+        const g = ctx.createGain()
+        g.gain.value = level
+        lfo.connect(lg).connect(g.gain)
+        n.connect(bp).connect(g).connect(dest)
+        n.start(t0)
+        n.stop(t1)
+        lfo.start(t0)
+        lfo.stop(t1)
+      }
+
+      function masterFade(ctx, node, dur, fin = 1.2, fout = 1.6) {
+        node.gain.setValueAtTime(0, 0)
+        node.gain.linearRampToValueAtTime(1, fin)
+        node.gain.setValueAtTime(1, dur - fout)
+        node.gain.linearRampToValueAtTime(0, dur - 0.02)
+      }
+
+      /* ======================================================================= */
+      /* Films                                                                   */
+      /* ======================================================================= */
+
+      const CHORDS = (t0, dur, list, len = 8) => list.map((notes, i) => ({ t0: t0 + i * (len - 2), t1: Math.min(dur, t0 + i * (len - 2) + len), notes }))
+
+      const FILMS = {
+        /* ------------------------------------------------------------------ */
+        'welcome-film': {
+          w: 1280, h: 720, fps: 30, duration: 30, channels: 2, bitrate: 1_800_000, poster: 3.2,
+          setup(w, h) {
+            return {
+              a: cloth(2200, 1500, 'wf-a', C.cream, 'teardrop', 210, { outline: C.black, fill: C.madder, fillAlpha: 0.9 }, { alternate: true, filler: C.black }),
+              b: cloth(2200, 1500, 'wf-b', C.ecru, 'rosette', 250, { outline: C.indigo, fill: C.indigo, fillAlpha: 0.5 }, { filler: C.indigo }),
+              v: vignette(w, h, 0.6),
+            }
+          },
+          draw(ctx, t, A, w, h) {
+            const mix = smooth((t - 14) / 3)
+            kenBurns(ctx, A.a, w, h, t, 30, { s: 0.74, x: 0.43, y: 0.45, r: -0.012 }, { s: 0.8, x: 0.57, y: 0.53, r: 0.01 })
+            if (mix > 0) {
+              ctx.save(); ctx.globalAlpha = mix
+              kenBurns(ctx, A.b, w, h, t, 30, { s: 0.8, x: 0.57, y: 0.42, r: 0.01 }, { s: 0.74, x: 0.44, y: 0.56, r: -0.008 })
+              ctx.restore()
+            }
+            lightSweep(ctx, w, h, t, 16, 0.14)
+            ctx.drawImage(A.v, 0, 0)
+            titleCard(ctx, w, h, window01(t, 1.0, 8.0, 1.4), 'Hand Block Printing', 'Welcome to the exhibition')
+            endCard(ctx, w, h, window01(t, 23.5, 29.2, 1.2), 'Welcome Film')
+            caption(ctx, w, h, 'Placeholder')
+            fadeBlack(ctx, w, h, 1 - smooth(t / 0.8) + smooth((t - 29.2) / 0.8))
+          },
+          sound(ctx, out, dur) {
+            // D major-ish, unhurried: Dmaj9 → Gmaj7 → Bm9 → Asus → Dmaj9
+            pad(ctx, out, CHORDS(0, dur, [[50, 57, 62, 66, 69], [43, 55, 59, 62, 66], [47, 54, 61, 62, 66], [45, 52, 57, 59, 64], [50, 57, 62, 64, 69]], 8.5), { level: 0.028, cutoff: 850, seed: 'wf' })
+            const panner = ctx.createStereoPanner()
+            panner.connect(out)
+            const notes = [74, 78, 81, 76, 73, 78, 74, 69, 71, 74]
+            notes.forEach((n, i) => bell(ctx, panner, 2.2 + i * 2.6 + (i % 3) * 0.3, NOTE(n), 0.05, 2.2))
+            panner.pan.setValueAtTime(-0.4, 0)
+            panner.pan.linearRampToValueAtTime(0.4, dur)
+            wash(ctx, out, 0, dur, { level: 0.012, freq: 900, rate: 0.07 })
+          },
+        },
+
+        /* ------------------------------------------------------------------ */
+        'process-film-1': {
+          w: 1280, h: 720, fps: 30, duration: 26, channels: 2, bitrate: 1_600_000, poster: 19,
+          setup(w, h) {
+            const cw = 1700, ch = 1000
+            const base = cloth(cw, ch, 'pf1', C.ecru, 'rosette', 170, {}, { empty: true })
+            const printed = canvas(cw, ch)
+            printed.getContext('2d').drawImage(base, 0, 0)
+            const cell = 150
+            const cols = Math.floor(cw / cell) - 1, rows = Math.floor(ch / cell) - 1
+            const stamps = []
+            for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+              const cc = r % 2 ? cols - 1 - c : c
+              stamps.push({ x: cell * (cc + 1), y: cell * (r + 1) + (cc % 2 ? cell / 2 : 0) - cell * 0.25 })
+            }
+            // wooden block sprite (seen from above: carved face down, back with handle)
+            const blk = canvas(200, 200)
+            const b = blk.getContext('2d')
+            const g = b.createLinearGradient(0, 0, 200, 200)
+            g.addColorStop(0, '#7a5534'); g.addColorStop(1, '#4e3320')
+            b.fillStyle = g
+            b.beginPath(); b.roundRect(20, 20, 160, 160, 10); b.fill()
+            b.strokeStyle = 'rgba(0,0,0,0.25)'
+            for (let i = 0; i < 30; i++) { b.lineWidth = 0.5 + (i % 3); b.beginPath(); b.moveTo(20, 24 + i * 5.2); b.bezierCurveTo(80, 20 + i * 5.2 + 6, 120, 28 + i * 5.2 - 6, 180, 24 + i * 5.2); b.stroke() }
+            b.fillStyle = '#3a2618'
+            b.beginPath(); b.ellipse(100, 100, 34, 22, 0, 0, Math.PI * 2); b.fill()
+            b.fillStyle = 'rgba(255,230,190,0.18)'
+            b.beginPath(); b.ellipse(94, 94, 22, 12, 0, 0, Math.PI * 2); b.fill()
+            return { base, printed, stamps, cell, blk, committed: 0, rng: mulberry32(11), v: vignette(w, h, 0.5), cw, ch }
+          },
+          T0: 3.2, RATE: 0.62,
+          draw(ctx, t, A, w, h) {
+            const f = FILMS['process-film-1']
+            const pc = A.printed.getContext('2d')
+            const idx = (t - f.T0) / f.RATE
+            // commit stamps whose impact has passed (sequential rendering keeps this deterministic)
+            while (A.committed < A.stamps.length && A.committed + 1 <= idx) {
+              const s = A.stamps[A.committed++]
+              stamp2(pc, 'rosette', s.x, s.y, A.cell * 0.86, 0, { outline: C.madderDeep, fill: C.madder, fillAlpha: 0.55 }, A.rng)
+            }
+            // camera: slow drift across the table
+            const k = smooth(t / f.duration)
+            const s = 1.05 - 0.12 * k
+            ctx.fillStyle = '#2b2119'
+            ctx.fillRect(0, 0, w, h)
+            ctx.save()
+            ctx.translate(w / 2, h / 2)
+            ctx.scale(s, s)
+            ctx.translate(-A.cw * (0.42 + 0.14 * k), -A.ch * (0.45 + 0.08 * k))
+            ctx.drawImage(A.printed, 0, 0)
+            // the block: lifts, travels, presses
+            const n = Math.floor(idx)
+            if (idx >= 0 && n < A.stamps.length) {
+              const ph = idx - n // 0 = just pressed previous, 1 = pressing this one
+              const cur = A.stamps[n]
+              const prev = A.stamps[Math.max(0, n - 1)]
+              const travel = smooth((ph - 0.15) / 0.6)
+              const x = prev.x + (cur.x - prev.x) * travel
+              const y = prev.y + (cur.y - prev.y) * travel
+              const lift = Math.sin(Math.PI * clamp01((ph - 0.05) / 0.9)) // 0 on cloth → 1 up
+              const sz = A.cell * (1.05 + 0.18 * lift)
+              ctx.save()
+              ctx.globalAlpha = 0.28 * (1 - 0.5 * lift)
+              ctx.fillStyle = '#000'
+              ctx.filter = `blur(${4 + lift * 14}px)`
+              ctx.fillRect(x - sz / 2 + 8 + lift * 26, y - sz / 2 + 10 + lift * 30, sz, sz)
+              ctx.restore()
+              ctx.drawImage(A.blk, x - sz / 2, y - sz / 2, sz, sz)
+            }
+            ctx.restore()
+            lightSweep(ctx, w, h, t, 20, 0.08)
+            ctx.drawImage(A.v, 0, 0)
+            titleCard(ctx, w, h, window01(t, 0.4, 3.6, 0.9), 'Printing', 'Process film')
+            endCard(ctx, w, h, window01(t, 21.2, 25.4, 1.0), 'Process Film — Printing')
+            caption(ctx, w, h, 'Placeholder')
+            fadeBlack(ctx, w, h, 1 - smooth(t / 0.6) + smooth((t - 25.4) / 0.6))
+          },
+          sound(ctx, out, dur) {
+            const f = FILMS['process-film-1']
+            pad(ctx, out, CHORDS(0, dur, [[45, 52, 57, 60, 64], [41, 53, 57, 60, 65], [43, 55, 59, 62, 67], [45, 52, 57, 59, 64]], 8), { level: 0.02, cutoff: 700, seed: 'pf1' })
+            const pan = ctx.createStereoPanner()
+            pan.connect(out)
+            for (let i = 1; f.T0 + i * f.RATE < dur - 4.6; i++) thump(ctx, pan, f.T0 + i * f.RATE, 0.22 + (i % 4 === 0 ? 0.06 : 0))
+            pan.pan.setValueAtTime(-0.25, 0)
+            pan.pan.linearRampToValueAtTime(0.25, dur)
+            wash(ctx, out, 0, dur, { level: 0.01, freq: 1500, rate: 0.05 })
+          },
+        },
+
+        /* ------------------------------------------------------------------ */
+        'process-film-2': {
+          w: 1280, h: 720, fps: 30, duration: 26, channels: 2, bitrate: 1_600_000, poster: 14,
+          setup(w, h) {
+            const cw = 1600, ch = 1000
+            return {
+              raw: cloth(cw, ch, 'pf2', C.ecru, 'rosette', 180, {}, { empty: true }),
+              dyed: resistCloth(cw, ch, 'pf2d', C.indigo, 'star-lattice', 200),
+              deep: resistCloth(cw, ch, 'pf2d', C.indigoDeep, 'star-lattice', 200),
+              mask: canvas(cw, ch), tmp: canvas(cw, ch), v: vignette(w, h, 0.55), cw, ch,
+            }
+          },
+          draw(ctx, t, A, w, h) {
+            const { cw, ch } = A
+            const tc = A.tmp.getContext('2d')
+            const mc = A.mask.getContext('2d')
+            // dye front rises from the bottom (dip), then a second dip deepens the colour
+            const level = smooth((t - 3) / 12) // 0..1
+            const deep = smooth((t - 15.5) / 5)
+            mc.clearRect(0, 0, cw, ch)
+            mc.save()
+            mc.filter = 'blur(18px)'
+            mc.fillStyle = '#fff'
+            mc.beginPath()
+            const yFront = ch * (1.08 - 1.2 * level)
+            mc.moveTo(0, ch + 40)
+            for (let x = 0; x <= cw; x += 20) mc.lineTo(x, yFront + Math.sin(x / 140 + t * 0.9) * 16 + Math.sin(x / 57 - t * 1.7) * 7)
+            mc.lineTo(cw, ch + 40)
+            mc.closePath()
+            mc.fill()
+            mc.restore()
+            tc.clearRect(0, 0, cw, ch)
+            tc.globalCompositeOperation = 'source-over'
+            tc.drawImage(A.dyed, 0, 0)
+            if (deep > 0) { tc.globalAlpha = deep; tc.drawImage(A.deep, 0, 0); tc.globalAlpha = 1 }
+            tc.globalCompositeOperation = 'destination-in'
+            tc.drawImage(A.mask, 0, 0)
+            tc.globalCompositeOperation = 'source-over'
+            ctx.fillStyle = '#10141c'
+            ctx.fillRect(0, 0, w, h)
+            const k = smooth(t / 26)
+            const s = 0.86 + 0.08 * k
+            ctx.save()
+            ctx.translate(w / 2, h / 2)
+            ctx.rotate(-0.03 + 0.04 * k)
+            ctx.scale(s, s)
+            ctx.translate(-cw / 2 - 60 + 120 * k, -ch / 2)
+            ctx.drawImage(A.raw, 0, 0)
+            ctx.drawImage(A.tmp, 0, 0)
+            ctx.restore()
+            // wet sheen near the dye front
+            lightSweep(ctx, w, h, t, 11, 0.12)
+            ctx.drawImage(A.v, 0, 0)
+            titleCard(ctx, w, h, window01(t, 0.4, 3.8, 0.9), 'Dyeing', 'Process film')
+            endCard(ctx, w, h, window01(t, 21.2, 25.4, 1.0), 'Process Film — Dyeing')
+            caption(ctx, w, h, 'Placeholder')
+            fadeBlack(ctx, w, h, 1 - smooth(t / 0.6) + smooth((t - 25.4) / 0.6))
+          },
+          sound(ctx, out, dur) {
+            pad(ctx, out, CHORDS(0, dur, [[38, 50, 57, 60, 65], [36, 48, 55, 60, 64], [41, 53, 57, 60, 67], [43, 50, 55, 58, 62]], 8), { level: 0.02, cutoff: 650, seed: 'pf2' })
+            wash(ctx, out, 2, dur, { level: 0.035, freq: 420, rate: 0.16 })
+            wash(ctx, out, 3, dur, { level: 0.02, freq: 1600, rate: 0.27 })
+            const pan = ctx.createStereoPanner()
+            pan.connect(out)
+            ;[4.2, 7.9, 11.3, 16.1, 19.4].forEach((tt, i) => bell(ctx, pan, tt, NOTE([69, 72, 76, 74, 69][i]), 0.03, 2.8))
+          },
+        },
+
+        /* ------------------------------------------------------------------ */
+        'theatre-film': {
+          w: 1920, h: 1080, fps: 30, duration: 36, channels: 6, bitrate: 2_000_000, poster: 2.8,
+          // WebAudio discrete 5.1 order: 0 L, 1 R, 2 C, 3 LFE, 4 SL, 5 SR
+          TESTS: [
+            { t0: 4.0, t1: 6.4, ch: 0, label: 'Front left', note: 72 },
+            { t0: 6.5, t1: 8.9, ch: 2, label: 'Centre', note: 76 },
+            { t0: 9.0, t1: 11.4, ch: 1, label: 'Front right', note: 79 },
+            { t0: 11.5, t1: 13.9, ch: 5, label: 'Surround right', note: 81 },
+            { t0: 14.0, t1: 16.4, ch: 4, label: 'Surround left', note: 74 },
+            { t0: 16.5, t1: 18.9, ch: 3, label: 'Low-frequency effects', note: 28 },
+          ],
+          CIRCLE: { t0: 19.2, t1: 27.2, period: 4 },
+          setup(w, h) {
+            const sprites = ['rosette', 'star-lattice', 'teardrop', 'diamond'].map((m, i) => {
+              const s = canvas(320, 320)
+              const g = s.getContext('2d')
+              drawMotif(g, m, 160, 160, 250, i % 2 ? C.ochre : '#e9dcc0', { layer: 'all', alpha: 0.9 })
+              const blur = canvas(320, 320)
+              const bg = blur.getContext('2d')
+              bg.filter = 'blur(10px)'
+              bg.drawImage(s, 0, 0)
+              return { s, blur }
+            })
+            const rng = mulberry32(5)
+            const floaters = Array.from({ length: 16 }, (_, i) => ({ sp: i % 4, x: rng(), y: rng(), z: 0.35 + rng() * 0.9, rot: rng() * 6, vr: (rng() - 0.5) * 0.05, vx: (rng() - 0.5) * 0.012, vy: -0.006 - rng() * 0.01 }))
+            return { back: resistCloth(2600, 1600, 'th', C.indigoNight, 'rosette', 260), sprites, floaters, v: vignette(w, h, 0.7) }
+          },
+          weights(t) {
+            const f = FILMS['theatre-film']
+            const wts = [0, 0, 0, 0, 0, 0]
+            for (const s of f.TESTS) wts[s.ch] = Math.max(wts[s.ch], window01(t, s.t0, s.t1, 0.15))
+            const c = f.CIRCLE
+            if (t > c.t0 && t < c.t1) {
+              const env = window01(t, c.t0, c.t1, 0.5)
+              const ring = [0, 1, 5, 4] // FL → FR → SR → SL
+              const pos = (((t - c.t0) / c.period) % 1) * 4
+              const i = Math.floor(pos), fr = pos - i
+              wts[ring[i]] = Math.max(wts[ring[i]], Math.cos(fr * Math.PI / 2) * env)
+              wts[ring[(i + 1) % 4]] = Math.max(wts[ring[(i + 1) % 4]], Math.sin(fr * Math.PI / 2) * env)
+            }
+            return wts
+          },
+          draw(ctx, t, A, w, h) {
+            const f = FILMS['theatre-film']
+            ctx.fillStyle = '#070a12'
+            ctx.fillRect(0, 0, w, h)
+            kenBurns(ctx, A.back, w, h, t, 36, { s: 0.95, x: 0.42, y: 0.46, r: 0.01 }, { s: 1.04, x: 0.58, y: 0.54, r: -0.012 })
+            ctx.save()
+            ctx.globalCompositeOperation = 'multiply'
+            ctx.fillStyle = 'rgba(40,52,90,0.55)'
+            ctx.fillRect(0, 0, w, h)
+            ctx.restore()
+            // drifting motif blocks (parallax, soft focus when far)
+            for (const fl of A.floaters) {
+              const x = (((fl.x + fl.vx * t * fl.z) % 1) + 1) % 1
+              const y = (((fl.y + fl.vy * t * fl.z) % 1) + 1) % 1
+              const sz = 180 * fl.z
+              const sp = A.sprites[fl.sp]
+              ctx.save()
+              ctx.globalAlpha = 0.1 + 0.22 * fl.z
+              ctx.translate(x * (w + 400) - 200, y * (h + 400) - 200)
+              ctx.rotate(fl.rot + fl.vr * t)
+              ctx.drawImage(fl.z < 0.7 ? sp.blur : sp.s, -sz / 2, -sz / 2, sz, sz)
+              ctx.restore()
+            }
+            lightSweep(ctx, w, h, t, 18, 0.1)
+            ctx.drawImage(A.v, 0, 0)
+            // speaker-test overlay
+            const wts = f.weights(t)
+            const test = f.TESTS.find((s) => t >= s.t0 && t <= s.t1)
+            const circle = t > f.CIRCLE.t0 && t < f.CIRCLE.t1
+            const la = test ? window01(t, test.t0, test.t1, 0.25) : circle ? window01(t, f.CIRCLE.t0, f.CIRCLE.t1, 0.5) : 0
+            if (la > 0) {
+              ctx.save()
+              ctx.globalAlpha = la
+              ctx.textAlign = 'center'
+              ctx.fillStyle = '#f3ecdf'
+              ctx.font = `400 ${Math.round(h * 0.06)}px ${SERIF}`
+              ctx.fillText(test ? test.label : 'Circling the room', w / 2, h * 0.5)
+              ctx.fillStyle = 'rgba(243,236,223,0.6)'
+              ctx.font = `300 ${Math.round(h * 0.02)}px ${SANS}`
+              spaced(ctx, 'SURROUND CALIBRATION', w / 2, h * 0.43, h * 0.005)
+              ctx.restore()
+            }
+            // tiny top-down layout diagram (screen at top), lower right
+            const dA = Math.max(la, window01(t, 3.4, 27.8, 0.6) * 0.6)
+            if (dA > 0) {
+              const cx = w * 0.88, cy = h * 0.8, R = h * 0.075
+              ctx.save()
+              ctx.globalAlpha = dA
+              ctx.strokeStyle = 'rgba(243,236,223,0.35)'
+              ctx.lineWidth = 1.5
+              ctx.beginPath(); ctx.moveTo(cx - R * 0.9, cy - R * 1.25); ctx.quadraticCurveTo(cx, cy - R * 1.12, cx + R * 0.9, cy - R * 1.25); ctx.stroke()
+              ctx.beginPath(); ctx.arc(cx, cy + R * 0.1, R * 0.12, 0, Math.PI * 2); ctx.stroke()
+              const pos = [[-0.75, -0.95], [0.75, -0.95], [0, -1.02], [-0.35, -0.92], [-1.05, 0.55], [1.05, 0.55]]
+              pos.forEach(([px, py], i) => {
+                const a = wts[i]
+                ctx.fillStyle = `rgba(${Math.round(160 + 95 * a)},${Math.round(170 + 70 * a)},${Math.round(190 + 20 * a)},${0.35 + 0.65 * a})`
+                ctx.beginPath(); ctx.arc(cx + px * R, cy + py * R, R * (0.07 + 0.06 * a), 0, Math.PI * 2); ctx.fill()
+              })
+              ctx.restore()
+            }
+            titleCard(ctx, w, h, window01(t, 0.6, 3.6, 0.8), 'Immersive Theatre', '5.1 surround · placeholder feature')
+            endCard(ctx, w, h, window01(t, 30.2, 35.2, 1.2), 'Immersive Theatre — Feature Film')
+            caption(ctx, w, h, 'Placeholder')
+            fadeBlack(ctx, w, h, 1 - smooth(t / 0.7) + smooth((t - 35.2) / 0.7))
+          },
+          sound(ctx, out, dur) {
+            const f = FILMS['theatre-film']
+            const merger = ctx.createChannelMerger(6)
+            merger.connect(out)
+            const bus = Array.from({ length: 6 }, (_, i) => { const g = ctx.createGain(); g.connect(merger, 0, i); return g })
+            // Pad bed: fronts + (decorrelated) surrounds; a quiet sub drone on the LFE.
+            const chords = CHORDS(0, dur, [[38, 50, 57, 62, 65], [34, 46, 53, 58, 62], [36, 48, 55, 60, 64], [33, 45, 52, 57, 60], [38, 50, 57, 62, 66]], 9)
+            const bedLevel = (g, lv) => { g.gain.setValueAtTime(lv, 0); g.gain.linearRampToValueAtTime(lv * 0.45, 3.8); g.gain.setValueAtTime(lv * 0.45, 27); g.gain.linearRampToValueAtTime(lv * 1.25, 29); g.gain.setValueAtTime(lv * 1.25, 31); g.gain.linearRampToValueAtTime(lv, 33) }
+            const mk = (targets, seed, level) => {
+              const g = ctx.createGain()
+              bedLevel(g, 1)
+              for (const [i, a] of targets) { const s = ctx.createGain(); s.gain.value = a; g.connect(s).connect(bus[i]) }
+              pad(ctx, g, chords, { level, cutoff: 800, seed })
+            }
+            mk([[0, 1], [1, 0.35]], 'thL', 0.018)
+            mk([[1, 1], [0, 0.35]], 'thR', 0.018)
+            mk([[4, 1], [5, 0.2]], 'thSL', 0.011)
+            mk([[5, 1], [4, 0.2]], 'thSR', 0.011)
+            const sub = ctx.createGain()
+            bedLevel(sub, 1)
+            sub.connect(bus[3])
+            pad(ctx, sub, chords.map((c) => ({ ...c, notes: [c.notes[0] - 12 >= 21 ? c.notes[0] - 12 : c.notes[0]] })), { level: 0.022, cutoff: 120, seed: 'sub' })
+            // Discrete test tones.
+            for (const s of f.TESTS) {
+              if (s.ch === 3) {
+                for (let k = 0; k < 3; k++) {
+                  const t = s.t0 + 0.15 + k * 0.72
+                  const o = ctx.createOscillator(); o.frequency.value = 45
+                  const g = ctx.createGain()
+                  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.5, t + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6)
+                  o.connect(g).connect(bus[3]); o.start(t); o.stop(t + 0.65)
+                }
+              } else {
+                for (let k = 0; k < 3; k++) bell(ctx, bus[s.ch], s.t0 + 0.12 + k * 0.72, NOTE(s.note), 0.13, 1.2)
+              }
+            }
+            // Circling tone: constant-power pan around FL → FR → SR → SL.
+            const c = f.CIRCLE
+            const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = NOTE(69)
+            const trem = ctx.createOscillator(); trem.frequency.value = 5
+            const tg = ctx.createGain(); tg.gain.value = 0.25
+            const src = ctx.createGain(); src.gain.value = 0.75
+            trem.connect(tg).connect(src.gain)
+            const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800
+            o.connect(lp).connect(src)
+            o.start(c.t0); o.stop(c.t1); trem.start(c.t0); trem.stop(c.t1)
+            const ring = [0, 1, 5, 4]
+            const N = Math.ceil((c.t1 - c.t0) * 100)
+            ring.forEach((ch, idx) => {
+              const curve = new Float32Array(N)
+              for (let i = 0; i < N; i++) {
+                const t = c.t0 + i / 100
+                const env = window01(t, c.t0, c.t1, 0.5)
+                const pos = (((t - c.t0) / c.period) % 1) * 4
+                const d = ((pos - idx) % 4 + 4) % 4 // 0..4
+                const wgt = d < 1 ? Math.cos(d * Math.PI / 2) : d > 3 ? Math.sin((d - 3) * Math.PI / 2) : 0
+                curve[i] = 0.09 * wgt * env
+              }
+              const g = ctx.createGain()
+              g.gain.value = 0
+              g.gain.setValueCurveAtTime(curve, c.t0, c.t1 - c.t0)
+              src.connect(g).connect(bus[ch])
+            })
+          },
+        },
+      }
+
+      /* ======================================================================= */
+      /* Opus multistream packing                                                */
+      /* ======================================================================= */
+
+      const lenEnc = (n) => (n < 252 ? [n] : [252 + (n & 3), (n - 252 - (n & 3)) >> 2])
+      const readLen = (p, i) => (p[i] < 252 ? [p[i], 1] : [p[i] + 4 * p[i + 1], 2])
+      /** Convert a standard Opus packet to self-delimited framing (RFC 6716 App. B). */
+      function selfDelimit(p) {
+        const code = p[0] & 3
+        const L = p.length
+        let at, n
+        if (code === 0) { at = 1; n = L - 1 }
+        else if (code === 1) { at = 1; n = (L - 1) / 2 }
+        else if (code === 2) { const [n1, s] = readLen(p, 1); at = 1 + s; n = L - 1 - s - n1 }
+        else {
+          const cb = p[1], vbr = cb & 0x80, padFlag = cb & 0x40, M = cb & 0x3f
+          let i = 2, pad = 0
+          if (padFlag) { for (;;) { const b = p[i++]; pad += b === 255 ? 254 : b; if (b !== 255) break } }
+          if (vbr) { let sum = 0; for (let k = 0; k < M - 1; k++) { const [x, s] = readLen(p, i); sum += x; i += s } n = L - i - sum - pad }
+          else n = (L - i - pad) / M
+          at = i
+        }
+        const le = lenEnc(n)
+        const out = new Uint8Array(L + le.length)
+        out.set(p.subarray(0, at), 0)
+        out.set(le, at)
+        out.set(p.subarray(at), at + le.length)
+        return out
+      }
+
+      function opusHead(channels, preSkip, family, streams, coupled, mapping) {
+        const len = family ? 21 + channels : 19
+        const b = new Uint8Array(len)
+        const dv = new DataView(b.buffer)
+        b.set(new TextEncoder().encode('OpusHead'), 0)
+        b[8] = 1
+        b[9] = channels
+        dv.setUint16(10, preSkip, true)
+        dv.setUint32(12, 48000, true)
+        dv.setInt16(16, 0, true)
+        b[18] = family
+        if (family) { b[19] = streams; b[20] = coupled; b.set(mapping, 21) }
+        return b
+      }
+
+      /* ======================================================================= */
+      /* Minimal WebM muxer                                                      */
+      /* ======================================================================= */
+
+      const TE = new TextEncoder()
+      function cat(parts) {
+        let n = 0
+        for (const p of parts) n += p.length
+        const out = new Uint8Array(n)
+        let o = 0
+        for (const p of parts) { out.set(p, o); o += p.length }
+        return out
+      }
+      function idB(id) { const b = []; let v = id; while (v > 0) { b.unshift(v & 0xff); v = Math.floor(v / 256) } return new Uint8Array(b) }
+      function vsize(n) {
+        for (let len = 1; len <= 8; len++) {
+          if (n < 2 ** (7 * len) - 1) {
+            const out = new Uint8Array(len)
+            let v = n
+            for (let i = len - 1; i >= 0; i--) { out[i] = v % 256; v = Math.floor(v / 256) }
+            out[0] |= 1 << (8 - len)
+            return out
+          }
+        }
+        throw new Error('size too large')
+      }
+      const E = (id, payload) => cat([idB(id), vsize(payload.length), payload])
+      const M = (id, children) => E(id, cat(children))
+      function U(id, v, width = 0) {
+        const b = []
+        let x = v
+        do { b.unshift(x % 256); x = Math.floor(x / 256) } while (x > 0)
+        while (b.length < width) b.unshift(0)
+        return E(id, new Uint8Array(b))
+      }
+      const S = (id, s) => E(id, TE.encode(s))
+      function F(id, v) { const b = new Uint8Array(8); new DataView(b.buffer).setFloat64(0, v); return E(id, b) }
+
+      function muxWebM({ width, height, fps, video, audio, audioChannels, codecPrivate, durationMs }) {
+        const header = M(0x1a45dfa3, [U(0x4286, 1), U(0x42f7, 1), U(0x42f2, 4), U(0x42f3, 8), S(0x4282, 'webm'), U(0x4287, 4), U(0x4285, 2)])
+        const info = M(0x1549a966, [U(0x2ad7b1, 1_000_000), F(0x4489, durationMs), S(0x4d80, 'museum-placeholder-mux'), S(0x5741, 'museum-placeholder-gen')])
+        const tracks = M(0x1654ae6b, [
+          M(0xae, [U(0xd7, 1), U(0x73c5, 1), U(0x83, 1), S(0x86, 'V_VP9'), U(0x23e383, Math.round(1e9 / fps)), M(0xe0, [U(0xb0, width), U(0xba, height)])]),
+          M(0xae, [U(0xd7, 2), U(0x73c5, 2), U(0x83, 2), S(0x86, 'A_OPUS'), E(0x63a2, codecPrivate), U(0x56aa, 6_500_000), U(0x56bb, 80_000_000), M(0xe1, [F(0xb5, 48000), U(0x9f, audioChannels)])]),
+        ])
+        // Interleave by time; clusters start on video keyframes.
+        const blocks = [
+          ...video.map((c) => ({ track: 1, ms: Math.round(c.timestamp / 1000), key: c.key, data: c.data })),
+          ...audio.map((c) => ({ track: 2, ms: Math.round(c.timestamp / 1000), key: true, data: c.data })),
+        ].sort((a, b) => a.ms - b.ms || a.track - b.track)
+        const clusters = []
+        let cur = null
+        for (const b of blocks) {
+          if (!cur || (b.track === 1 && b.key && b.ms !== cur.ms) || b.ms - cur.ms > 30000) {
+            cur = { ms: b.ms, parts: [U(0xe7, b.ms)] }
+            clusters.push(cur)
+          }
+          const hdr = new Uint8Array(4)
+          hdr[0] = 0x80 | b.track
+          new DataView(hdr.buffer).setInt16(1, b.ms - cur.ms)
+          hdr[3] = b.key ? 0x80 : 0
+          cur.parts.push(E(0xa3, cat([hdr, b.data])))
+        }
+        const clusterBytes = clusters.map((c) => M(0x1f43b675, c.parts))
+        // SeekHead with fixed-width positions → deterministic size.
+        const seek = (id, pos) => M(0x4dbb, [E(0x53ab, idB(id)), U(0x53ac, pos, 8)])
+        const seekHeadLen = M(0x114d9b74, [seek(0x1549a966, 0), seek(0x1654ae6b, 0), seek(0x1c53bb6b, 0)]).length
+        const infoPos = seekHeadLen
+        const tracksPos = infoPos + info.length
+        let pos = tracksPos + tracks.length
+        const cuePoints = []
+        clusterBytes.forEach((cb, i) => {
+          cuePoints.push(M(0xbb, [U(0xb3, clusters[i].ms), M(0xb7, [U(0xf7, 1), U(0xf1, pos, 8)])]))
+          pos += cb.length
+        })
+        const cuesPos = pos
+        const cues = M(0x1c53bb6b, cuePoints)
+        const seekHead = M(0x114d9b74, [seek(0x1549a966, infoPos), seek(0x1654ae6b, tracksPos), seek(0x1c53bb6b, cuesPos)])
+        const segment = M(0x18538067, [seekHead, info, tracks, ...clusterBytes, cues])
+        return cat([header, segment])
+      }
+
+      /* ======================================================================= */
+      /* Render + encode                                                         */
+      /* ======================================================================= */
+
+      const log = (s) => { document.getElementById('log').textContent = s; console.log(s) }
+
+      async function renderAudio(film) {
+        const rate = 48000
+        const len = Math.round(film.duration * rate)
+        const ctx = new OfflineAudioContext(film.channels, len, rate)
+        ctx.destination.channelInterpretation = 'discrete'
+        const master = ctx.createGain()
+        masterFade(ctx, master, film.duration)
+        master.connect(ctx.destination)
+        film.sound(ctx, master, film.duration)
+        const buf = await ctx.startRendering()
+        // Normalise to a gentle peak (-4 dBFS).
+        let peak = 0
+        for (let c = 0; c < buf.numberOfChannels; c++) { const d = buf.getChannelData(c); for (let i = 0; i < d.length; i++) peak = Math.max(peak, Math.abs(d[i])) }
+        const g = peak > 0 ? 0.63 / peak : 1
+        return Array.from({ length: buf.numberOfChannels }, (_, c) => { const d = buf.getChannelData(c).slice(); for (let i = 0; i < d.length; i++) d[i] *= g; return d })
+      }
+
+      async function encodeOpus(planes, bitrate) {
+        const chunks = []
+        let err = null
+        const enc = new AudioEncoder({ output: (c) => { const d = new Uint8Array(c.byteLength); c.copyTo(d); chunks.push({ timestamp: c.timestamp, data: d }) }, error: (e) => { err = e } })
+        enc.configure({ codec: 'opus', sampleRate: 48000, numberOfChannels: planes.length, bitrate, opus: { frameDuration: 20000, complexity: 10 } })
+        const block = 48000
+        const n = planes[0].length
+        for (let s = 0; s < n; s += block) {
+          const len = Math.min(block, n - s)
+          const data = new Float32Array(len * planes.length)
+          planes.forEach((p, c) => data.set(p.subarray(s, s + len), c * len))
+          enc.encode(new AudioData({ format: 'f32-planar', sampleRate: 48000, numberOfFrames: len, numberOfChannels: planes.length, timestamp: Math.round((s / 48000) * 1e6), data }))
+        }
+        await enc.flush()
+        enc.close()
+        if (err) throw err
+        return chunks
+      }
+
+      async function renderFilm(id) {
+        const film = FILMS[id]
+        if (!film) throw new Error('unknown film ' + id)
+        await document.fonts.ready
+        await Promise.all([`400 40px ${SERIF}`, `300 20px ${SANS}`].map((f) => document.fonts.load(f)))
+        const { w, h, fps, duration } = film
+        const cv = canvas(w, h)
+        const ctx = cv.getContext('2d', { alpha: false })
+        log(`${id}: preparing assets`)
+        const assets = film.setup(w, h)
+
+        // ---- audio ----
+        log(`${id}: rendering audio`)
+        const planes = await renderAudio(film)
+        let audio, codecPrivate
+        if (film.channels === 6) {
+          // Vorbis/Opus 5.1 order L C R SL SR LFE ← WebAudio order L R C LFE SL SR
+          const [L, R, Cc, LFE, SL, SR] = planes
+          const [s0, s1, s2, s3] = await Promise.all([encodeOpus([L, R], 160_000), encodeOpus([SL, SR], 128_000), encodeOpus([Cc], 80_000), encodeOpus([LFE], 48_000)])
+          const n = Math.min(s0.length, s1.length, s2.length, s3.length)
+          audio = []
+          for (let i = 0; i < n; i++) audio.push({ timestamp: s0[i].timestamp, data: cat([selfDelimit(s0[i].data), selfDelimit(s1[i].data), selfDelimit(s2[i].data), s3[i].data]) })
+          codecPrivate = opusHead(6, 312, 1, 4, 2, [0, 4, 1, 2, 3, 5])
+        } else {
+          audio = await encodeOpus(planes, 128_000)
+          codecPrivate = opusHead(2, 312, 0)
+        }
+
+        // ---- video ----
+        const video = []
+        let verr = null
+        const venc = new VideoEncoder({ output: (c) => { const d = new Uint8Array(c.byteLength); c.copyTo(d); video.push({ timestamp: c.timestamp, key: c.type === 'key', data: d }) }, error: (e) => { verr = e } })
+        venc.configure({ codec: h > 720 ? 'vp09.00.40.08' : 'vp09.00.31.08', width: w, height: h, bitrate: film.bitrate, framerate: fps, bitrateMode: 'variable', latencyMode: 'quality' })
+        const frames = Math.round(duration * fps)
+        let poster = null
+        const posterFrame = Math.round(film.poster * fps)
+        for (let i = 0; i < frames; i++) {
+          const t = i / fps
+          ctx.save()
+          film.draw(ctx, t, assets, w, h)
+          ctx.restore()
+          if (i === posterFrame) poster = cv.toDataURL('image/jpeg', 0.86)
+          const frame = new VideoFrame(cv, { timestamp: Math.round((i * 1e6) / fps), duration: Math.round(1e6 / fps) })
+          venc.encode(frame, { keyFrame: i % (fps * 2) === 0 })
+          frame.close()
+          while (venc.encodeQueueSize > 4) await new Promise((r) => setTimeout(r, 2))
+          if (i % 30 === 0) log(`${id}: frame ${i}/${frames}`)
+          if (verr) throw verr
+        }
+        await venc.flush()
+        venc.close()
+        if (verr) throw verr
+
+        const bytes = muxWebM({ width: w, height: h, fps, video, audio, audioChannels: film.channels, codecPrivate, durationMs: duration * 1000 })
+        window.__out = bytes
+        log(`${id}: done, ${(bytes.length / 1e6).toFixed(2)} MB`)
+        return { size: bytes.length, poster, frames: video.length, audioPackets: audio.length }
+      }
+
+      function readOut(offset, len) {
+        const b = window.__out.subarray(offset, offset + len)
+        let s = ''
+        for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000))
+        return btoa(s)
+      }
+
+      /* ---------------------------- verification ---------------------------- */
+
+      async function verify(url, probes = []) {
+        const out = { url }
+        const el = document.createElement('video')
+        el.crossOrigin = 'anonymous'
+        el.preload = 'auto'
+        el.src = url
+        await new Promise((res, rej) => { el.onloadedmetadata = res; el.onerror = () => rej(new Error('video error ' + el.error?.code)) })
+        Object.assign(out, { duration: el.duration, width: el.videoWidth, height: el.videoHeight })
+        const buf = await (await fetch(url)).arrayBuffer()
+        const ac = new AudioContext()
+        const ab = await ac.decodeAudioData(buf.slice(0))
+        Object.assign(out, { audioChannels: ab.numberOfChannels, audioDuration: +ab.duration.toFixed(2), bytes: buf.byteLength })
+        // Decoded-buffer channel energy for each probe window.
+        out.decoded = probes.map(([t0, t1]) => {
+          const e = []
+          for (let c = 0; c < ab.numberOfChannels; c++) {
+            const d = ab.getChannelData(c)
+            let s = 0
+            const a = Math.floor(t0 * ab.sampleRate), b = Math.floor(t1 * ab.sampleRate)
+            for (let i = a; i < b; i++) s += d[i] * d[i]
+            e.push(Math.sqrt(s / (b - a)))
+          }
+          const mx = Math.max(...e)
+          return { window: [t0, t1], loudest: e.indexOf(mx), rel: e.map((x) => +(x / mx).toFixed(2)) }
+        })
+        // Live playback through a MediaElementSource → 8-way splitter (what the museum does).
+        const src = ac.createMediaElementSource(el)
+        const sp = ac.createChannelSplitter(8)
+        src.connect(sp)
+        const an = Array.from({ length: 8 }, (_, i) => { const a = ac.createAnalyser(); a.fftSize = 2048; sp.connect(a, i); return a })
+        const silent = ac.createGain(); silent.gain.value = 0; src.connect(silent).connect(ac.destination)
+        await ac.resume()
+        out.live = []
+        for (const [t0, t1] of probes) {
+          el.currentTime = t0
+          await new Promise((r) => (el.onseeked = r))
+          await el.play()
+          const acc = new Array(8).fill(0)
+          const tmp = new Float32Array(2048)
+          const until = performance.now() + (t1 - t0) * 1000
+          while (performance.now() < until) {
+            await new Promise((r) => setTimeout(r, 40))
+            an.forEach((a, i) => { a.getFloatTimeDomainData(tmp); let s = 0; for (const v of tmp) s += v * v; acc[i] += s })
+          }
+          el.pause()
+          const mx = Math.max(...acc)
+          out.live.push({ window: [t0, t1], loudest: acc.indexOf(mx), rel: acc.map((x) => +(x / (mx || 1)).toFixed(2)) })
+        }
+        out.playedTo = +el.currentTime.toFixed(2)
+        await ac.close()
+        return out
+      }
+
+      window.FILM_IDS = Object.keys(FILMS)
+      window.renderFilm = renderFilm
+      window.readOut = readOut
+      window.verifyFilm = verify
+      window.filmGenReady = true
+      log('ready')
+    </script>
+  </body>
+</html>

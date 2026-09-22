@@ -1,0 +1,350 @@
+<!doctype html>
+<!--
+  PLACEHOLDER textile generator page (dev tool only — not part of the app build).
+  Served by the Vite dev server so the TypeScript motif library can be imported directly.
+  Driven by scripts/generate-placeholders.mjs; can also be opened by hand at
+  http://localhost:5199/scripts/placeholder-gen.html to preview all textiles.
+
+  Everything drawn here is a generic, procedurally generated stand-in. It does not
+  depict any documented traditional design and will be replaced by workshop deliverables.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Placeholder textile generator</title>
+    <style>
+      body { margin: 0; padding: 16px; background: #2b2621; color: #f5f1e8; font: 13px system-ui, sans-serif; }
+      .grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+      figure { margin: 0; }
+      figure img { display: block; height: 320px; width: auto; box-shadow: 0 4px 18px rgba(0,0,0,.4); }
+      figcaption { margin-top: 6px; opacity: .7; }
+    </style>
+  </head>
+  <body>
+    <div class="grid" id="grid"></div>
+    <script type="module">
+      import { drawMotif, paintCottonGround, mulberry32, hashString } from '/src/museum/exhibits/motifs.ts'
+
+      /* Natural-dye inspired palette (placeholder colours) */
+      const C = {
+        indigo: '#2c3f6b',
+        indigoDeep: '#1f2d4f',
+        madder: '#9b3326',
+        madderDeep: '#7d2a20',
+        ochre: '#b7862f',
+        black: '#2a2522',
+        ecru: '#efe6d3',
+        cream: '#f3ead8',
+        natural: '#e8dcc3',
+      }
+
+      const SPECS = [
+        { file: 'hero-01.jpg', w: 1536, h: 2048, ground: C.ecru,
+          field: { motif: 'rosette', cells: 5.2, outline: C.indigo, fill: C.indigo, fillAlpha: 0.5, drop: 'col' },
+          border: { motif: 'diamond', color: C.indigo, fill: C.indigo, sides: 'all', band: 0.085 } },
+        { file: 'hero-02.jpg', w: 2048, h: 1365, ground: C.cream,
+          field: { motif: 'teardrop', cells: 4.2, outline: C.black, fill: C.madder, fillAlpha: 0.92, drop: 'col', alternate: true },
+          border: { motif: 'leaf-trail', color: C.black, fill: C.madder, sides: 'tb', band: 0.12, rotate: Math.PI / 2 } },
+        { file: 'hero-03.jpg', w: 2048, h: 2048, ground: C.ecru,
+          field: { motif: 'star-lattice', cells: 5.5, outline: C.indigo, fill: C.ochre, fillAlpha: 0.9, drop: 'none' },
+          border: { motif: 'rosette', color: C.indigo, fill: C.ochre, sides: 'all', band: 0.075 } },
+        { file: 'hero-04.jpg', w: 853, h: 2048, ground: C.natural,
+          field: { motif: 'leaf-trail', cells: 2.6, outline: C.black, fill: C.madder, fillAlpha: 0.9, drop: 'col', alternate: true },
+          border: { motif: 'diamond', color: C.black, fill: C.madder, sides: 'lr', band: 0.13, ends: { motif: 'rosette', band: 0.2 } } },
+        { file: 'hero-05.jpg', w: 2048, h: 819, ground: C.ecru, resist: C.indigo,
+          field: { motif: 'diamond', cells: 3.4, drop: 'col' },
+          border: { motif: 'rosette', sides: 'tb', band: 0.16 } },
+        { file: 'study-01.jpg', w: 1120, h: 1400, ground: C.ecru,
+          field: { motif: 'rosette', cells: 3.6, outline: C.black, fill: C.madder, fillAlpha: 0.9, drop: 'col' },
+          border: { motif: 'leaf-trail', color: C.black, fill: C.madder, sides: 'tb', band: 0.11, rotate: Math.PI / 2 } },
+        { file: 'study-02.jpg', w: 1400, h: 1400, ground: C.cream,
+          field: { motif: 'diamond', cells: 6, outline: C.madderDeep, fill: C.ochre, fillAlpha: 0.85, drop: 'col' },
+          border: { motif: 'diamond', color: C.madderDeep, fill: C.ochre, sides: 'all', band: 0.06 } },
+        { file: 'study-03.jpg', w: 1400, h: 1120, ground: C.natural,
+          field: { motif: 'teardrop', cells: 4.6, outline: C.indigo, fill: C.ochre, fillAlpha: 0.85, drop: 'col', alternate: true },
+          border: { motif: 'star-lattice', color: C.indigo, fill: C.ochre, sides: 'lr', band: 0.1 } },
+        { file: 'study-04.jpg', w: 1600, h: 900, ground: C.ecru, resist: C.madder, overprint: C.black,
+          field: { motif: 'star-lattice', cells: 3.3, drop: 'none' },
+          border: { motif: 'leaf-trail', sides: 'tb', band: 0.15, rotate: Math.PI / 2 } },
+        { file: 'study-05.jpg', w: 933, h: 1400, ground: C.cream,
+          field: { motif: 'leaf-trail', cells: 3.4, outline: C.indigo, fill: C.madder, fillAlpha: 0.88, drop: 'col', alternate: true },
+          border: { motif: 'rosette', color: C.indigo, fill: C.madder, sides: 'tb', band: 0.12 } },
+      ]
+
+      /* A hand-printed rule line: rough edges, uneven ink. */
+      function rule(ctx, x0, y0, x1, y1, width, color, rng, alpha = 0.9) {
+        const len = Math.hypot(x1 - x0, y1 - y0)
+        const ux = (x1 - x0) / len, uy = (y1 - y0) / len
+        const nx = -uy, ny = ux
+        const steps = Math.max(8, Math.floor(len / 6))
+        const top = [], bot = []
+        let wob = 0
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps
+          wob += (rng() - 0.5) * 0.35
+          wob *= 0.9
+          const px = x0 + ux * len * t, py = y0 + uy * len * t
+          const hw = width / 2 + (rng() - 0.5) * width * 0.12
+          top.push([px + nx * (hw + wob), py + ny * (hw + wob)])
+          bot.push([px - nx * (hw - wob), py - ny * (hw - wob)])
+        }
+        ctx.save()
+        ctx.globalCompositeOperation = 'multiply'
+        ctx.fillStyle = color
+        ctx.globalAlpha = alpha
+        ctx.filter = 'blur(0.5px)'
+        ctx.beginPath()
+        top.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)))
+        bot.reverse().forEach(([x, y]) => ctx.lineTo(x, y))
+        ctx.closePath()
+        ctx.fill()
+        ctx.filter = 'none'
+        // voids in the rule
+        ctx.globalCompositeOperation = 'source-over'
+        ctx.restore()
+      }
+
+      /* A two-block (fill + outline) impression with misregistration. */
+      function stamp2(ctx, motif, x, y, size, rot, st, rng, reg) {
+        const jitter = () => (rng() - 0.5) * 1.6
+        const hand = { x: x + jitter() * 1.5, y: y + jitter() * 1.5, r: rot + (rng() - 0.5) * 0.012 }
+        const density = 0.86 + rng() * 0.14
+        const common = { rng, voids: 0.55, mottle: 0.55, grain: 0.6, bleed: Math.max(0.5, size / 260), composite: 'multiply', rotation: hand.r }
+        if (st.fill) {
+          drawMotif(ctx, motif, hand.x + reg.x + jitter(), hand.y + reg.y + jitter(), size, st.fill,
+            { ...common, layer: 'fill', alpha: (st.fillAlpha ?? 0.9) * density })
+        }
+        if (st.outline) {
+          drawMotif(ctx, motif, hand.x, hand.y, size, st.outline, { ...common, layer: 'outline', alpha: 0.93 * density })
+        }
+      }
+
+      function render(spec) {
+        const { w, h } = spec
+        const rng = mulberry32(hashString(spec.file))
+        const cv = document.createElement('canvas')
+        cv.width = w
+        cv.height = h
+        const ctx = cv.getContext('2d')
+        const minD = Math.min(w, h)
+        const thread = Math.max(1.8, minD / 620)
+        paintCottonGround(ctx, w, h, spec.ground, rng, { threadPx: thread, unevenness: 1, noise: 7 })
+
+        // global misregistration of the fill block for this cloth (as if the printer's guide drifted)
+        const reg = { x: (rng() - 0.5) * minD * 0.004 + 1.5, y: (rng() - 0.5) * minD * 0.004 + 1 }
+
+        const b = spec.border
+        const band = Math.round(minD * b.band)
+        const ends = b.ends ? Math.round(minD * b.ends.band) : 0
+        const margin = Math.round(minD * 0.025)
+        const has = (s) => b.sides === 'all' || b.sides.includes(s)
+        const inset = {
+          l: has('l') ? margin + band : margin * 0.6,
+          r: has('r') ? margin + band : margin * 0.6,
+          t: has('t') ? margin + band : ends ? margin + ends : margin * 0.6,
+          b: has('b') ? margin + band : ends ? margin + ends : margin * 0.6,
+        }
+        if (b.sides === 'all') { inset.t = inset.b = inset.l = inset.r = margin + band }
+
+        // ink layer target: normal cloth prints straight onto the ground; resist cloth uses a dye layer
+        let dye = null
+        let dctx = ctx
+        if (spec.resist) {
+          dye = document.createElement('canvas')
+          dye.width = w
+          dye.height = h
+          dctx = dye.getContext('2d')
+          dctx.fillStyle = spec.resist
+          dctx.fillRect(0, 0, w, h)
+          // dye-bath unevenness
+          for (let i = 0; i < 40; i++) {
+            const bx = rng() * w, by = rng() * h, br = Math.max(w, h) * (0.05 + rng() * 0.25)
+            const g = dctx.createRadialGradient(bx, by, 0, bx, by, br)
+            const a = 0.06 + rng() * 0.1
+            g.addColorStop(0, rng() < 0.5 ? `rgba(255,255,255,${a})` : `rgba(0,0,20,${a})`)
+            g.addColorStop(1, 'rgba(0,0,0,0)')
+            dctx.fillStyle = g
+            dctx.fillRect(bx - br, by - br, br * 2, br * 2)
+          }
+        }
+
+        // resist = paste stamped where the dye must NOT take; a soft halo where dye crept under
+        const resistStamp = (motif, x, y, size, rot) => {
+          const o = { rng, voids: 0.25, mottle: 0.35, grain: 0.3, rotation: rot + (rng() - 0.5) * 0.012 }
+          drawMotif(dctx, motif, x, y, size * 1.02, '#000', { ...o, layer: 'all', composite: 'destination-out', alpha: 0.35, bleed: size / 120 })
+          drawMotif(dctx, motif, x + (rng() - 0.5) * 1.5, y + (rng() - 0.5) * 1.5, size, '#000', { ...o, layer: 'all', composite: 'destination-out', alpha: 0.9, bleed: size / 500 })
+        }
+        const put = (motif, x, y, size, rot, st) => {
+          if (spec.resist) resistStamp(motif, x, y, size, rot)
+          else stamp2(ctx, motif, x, y, size, rot, st, rng, reg)
+        }
+
+        /* ---- field: half-drop repeat ---- */
+        const f = spec.field
+        const fx0 = inset.l, fy0 = inset.t, fw = w - inset.l - inset.r, fh = h - inset.t - inset.b
+        const cellW = Math.min(fw, fh) / f.cells
+        const cols = Math.round(fw / cellW)
+        const cw = fw / cols
+        const rows = Math.ceil(fh / cw) + 1
+        const motifSize = cw * (f.motif === 'leaf-trail' ? 1.0 : 0.9)
+        ctx.save()
+        dctx.save()
+        const clip = (c) => { c.beginPath(); c.rect(fx0, fy0, fw, fh); c.clip() }
+        clip(ctx)
+        if (dctx !== ctx) clip(dctx)
+        const fieldStyle = { outline: f.outline, fill: f.fill, fillAlpha: f.fillAlpha }
+        for (let c = -1; c <= cols; c++) {
+          const drop = f.drop === 'col' && ((c % 2) + 2) % 2 === 1 ? cw / 2 : 0
+          for (let r = -1; r <= rows; r++) {
+            const x = fx0 + cw * (c + 0.5)
+            const y = fy0 + cw * (r + 0.5) + drop
+            let rot = 0
+            if (f.alternate && ((c % 2) + 2) % 2 === 1) rot = Math.PI
+            put(f.motif, x, y, motifSize, rot, fieldStyle)
+          }
+        }
+        // small filler spots between the main repeat (generic placeholder)
+        if (f.drop !== 'none' && !spec.resist) {
+          for (let c = 0; c <= cols; c++) {
+            for (let r = 0; r <= rows; r++) {
+              const x = fx0 + cw * c
+              const y = fy0 + cw * r + ((c % 2) ? 0 : cw / 2)
+              stamp2(ctx, 'rosette', x, y, cw * 0.13, 0, { fill: f.outline, fillAlpha: 0.8 }, rng, reg)
+            }
+          }
+        }
+        ctx.restore()
+        dctx.restore()
+
+        /* ---- borders ---- */
+        const bandStyle = { outline: b.color, fill: b.fill, fillAlpha: 0.85 }
+        const bandRun = (x0, y0, x1, y1, bw, motif, rot) => {
+          const len = Math.hypot(x1 - x0, y1 - y0)
+          const n = Math.max(1, Math.round(len / (bw * 0.95)))
+          const step = len / n
+          const ux = (x1 - x0) / len, uy = (y1 - y0) / len
+          for (let i = 0; i < n; i++) {
+            const t = (i + 0.5) * step
+            put(motif, x0 + ux * t, y0 + uy * t, Math.min(step, bw) * 0.86, rot, bandStyle)
+          }
+        }
+        const ruleCol = spec.resist ? null : b.color
+        const ruleW = Math.max(3, minD * 0.006)
+        const rules = (x0, y0, x1, y1) => {
+          if (ruleCol) rule(ctx, x0, y0, x1, y1, ruleW, ruleCol, rng)
+          else {
+            // resist rules: cut from dye layer
+            dctx.save()
+            dctx.globalCompositeOperation = 'destination-out'
+            dctx.lineWidth = ruleW
+            dctx.globalAlpha = 0.9
+            dctx.filter = 'blur(0.8px)'
+            dctx.beginPath(); dctx.moveTo(x0, y0); dctx.lineTo(x1, y1); dctx.stroke()
+            dctx.restore()
+          }
+        }
+        const bRot = b.rotate ?? 0
+        const sy0 = ends ? margin + ends : margin, sy1 = ends ? h - margin - ends : h - margin
+        if (has('t') || b.sides === 'all') {
+          const y = margin + band / 2
+          bandRun(inset.l, y, w - inset.r, y, band, b.motif, bRot)
+          rules(margin, margin, w - margin, margin)
+          rules(margin, margin + band, w - margin, margin + band)
+        }
+        if (has('b') || b.sides === 'all') {
+          const y = h - margin - band / 2
+          bandRun(inset.l, y, w - inset.r, y, band, b.motif, bRot + Math.PI)
+          rules(margin, h - margin, w - margin, h - margin)
+          rules(margin, h - margin - band, w - margin, h - margin - band)
+        }
+        if (has('l') || b.sides === 'all') {
+          const x = margin + band / 2
+          bandRun(x, inset.t, x, h - inset.b, band, b.motif, bRot + Math.PI / 2)
+          rules(margin, sy0, margin, sy1)
+          rules(margin + band, sy0, margin + band, sy1)
+        }
+        if (has('r') || b.sides === 'all') {
+          const x = w - margin - band / 2
+          bandRun(x, inset.t, x, h - inset.b, band, b.motif, bRot - Math.PI / 2)
+          rules(w - margin, sy0, w - margin, sy1)
+          rules(w - margin - band, sy0, w - margin - band, sy1)
+        }
+        if (b.sides === 'all') {
+          // corner blocks
+          for (const [cx, cy] of [[margin + band / 2, margin + band / 2], [w - margin - band / 2, margin + band / 2], [margin + band / 2, h - margin - band / 2], [w - margin - band / 2, h - margin - band / 2]]) {
+            put('star-lattice', cx, cy, band * 0.8, 0, bandStyle)
+          }
+        }
+        if (ends) {
+          const eStyle = { outline: b.color, fill: b.fill, fillAlpha: 0.85 }
+          for (const top of [true, false]) {
+            const y = top ? margin + ends / 2 : h - margin - ends / 2
+            const n = Math.max(1, Math.round((w - 2 * margin) / ends))
+            const step = (w - 2 * margin) / n
+            for (let i = 0; i < n; i++) stamp2(ctx, b.ends.motif, margin + step * (i + 0.5), y, Math.min(step, ends) * 0.85, 0, eStyle, rng, reg)
+            rule(ctx, margin, top ? margin + ends : h - margin - ends, w - margin, top ? margin + ends : h - margin - ends, ruleW, b.color, rng)
+          }
+        }
+
+        if (dye) {
+          // lay the dye layer onto the cloth so the weave shows through
+          ctx.save()
+          ctx.globalCompositeOperation = 'multiply'
+          ctx.drawImage(dye, 0, 0)
+          ctx.restore()
+          if (spec.overprint) {
+            // a fine outline block printed over the resisted areas
+            const st = { outline: spec.overprint }
+            for (let c = -1; c <= cols; c++) {
+              const drop = f.drop === 'col' && ((c % 2) + 2) % 2 === 1 ? cw / 2 : 0
+              for (let r = -1; r <= rows; r++) {
+                const x = fx0 + cw * (c + 0.5), y = fy0 + cw * (r + 0.5) + drop
+                if (x < fx0 - cw || x > fx0 + fw + cw || y > fy0 + fh + cw) continue
+                ctx.save(); ctx.beginPath(); ctx.rect(fx0, fy0, fw, fh); ctx.clip()
+                stamp2(ctx, f.motif, x, y, motifSize, 0, st, rng, reg)
+                ctx.restore()
+              }
+            }
+          }
+        }
+
+        // final: very light overall warm wash + fibre speckle
+        ctx.save()
+        ctx.globalCompositeOperation = 'multiply'
+        ctx.fillStyle = 'rgba(245,235,215,0.35)'
+        ctx.fillRect(0, 0, w, h)
+        ctx.restore()
+        ctx.save()
+        const specks = Math.floor((w * h) / 2500)
+        for (let i = 0; i < specks; i++) {
+          ctx.globalAlpha = 0.08 + rng() * 0.15
+          ctx.fillStyle = rng() < 0.5 ? '#4a3a28' : '#fffaf0'
+          ctx.fillRect(rng() * w, rng() * h, 0.6 + rng() * 1.4, 0.6 + rng() * 1.4)
+        }
+        ctx.restore()
+        return cv
+      }
+
+      window.PLACEHOLDER_SPECS = SPECS.map((s) => s.file)
+      window.renderPlaceholder = (file, quality = 0.9) => {
+        const spec = SPECS.find((s) => s.file === file)
+        if (!spec) throw new Error('unknown ' + file)
+        return render(spec).toDataURL('image/jpeg', quality)
+      }
+      window.placeholderReady = true
+
+      if (!navigator.webdriver) {
+        const grid = document.getElementById('grid')
+        for (const s of SPECS) {
+          const fig = document.createElement('figure')
+          const img = document.createElement('img')
+          img.src = window.renderPlaceholder(s.file, 0.85)
+          const cap = document.createElement('figcaption')
+          cap.textContent = `${s.file} — ${s.w}×${s.h}`
+          fig.append(img, cap)
+          grid.append(fig)
+        }
+      }
+    </script>
+  </body>
+</html>

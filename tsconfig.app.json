@@ -1,0 +1,4 @@
+{
+  "//": "Kept for existing tooling (`tsc -p tsconfig.app.json`); the Next.js config lives in tsconfig.json.",
+  "extends": "./tsconfig.json"
+}

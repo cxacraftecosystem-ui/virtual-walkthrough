@@ -1,0 +1,20 @@
+{
+  "CORSRules": [
+    {
+      "ID": "public-read",
+      "AllowedMethods": ["GET", "HEAD"],
+      "AllowedOrigins": ["*"],
+      "AllowedHeaders": ["*"],
+      "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges", "ETag"],
+      "MaxAgeSeconds": 86400
+    },
+    {
+      "ID": "admin-direct-upload",
+      "AllowedMethods": ["PUT"],
+      "AllowedOrigins": ["https://YOUR-APP.vercel.app", "http://localhost:3000"],
+      "AllowedHeaders": ["Content-Type", "Cache-Control"],
+      "ExposeHeaders": ["ETag"],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+}

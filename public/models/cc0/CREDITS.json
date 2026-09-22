@@ -1,0 +1,246 @@
+{
+  "source": "Poly Haven — https://polyhaven.com",
+  "license": "CC0 1.0 Universal (public domain dedication) — https://creativecommons.org/publicdomain/zero/1.0/",
+  "note": "Attribution is not required for CC0 assets; recorded here as good practice.",
+  "resolution": "1k",
+  "models": [
+    {
+      "id": "antique_ceramic_vase_01",
+      "name": "Antique Ceramic Vase 01",
+      "authors": [
+        "James Ray Cock"
+      ],
+      "license": "CC0",
+      "url": "https://polyhaven.com/a/antique_ceramic_vase_01",
+      "file": "/models/cc0/antique_ceramic_vase_01/antique_ceramic_vase_01_1k.gltf",
+      "dimensionsMm": [
+        255.02996146678925,
+        255.02994656562805,
+        439.553053722193
+      ],
+      "polycount": 9408,
+      "use": "atrium vessel"
+    },
+    {
+      "id": "brass_diya_lantern",
+      "name": "Brass Diya Lantern",
+      "authors": [
+        "Bhargav Kubal"
+      ],
+      "license": "CC0",
+      "url": "https://polyhaven.com/a/brass_diya_lantern",
+      "file": "/models/cc0/brass_diya_lantern/brass_diya_lantern_1k.gltf",
+      "dimensionsMm": [
+        123.00453707575798,
+        123.00454080104828,
+        380.8239474892616
+      ],
+      "polycount": 12742,
+      "use": "information desk decorative lamp"
+    },
+    {
+      "id": "brass_pot_01",
+      "name": "Brass Pot 01",
+      "authors": [
+        "Rico Cilliers"
+      ],
+      "license": "CC0",
+      "url": "https://polyhaven.com/a/brass_pot_01",
+      "file": "/models/cc0/brass_pot_01/brass_pot_01_1k.gltf",
+      "dimensionsMm": [
+        301.94565653800964,
+        301.69259011745453,
+        290.94765486661345
+      ],
+      "polycount": 3760,
+      "use": "workshop / dye area vessel"
+    },
+    {
+      "id": "ceramic_vase_01",
+      "name": "Ceramic Vase 01",
+      "authors": [
+        "James Ray Cock"
+      ],
+      "license": "CC0",
+      "url": "https://polyhaven.com/a/ceramic_vase_01",
+      "file": "/models/cc0/ceramic_vase_01/ceramic_vase_01_1k.gltf",
+      "dimensionsMm": [
+        204.87193763256073,
+        206.37669414281845,
+        401.379804010503
+      ],
+      "polycount": 2548,
+      "use": "atrium desk / plinth vessel"
+    },
+    {
+      "id": "ceramic_vase_03",
+      "name": "Ceramic Vase 03",
+      "authors": [
+        "James Ray Cock"
+      ],
+      "license": "CC0",
+      "url": "https://polyhaven.com/a/ceramic_vase_03",
+      "file": "/models/cc0/ceramic_vase_03/ceramic_vase_03_1k.gltf",
+      "dimensionsMm": [
+        112.45502531528473,
+        112.45502158999443,
+        414.438920259272
+      ],
+      "polycount": 2784,
+      "use": "atrium vessel"
+    },
+    {
+      "id": "planter_pot_clay",
+      "name": "Planter Pot Clay",
+      "authors": [
+        "Amal Kumar"
+      ],
+      "license": "CC0",
+      "url": "https://polyhaven.com/a/planter_pot_clay",
+      "file": "/models/cc0/planter_pot_clay/planter_pot_clay_1k.gltf",
+      "dimensionsMm": [
+        265.9967243671417,
+        263.4630501270294,
+        221.87034250237048
+      ],
+      "polycount": 3080,
+      "use": "courtyard clay pot"
+    },
+    {
+      "id": "potted_plant_01",
+      "name": "Potted Plant 01",
+      "authors": [
+        "Rico Cilliers"
+      ],
+      "license": "CC0",
+      "url": "https://polyhaven.com/a/potted_plant_01",
+      "file": "/models/cc0/potted_plant_01/potted_plant_01_1k.gltf",
+      "dimensionsMm": [
+        588.9185070991516,
+        636.6117596626282,
+        1350.7787585258484
+      ],
+      "polycount": 96030,
+      "use": "atrium planters (large terracotta pedestal pot)"
+    },
+    {
+      "id": "potted_plant_02",
+      "name": "Potted Plant 02",
+      "authors": [
+        "Rico Cilliers"
+      ],
+      "license": "CC0",
+      "url": "https://polyhaven.com/a/potted_plant_02",
+      "file": "/models/cc0/potted_plant_02/potted_plant_02_1k.gltf",
+      "dimensionsMm": [
+        701.1570334434509,
+        657.3865860700607,
+        841.1787391305552
+      ],
+      "polycount": 69806,
+      "use": "courtyard planter"
+    },
+    {
+      "id": "potted_plant_04",
+      "name": "Potted Plant 04",
+      "authors": [
+        "James Ray Cock"
+      ],
+      "license": "CC0",
+      "url": "https://polyhaven.com/a/potted_plant_04",
+      "file": "/models/cc0/potted_plant_04/potted_plant_04_1k.gltf",
+      "dimensionsMm": [
+        170.27407884597778,
+        185.9453096985817,
+        267.5964875961654
+      ],
+      "polycount": 6097,
+      "use": "courtyard planter (succulent)"
+    },
+    {
+      "id": "wicker_basket_01",
+      "name": "Wicker Basket 01",
+      "authors": [
+        "Kuutti Siitonen"
+      ],
+      "license": "CC0",
+      "url": "https://polyhaven.com/a/wicker_basket_01",
+      "file": "/models/cc0/wicker_basket_01/wicker_basket_01_1k.gltf",
+      "dimensionsMm": [
+        383.2242637872696,
+        295.01520097255707,
+        117.42293369024992
+      ],
+      "polycount": 22276,
+      "use": "workshop cloth baskets"
+    },
+    {
+      "id": "wicker_basket_02",
+      "name": "Wicker Basket 02",
+      "authors": [
+        "Kuutti Siitonen"
+      ],
+      "license": "CC0",
+      "url": "https://polyhaven.com/a/wicker_basket_02",
+      "file": "/models/cc0/wicker_basket_02/wicker_basket_02_1k.gltf",
+      "dimensionsMm": [
+        374.6650815010071,
+        270.6727311015129,
+        218.15226320177317
+      ],
+      "polycount": 17850,
+      "use": "courtyard harvest basket"
+    },
+    {
+      "id": "wooden_bucket_01",
+      "name": "Wooden Bucket 01",
+      "authors": [
+        "James Ray Cock"
+      ],
+      "license": "CC0",
+      "url": "https://polyhaven.com/a/wooden_bucket_01",
+      "file": "/models/cc0/wooden_bucket_01/wooden_bucket_01_1k.gltf",
+      "dimensionsMm": [
+        366.97085201740265,
+        342.2211855649948,
+        549.862340092659
+      ],
+      "polycount": 5116,
+      "use": "wash tank / courtyard bucket"
+    },
+    {
+      "id": "wooden_crate_01",
+      "name": "Wooden Crate 01",
+      "authors": [
+        "James Ray Cock"
+      ],
+      "license": "CC0",
+      "url": "https://polyhaven.com/a/wooden_crate_01",
+      "file": "/models/cc0/wooden_crate_01/wooden_crate_01_1k.gltf",
+      "dimensionsMm": [
+        825.2729177474976,
+        408.9537411928177,
+        349.6182831004262
+      ],
+      "polycount": 6576,
+      "use": "workshop storage crate"
+    },
+    {
+      "id": "wooden_stool_01",
+      "name": "Wooden Stool 01",
+      "authors": [
+        "Kuutti Siitonen"
+      ],
+      "license": "CC0",
+      "url": "https://polyhaven.com/a/wooden_stool_01",
+      "file": "/models/cc0/wooden_stool_01/wooden_stool_01_1k.gltf",
+      "dimensionsMm": [
+        425.3551661968231,
+        442.36281514167786,
+        437.35266576914
+      ],
+      "polycount": 10946,
+      "use": "workshop stools"
+    }
+  ]
+}

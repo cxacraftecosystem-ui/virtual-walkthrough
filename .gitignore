@@ -1,0 +1,19 @@
+node_modules
+dist
+scripts/out
+scripts/*.log
+*.local
+.DS_Store
+
+# local secrets / Vercel link
+.env
+.env*.local
+.vercel
+.next
+next-env.d.ts
+*.tsbuildinfo
+
+# backend local data (SQLite + uploaded media)
+.data/
+.next-dev.log
+.next-start.log

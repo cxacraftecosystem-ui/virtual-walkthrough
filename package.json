@@ -1,0 +1,60 @@
+{
+  "name": "hand-block-printing-virtual-museum",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "shots": "node scripts/screenshots.mjs",
+    "db:migrate": "tsx --conditions=react-server scripts/db-migrate.ts",
+    "start": "next start"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/busboy": "^1.5.4",
+    "@types/node": "^26.6.2",
+    "@types/pg": "^8.23.1",
+    "@types/react": "~19.2.0",
+    "@types/react-dom": "~19.2.0",
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.12.0",
+    "puppeteer-core": "^25.11.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.1",
+    "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1138.0",
+    "@aws-sdk/lib-storage": "^3.1138.0",
+    "@aws-sdk/s3-request-presigner": "^3.1138.0",
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/multipart": "^10.1.2",
+    "@fastify/static": "^10.1.4",
+    "@fontsource/cormorant-garamond": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
+    "@react-three/postprocessing": "^3.1.1",
+    "busboy": "^1.6.0",
+    "fastify": "^5.12.5",
+    "next": "^16.3.6",
+    "pg": "^8.23.0",
+    "postprocessing": "^6.39.5",
+    "react": "~19.2.0",
+    "react-dom": "~19.2.0",
+    "server-only": "^0.0.1",
+    "three": "^0.186.0",
+    "tsx": "^4.23.15",
+    "zustand": "^5.0.15"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}
