@@ -154,6 +154,17 @@ export interface MedallionTreatment {
   offset?: number
   /** Slow backlight: halo colour, peak intensity, period (s). */
   glow?: { color: string; intensity: number; period?: number }
+  /**
+   * Layered roundel around the mandala (all sizes are fractions of `size`):
+   * a painted backing disc, a second smaller mandala rotated into the open centre
+   * (optionally turning very slowly), raised brass rings and a domed centre boss.
+   */
+  ornate?: {
+    disc?: { color: string; scale?: number; roughness?: number }
+    inner?: { color: string; scale?: number; rotationDeg?: number; metalness?: number; roughness?: number; spinPeriod?: number }
+    rings?: { color: string; radii: number[]; tube?: number }
+    boss?: { color: string; scale?: number }
+  }
   minTier?: QualityTier
 }
 
@@ -250,7 +261,9 @@ export const surfaceFace = (id: SurfaceId): DecorFace => surf(id).face
  * the surface and of floor objects standing within 1 m of the wall that reach its height.
  */
 function medallion(m: Omit<MedallionTreatment, 'type'>): MedallionTreatment[] {
-  const r = m.size / 2 + 0.15
+  const o = m.ornate
+  const extent = Math.max(0.5, (o?.disc?.scale ?? 0) / 2, ...(o?.rings?.radii ?? []))
+  const r = m.size * extent + 0.15
   const rect: DecorRect = { run: [m.at - r, m.at + r], y: [m.centerHeight - r, m.centerHeight + r] }
   if (contentReserves(m.surface, 0.05).some((b) => overlaps(b, rect))) return []
   const s = SURFACES[m.surface]
@@ -267,6 +280,13 @@ function medallion(m: Omit<MedallionTreatment, 'type'>): MedallionTreatment[] {
 }
 
 const MANDALA = '/decor/mandala.svg'
+/** Court roundel: gold lace on an indigo disc, a madder inner mandala turning slowly, brass rings + boss. */
+const COURT_ROUNDEL: MedallionTreatment['ornate'] = {
+  disc: { color: '#1f2a4f', scale: 1.02, roughness: 0.85 },
+  inner: { color: '#b4462d', scale: 0.52, rotationDeg: 7.5, roughness: 0.8, spinPeriod: 180 },
+  rings: { color: '#b8914a', radii: [0.515, 0.55], tube: 0.012 },
+  boss: { color: '#c9a35a', scale: 0.075 },
+}
 
 /** Brass fillet frames around every piece hung on a surface (the atrium's gallery-scale works). */
 function frameContent(surface: SurfaceId, f: DecorFace): FrameTreatment[] {
@@ -463,8 +483,8 @@ const court: DecorTreatment[] = [
   { type: 'field', ...CN, y: [0.12, 4.36], material: 'madderPlaster' },
   ...[CW, CE, CN].flatMap((s) => paintedFrieze(s.face, s.run, 4.4, 5.2)),
   // a pair of madder mandalas on lime, facing each other across the court's entry
-  ...medallion({ svg: MANDALA, surface: 'court-west', at: -20.9, centerHeight: 2.3, size: 2.2, color: '#8a3526', roughness: 0.85, relief: 0.35, finish: 'paint' }),
-  ...medallion({ svg: MANDALA, surface: 'court-east', at: -20.9, centerHeight: 2.3, size: 2.2, color: '#8a3526', roughness: 0.85, relief: 0.35, finish: 'paint' }),
+  ...medallion({ svg: MANDALA, surface: 'court-west', at: -20.9, centerHeight: 2.3, size: 2.2, color: '#dcb66c', roughness: 0.7, relief: 0.35, finish: 'paint', ornate: COURT_ROUNDEL }),
+  ...medallion({ svg: MANDALA, surface: 'court-east', at: -20.9, centerHeight: 2.3, size: 2.2, color: '#dcb66c', roughness: 0.7, relief: 0.35, finish: 'paint', ornate: COURT_ROUNDEL }),
 ]
 
 /* ── Gallery D — regional gallery ─────────────────────────────────── */
@@ -494,7 +514,24 @@ const galleryD: DecorTreatment[] = [
   ...doorSurround(DE, D.galleryToGalleryD.z, D.galleryToGalleryD.width, D.galleryToGalleryD.height, 'brass', 0.05, 0.022, 0.05),
   ...doorSurround(DS, D.theatreToGalleryD.x, D.theatreToGalleryD.width, D.theatreToGalleryD.height, 'brass', 0.05, 0.022, 0.05),
   // chased-brass mandala on the indigo, above the two pedestal vessels, softly backlit
-  ...medallion({ svg: MANDALA, surface: 'gallery-d-south', at: -19.1, centerHeight: 2.7, size: 2.9, color: '#c9a35a', metalness: 0.85, roughness: 0.34, relief: 1.2, glow: { color: '#ffc27a', intensity: 0.5, period: 9 } }),
+  ...medallion({
+    svg: MANDALA,
+    surface: 'gallery-d-south',
+    at: -19.1,
+    centerHeight: 2.7,
+    size: 2.9,
+    color: '#c9a35a',
+    metalness: 0.85,
+    roughness: 0.34,
+    relief: 1.2,
+    glow: { color: '#ffc27a', intensity: 0.5, period: 9 },
+    ornate: {
+      disc: { color: '#5e1f17', scale: 1.02, roughness: 0.75 },
+      inner: { color: '#efdfbb', scale: 0.5, rotationDeg: 7.5, roughness: 0.45, spinPeriod: 240 },
+      rings: { color: '#c9a35a', radii: [0.515, 0.545], tube: 0.014 },
+      boss: { color: '#d4ae62', scale: 0.08 },
+    },
+  }),
 ]
 
 /* ── Craft workshop ───────────────────────────────────────────────── */

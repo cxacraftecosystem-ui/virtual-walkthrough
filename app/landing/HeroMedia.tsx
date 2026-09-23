@@ -27,6 +27,33 @@ export function HeroMedia({ poster, video, alt }: { poster: string | null; video
     }
   }, [video])
 
+  // Only reveal the film once a real (non-black) frame is on screen; on a stall or a decode
+  // error it hides again, so the hero never shows an empty black rectangle over the still.
+  const reveal = () => {
+    const el = ref.current
+    if (!el) return
+    try {
+      const c = document.createElement('canvas')
+      c.width = 32
+      c.height = 18
+      const g = c.getContext('2d', { willReadFrequently: true })
+      if (g) {
+        g.drawImage(el, 0, 0, 32, 18)
+        const d = g.getImageData(0, 0, 32, 18).data
+        let sum = 0
+        for (let i = 0; i < d.length; i += 4) sum += d[i] + d[i + 1] + d[i + 2]
+        if (sum / (d.length / 4) / 3 < 24) {
+          // decoded frame is (near) black — try again on a later frame
+          window.setTimeout(() => (el.paused ? undefined : reveal()), 400)
+          return
+        }
+      }
+    } catch {
+      /* canvas unavailable: trust the playing event */
+    }
+    setPlaying(true)
+  }
+
   // Pause while the hero is off screen / the tab is hidden.
   useEffect(() => {
     const el = ref.current
@@ -53,7 +80,12 @@ export function HeroMedia({ poster, video, alt }: { poster: string | null; video
           preload="auto"
           aria-hidden="true"
           tabIndex={-1}
-          onPlaying={() => setPlaying(true)}
+          onPlaying={reveal}
+          onWaiting={() => setPlaying(false)}
+          onError={() => {
+            setPlaying(false)
+            setUseVideo(false)
+          }}
         />
       )}
     </div>

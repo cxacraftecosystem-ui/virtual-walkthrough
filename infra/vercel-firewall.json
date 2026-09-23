@@ -1,0 +1,144 @@
+{
+ "firewallEnabled": true,
+ "managedRules": {},
+ "crs": {},
+ "ips": [],
+ "rules": [
+  {
+   "name": "Rate limit analytics ingestion",
+   "description": "Per-IP cap on anonymous analytics beacons (DB-flood protection)",
+   "active": true,
+   "conditionGroup": [
+    {
+     "conditions": [
+      {
+       "type": "path",
+       "op": "pre",
+       "value": "/api/analytics"
+      }
+     ]
+    }
+   ],
+   "action": {
+    "mitigate": {
+     "action": "rate_limit",
+     "rateLimit": {
+      "algo": "fixed_window",
+      "window": 60,
+      "limit": 120,
+      "keys": [
+       "ip"
+      ],
+      "action": "deny"
+     }
+    }
+   }
+  },
+  {
+   "name": "Rate limit error reports, prints and comments",
+   "description": "Per-IP cap on client error reports, visitor print submissions and visitor notes",
+   "active": true,
+   "conditionGroup": [
+    {
+     "conditions": [
+      {
+       "type": "path",
+       "op": "pre",
+       "value": "/api/errors"
+      }
+     ]
+    },
+    {
+     "conditions": [
+      {
+       "type": "path",
+       "op": "pre",
+       "value": "/api/prints"
+      },
+      {
+       "type": "method",
+       "op": "eq",
+       "value": "POST"
+      }
+     ]
+    },
+    {
+     "conditions": [
+      {
+       "type": "path",
+       "op": "pre",
+       "value": "/api/comments"
+      },
+      {
+       "type": "method",
+       "op": "eq",
+       "value": "POST"
+      }
+     ]
+    }
+   ],
+   "action": {
+    "mitigate": {
+     "action": "rate_limit",
+     "rateLimit": {
+      "algo": "fixed_window",
+      "window": 60,
+      "limit": 30,
+      "keys": [
+       "ip"
+      ],
+      "action": "deny"
+     }
+    }
+   }
+  },
+  {
+   "name": "Rate limit sign-in",
+   "description": "Per-IP cap on login, register and Google sign-in (brute-force protection)",
+   "active": true,
+   "conditionGroup": [
+    {
+     "conditions": [
+      {
+       "type": "path",
+       "op": "pre",
+       "value": "/api/auth/login"
+      }
+     ]
+    },
+    {
+     "conditions": [
+      {
+       "type": "path",
+       "op": "pre",
+       "value": "/api/auth/register"
+      }
+     ]
+    },
+    {
+     "conditions": [
+      {
+       "type": "path",
+       "op": "pre",
+       "value": "/api/auth/google"
+      }
+     ]
+    }
+   ],
+   "action": {
+    "mitigate": {
+     "action": "rate_limit",
+     "rateLimit": {
+      "algo": "fixed_window",
+      "window": 60,
+      "limit": 20,
+      "keys": [
+       "ip"
+      ],
+      "action": "deny"
+     }
+    }
+   }
+  }
+ ]
+}

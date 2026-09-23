@@ -594,7 +594,8 @@
   justify-content: flex-end;
   min-height: max(640px, 100svh);
   overflow: hidden;
-  background: var(--lp-night);
+  /* warm museum tones behind the picture (never a black void while it loads) */
+  background: radial-gradient(120% 90% at 60% 35%, #b0703f 0%, #7a3b24 45%, #3a2418 100%);
   color: var(--lp-light);
 }
 .lp-hero__media {
@@ -616,7 +617,7 @@
   animation: lp-drift 30s ease-in-out infinite alternate;
 }
 .lp-hero__still--empty {
-  background: linear-gradient(160deg, #6b4a34, #2a211a);
+  background: radial-gradient(120% 90% at 60% 35%, #b0703f 0%, #7a3b24 45%, #3a2418 100%);
 }
 .lp-hero__video {
   opacity: 0;
