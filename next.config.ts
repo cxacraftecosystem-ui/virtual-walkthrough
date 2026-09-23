@@ -14,6 +14,13 @@ const nextConfig: NextConfig = {
   },
   // Server-only packages that must not be bundled.
   serverExternalPackages: ['pg'],
+  // Deep-zoom pyramids (thousands of tiles) live on the media CDN, not in the deployment
+  // (Vercel caps uploads per deploy). Local dev serves public/deepzoom first when present;
+  // otherwise /deepzoom/* is proxied, which keeps it same-origin for OpenSeadragon.
+  async rewrites() {
+    const origin = process.env.DEEPZOOM_ORIGIN ?? 'https://d3rtt6mxyznwx8.cloudfront.net'
+    return { beforeFiles: [], afterFiles: [], fallback: [{ source: '/deepzoom/:path*', destination: `${origin}/deepzoom/:path*` }] }
+  },
   async headers() {
     const security = [
       { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },

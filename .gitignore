@@ -28,3 +28,6 @@ supabase/.temp/
 
 # visual regression output (baselines ARE committed)
 tests/visual/diff/
+
+# Deep-zoom tiles are served from S3/CloudFront (aws s3 sync public/deepzoom s3://<bucket>/deepzoom/)
+public/deepzoom/
