@@ -105,7 +105,9 @@ async function getEngine(gl: THREE.WebGLRenderer, tier: QualityTier, useWorker =
     let worker: Engine['worker'] = null
     if (useWorker) {
       try {
-        const w = await import('three-mesh-bvh/worker')
+        // Not 'three-mesh-bvh/worker': that entry also bundles parallelMeshBVH.worker.js, which spawns
+        // itself as a Worker — Turbopack's worker graph never terminates on it (next build hangs).
+        const w = await import('three-mesh-bvh/src/workers/GenerateMeshBVHWorker.js')
         const bvhWorker = new w.GenerateMeshBVHWorker()
         pt.setBVHWorker(bvhWorker as unknown as Parameters<WebGLPathTracer['setBVHWorker']>[0])
         worker = bvhWorker
