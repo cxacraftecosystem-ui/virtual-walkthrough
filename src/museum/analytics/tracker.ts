@@ -19,6 +19,7 @@ import { api, checkBackend, type AnalyticsEvent, type AnalyticsEventType, type I
 import { zoneAt } from '../config/layout'
 import { useMuseum } from '../state/store'
 import { visitor } from '../state/visitor'
+import { startCuratorTracking } from './curatorTracking'
 
 const FLUSH_MS = 10000
 const POLL_MS = 500
@@ -42,7 +43,7 @@ function makeId() {
   return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
-function getSessionId() {
+export function getSessionId() {
   if (sessionId) return sessionId
   try {
     sessionId = sessionStorage.getItem(SESSION_KEY) ?? ''
@@ -80,7 +81,10 @@ function flush(useBeacon = false) {
       if (useBeacon) {
         if (!api.analytics.beacon(id, batch)) void api.analytics.send(id, batch).catch(() => {})
       } else {
-        void api.analytics.send(id, batch).catch(() => {
+        void api.analytics.send(id, batch).catch((err: unknown) => {
+          // client errors (4xx: malformed / rate-limited) would fail forever — drop that batch
+          const status = (err as { status?: number })?.status ?? 0
+          if (status >= 400 && status < 500 && status !== 429) return
           // put back (bounded) and retry next tick
           queue = [...batch, ...queue].slice(-MAX_QUEUE)
         })
@@ -206,6 +210,7 @@ export function startAnalytics() {
     const closeZone = startZoneTracking()
     const closeItem = startItemTracking()
     startVideoTracking()
+    startCuratorTracking(track) // 'pos' every 2 s + 'tour_step' (curator heatmap / funnel)
     // already entered (e.g. hot reload)
     const st = useMuseum.getState()
     if (st.phase === 'entered') track('session_start', { tier: st.tier })

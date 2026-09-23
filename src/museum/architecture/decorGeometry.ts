@@ -211,7 +211,7 @@ function slabEdges(b: Builder, ff: FaceFrame, r: R, o0: number, o1: number) {
 
 const tierOk = (t: QualityTier, min?: QualityTier) => !min || QUALITY_ORDER.indexOf(t) >= QUALITY_ORDER.indexOf(min)
 
-type Faced = Exclude<DecorTreatment, { type: 'wrap' }>
+type Faced = Exclude<DecorTreatment, { type: 'wrap' } | { type: 'medallion' }>
 
 /** The rectangle a faced treatment occupies (for `exclusive`). */
 function outerRect(t: Faced): R {
@@ -243,13 +243,14 @@ export function buildDecorGroup(group: DecorGroup, tier: QualityTier): DecorBuck
   const list = group.treatments.filter((t) => tierOk(tier, t.minTier))
   const exclusives = new Map<string, { t: Faced; r: R }[]>()
   for (const t of list) {
-    if (t.type === 'wrap' || !t.exclusive) continue
+    if (t.type === 'wrap' || t.type === 'medallion' || !t.exclusive) continue
     const k = faceKey(t.face)
     if (!exclusives.has(k)) exclusives.set(k, [])
     exclusives.get(k)!.push({ t, r: outerRect(t) })
   }
 
   for (const t of list) {
+    if (t.type === 'medallion') continue // rendered by <Medallion/> (async SVG texture)
     if (t.type === 'wrap') {
       wrap(t, B)
       continue

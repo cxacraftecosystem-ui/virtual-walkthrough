@@ -5,6 +5,9 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react'
+import { loc, useLang, useT } from '../i18n'
+import { zoneName } from '../i18n/content'
+import { useFocusTrap } from '../a11y/focus'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows, Environment, Lightformer, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
@@ -15,6 +18,7 @@ import { Artifact3D } from '../exhibits/Artifact3D'
 import { getSceneObject, type SceneObjectConfig } from '../config/objects'
 import { ModelClock } from '../models/modelMaterials'
 import { OBJECT_INSPECT_PREFIX, ObjectModel, objectBounds } from '../models/SceneObjects'
+import { ARButton } from '../xr/ARView'
 import './InspectModal.css'
 
 type OrbitControlsImpl = ComponentRef<typeof OrbitControls>
@@ -182,8 +186,12 @@ export function InspectModal() {
   const [shown, setShown] = useState<Shown | null>(null)
   const [closing, setClosing] = useState(false)
   const [resetToken, setResetToken] = useState(0)
-  const [autoRotate, setAutoRotate] = useState(true)
+  const [autoRotate, setAutoRotate] = useState(() => !useMuseum.getState().reducedMotion)
   const closeBtn = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const t = useT()
+  const lang = useLang()
+  useFocusTrap(dialogRef, !!inspecting, { autoFocus: false })
 
   // open / close with a short fade-out
   useEffect(() => {
@@ -191,7 +199,7 @@ export function InspectModal() {
     if (next) {
       setShown(next)
       setClosing(false)
-      setAutoRotate(true)
+      setAutoRotate(!useMuseum.getState().reducedMotion)
       setResetToken(0)
       if (document.pointerLockElement) document.exitPointerLock?.()
       return
@@ -225,24 +233,24 @@ export function InspectModal() {
   const obj = shown.type === 'object' ? shown.obj : null
   const artwork = ex ? getArtwork(ex.artworkId) : undefined
   const isPlaceholder = ex ? !!ex.placeholder || !ex.model : !!obj?.placeholder
-  const ZONE: Partial<Record<SceneObjectConfig['zone'], string>> = { atrium: 'Grand Atrium', theatre: 'Immersive Theatre', workshop: 'Craft Workshop', courtyard: 'Dye Garden', reveal: 'Craft Court', 'gallery-d': 'Gallery D' }
-  const eyebrow = ex ? ex.tradition : obj ? (ZONE[obj.zone] ?? '') : ''
-  const title = ex?.title ?? obj?.title ?? ''
-  const description = ex?.description ?? obj?.description
+  const eyebrow = ex ? (loc(ex, 'tradition', lang) ?? '') : obj ? zoneName(obj.zone, lang) : ''
+  const title = (ex ? loc(ex, 'title', lang) : obj ? loc(obj, 'title', lang) : '') ?? ''
+  const description = ex ? loc(ex, 'description', lang) : obj ? loc(obj, 'description', lang) : undefined
   const facts: [string, string | undefined][] = ex
     ? [
-        ['Material', ex.material],
-        ['Technique', ex.technique],
-        ['Artisan', ex.artisan],
-        ['Region', ex.region],
+        [t('info.material'), loc(ex, 'material', lang)],
+        [t('info.technique'), loc(ex, 'technique', lang)],
+        [t('info.artisan'), loc(ex, 'artisan', lang)],
+        [t('info.region'), loc(ex, 'region', lang)],
       ]
     : [
-        ['Model', obj?.model ? '3D model' : 'Procedural reconstruction'],
-        ['Credit', obj?.credit ? `${obj.credit.author} · ${obj.credit.license}` : undefined],
+        [t('inspect.model'), obj?.model ? t('inspect.model3d') : t('inspect.procedural')],
+        [t('inspect.credit'), obj?.credit ? `${obj.credit.author} · ${obj.credit.license}` : undefined],
       ]
 
   return (
     <div
+      ref={dialogRef}
       className={`inspect-root${closing ? ' inspect-closing' : ''}`}
       role="dialog"
       aria-modal="true"
@@ -278,24 +286,25 @@ export function InspectModal() {
             className="inspect-btn"
             onClick={() => {
               setResetToken((n) => n + 1)
-              setAutoRotate(true)
+              setAutoRotate(!useMuseum.getState().reducedMotion)
             }}
           >
-            Reset view
+            {t('inspect.reset')}
           </button>
+          <ARButton inspectId={inspecting} title={title} />
         </div>
-        <p className="inspect-hint">Drag to rotate · Scroll / pinch to zoom</p>
+        <p className="inspect-hint">{t('inspect.hint')}</p>
       </div>
 
       <aside className="inspect-info">
-        <button ref={closeBtn} type="button" className="inspect-btn inspect-close" onClick={close} aria-label="Close 3D viewer">
-          Close <span aria-hidden="true">✕</span>
+        <button ref={closeBtn} type="button" className="inspect-btn inspect-close" onClick={close} aria-label={t('inspect.close')}>
+          {t('inspect.closeWord')} <span aria-hidden="true">✕</span>
         </button>
         <p className="inspect-eyebrow">{eyebrow}</p>
         <h2 id="inspect-title" className="inspect-title">
           {title}
         </h2>
-        {isPlaceholder && <span className="inspect-badge">Placeholder model</span>}
+        {isPlaceholder && <span className="inspect-badge">{t('inspect.placeholder')}</span>}
         {facts.some(([, v]) => v) && (
           <dl className="inspect-facts">
             {facts
@@ -311,8 +320,8 @@ export function InspectModal() {
         {description && <p className="inspect-desc">{description}</p>}
         {artwork && (
           <div className="inspect-related">
-            <span className="inspect-related-label">Related textile</span>
-            <span className="inspect-related-title">{artwork.title}</span>
+            <span className="inspect-related-label">{t('inspect.related')}</span>
+            <span className="inspect-related-title">{loc(artwork, 'title', lang)}</span>
           </div>
         )}
       </aside>

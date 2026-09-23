@@ -9,7 +9,7 @@ export interface Selection {
 }
 
 export type Phase = 'loading' | 'ready' | 'entered'
-export type TimeOfDay = 'morning' | 'midday' | 'golden'
+export type TimeOfDay = 'morning' | 'midday' | 'golden' | 'dusk' | 'night'
 
 /** Social side panels (only available when the backend is reachable). */
 export type Drawer = 'favourites' | 'guestbook'
@@ -73,6 +73,15 @@ interface MuseumState {
   setMouseLook: (v: boolean) => void
   setTimeOfDay: (t: TimeOfDay) => void
 
+  // ── Accessibility (persisted; see src/museum/a11y/settings.ts) ────
+  /** No camera glides, auto-rotation, cinematic intros or animated sway. Defaults to prefers-reduced-motion. */
+  reducedMotion: boolean
+  /** High-contrast UI (solid panels, stronger text/borders). */
+  highContrast: boolean
+  /** Larger UI text. */
+  largeText: boolean
+  setA11y: (p: Partial<Pick<MuseumState, 'reducedMotion' | 'highContrast' | 'largeText'>>) => void
+
   // ── Social (backend) — see src/museum/api/social.ts ───────────────
   /** Backend reachable? null = still probing, false = static site (all social UI hidden). */
   online: boolean | null
@@ -92,6 +101,30 @@ interface MuseumState {
 }
 
 const initialQuality = readStoredQuality()
+
+const A11Y_KEY = 'museum.a11y'
+type A11yFlags = { reducedMotion: boolean; highContrast: boolean; largeText: boolean }
+function readA11y(): A11yFlags {
+  const out: A11yFlags = { reducedMotion: false, highContrast: false, largeText: false }
+  if (typeof window === 'undefined') return out
+  try {
+    out.reducedMotion = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    out.highContrast = !!window.matchMedia?.('(prefers-contrast: more)').matches || !!window.matchMedia?.('(forced-colors: active)').matches
+    const stored = JSON.parse(localStorage.getItem(A11Y_KEY) ?? '{}') as Partial<A11yFlags>
+    for (const k of ['reducedMotion', 'highContrast', 'largeText'] as const) if (typeof stored[k] === 'boolean') out[k] = stored[k]
+  } catch {
+    /* storage unavailable */
+  }
+  return out
+}
+function writeA11y(p: Partial<A11yFlags>) {
+  try {
+    const cur = JSON.parse(localStorage.getItem(A11Y_KEY) ?? '{}') as Partial<A11yFlags>
+    localStorage.setItem(A11Y_KEY, JSON.stringify({ ...cur, ...p }))
+  } catch {
+    /* ignore */
+  }
+}
 
 export const useMuseum = create<MuseumState>((set) => ({
   phase: 'loading',
@@ -131,6 +164,12 @@ export const useMuseum = create<MuseumState>((set) => ({
   setMouseLook: (mouseLook) => set({ mouseLook }),
   timeOfDay: 'midday',
   setTimeOfDay: (timeOfDay) => set({ timeOfDay }),
+
+  ...readA11y(),
+  setA11y: (p) => {
+    set(p)
+    writeA11y(p)
+  },
 
   online: null,
   user: null,

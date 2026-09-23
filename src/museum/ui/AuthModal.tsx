@@ -4,6 +4,8 @@ import { useMuseum } from '../state/store'
 import { register, signIn, signInWithGoogle } from '../api/social'
 import { GoogleSignInButton } from './GoogleSignInButton'
 import { IconClose } from './icons'
+import { useT } from '../i18n'
+import { useFocusTrap } from '../a11y/focus'
 
 export function AuthModal() {
   const auth = useMuseum((s) => s.auth)
@@ -17,12 +19,15 @@ export function AuthModal() {
   const [error, setError] = useState<string | null>(null)
   const firstRef = useRef<HTMLInputElement>(null)
   const mode = auth?.mode ?? 'signin'
+  const t = useT()
+  const cardRef = useRef<HTMLDivElement>(null)
+  useFocusTrap(cardRef, !!auth && !!online, { autoFocus: false })
 
   useEffect(() => {
     if (!auth) return
     setError(null)
     setBusy(false)
-    const t = window.setTimeout(() => firstRef.current?.focus({ preventScroll: true }), 60)
+    const h = window.setTimeout(() => firstRef.current?.focus({ preventScroll: true }), 60)
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation()
@@ -32,7 +37,7 @@ export function AuthModal() {
     }
     window.addEventListener('keydown', onKey, true)
     return () => {
-      window.clearTimeout(t)
+      window.clearTimeout(h)
       window.removeEventListener('keydown', onKey, true)
     }
   }, [auth, closeAuth])
@@ -74,19 +79,19 @@ export function AuthModal() {
         if (e.target === e.currentTarget) closeAuth()
       }}
     >
-      <div className="ui-help__card ui-panel ui-auth__card">
-        <button type="button" className="ui-icon-btn ui-help__close" aria-label="Close (Esc)" onClick={closeAuth}>
+      <div className="ui-help__card ui-panel ui-auth__card" ref={cardRef}>
+        <button type="button" className="ui-icon-btn ui-help__close" aria-label={t('auth.close')} onClick={closeAuth}>
           <IconClose />
         </button>
-        <div className="ui-kicker">Visitor account</div>
+        <div className="ui-kicker">{t('auth.kicker')}</div>
         <h2 id="ui-auth-title" className="ui-help__title ui-auth__title">
-          {isRegister ? 'Create an account' : 'Welcome back'}
+          {isRegister ? t('auth.register') : t('auth.welcome')}
         </h2>
-        <p className="ui-auth__lede">{auth.reason ?? 'Save favourite works and sign the guestbook.'}</p>
+        <p className="ui-auth__lede">{auth.reason ?? t('auth.lede')}</p>
 
         <GoogleSignInButton className="ui-auth__google" onCredential={(c) => void google(c)} onError={setError}>
           <div className="ui-auth__or" aria-hidden="true">
-            <span>or with email</span>
+            <span>{t('auth.orEmail')}</span>
           </div>
         </GoogleSignInButton>
 
@@ -99,7 +104,7 @@ export function AuthModal() {
         >
           {isRegister && (
             <label className="ui-auth__label">
-              <span>Display name</span>
+              <span>{t('auth.displayName')}</span>
               <input
                 ref={isRegister ? firstRef : undefined}
                 className="ui-field"
@@ -112,7 +117,7 @@ export function AuthModal() {
             </label>
           )}
           <label className="ui-auth__label">
-            <span>Email</span>
+            <span>{t('auth.email')}</span>
             <input
               ref={isRegister ? undefined : firstRef}
               className="ui-field"
@@ -124,7 +129,10 @@ export function AuthModal() {
             />
           </label>
           <label className="ui-auth__label">
-            <span>Password{isRegister && <em> · at least 8 characters</em>}</span>
+            <span>
+              {t('auth.password')}
+              {isRegister && <em> · {t('auth.passwordHint')}</em>}
+            </span>
             <input
               className="ui-field"
               type="password"
@@ -139,17 +147,17 @@ export function AuthModal() {
             </p>
           )}
           <button type="submit" className="ui-btn ui-auth__submit" disabled={!valid || busy}>
-            {busy ? 'One moment…' : isRegister ? 'Create account' : 'Sign in'}
+            {busy ? t('auth.busy') : isRegister ? t('auth.submitRegister') : t('auth.signIn')}
           </button>
         </form>
 
         <p className="ui-auth__switch">
-          {isRegister ? 'Already have an account?' : 'New here?'}{' '}
+          {isRegister ? t('auth.haveAccount') : t('auth.newHere')}{' '}
           <button type="button" className="ui-info__link" onClick={() => openAuth(auth.reason, isRegister ? 'signin' : 'register')}>
-            {isRegister ? 'Sign in' : 'Create an account'}
+            {isRegister ? t('auth.signIn') : t('auth.register')}
           </button>
         </p>
-        <p className="ui-auth__note">Browsing the museum never requires an account.</p>
+        <p className="ui-auth__note">{t('auth.note')}</p>
       </div>
     </div>
   )

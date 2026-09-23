@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, type AnalyticsSummary } from '../api'
-import { errMsg, formatDuration } from '../ui'
+import { Skeleton, errMsg, formatDuration } from '../ui'
+import { CuratorAnalytics } from './CuratorAnalytics'
 
 const RANGES = [
   { days: 7, label: '7 days' },
@@ -57,7 +58,7 @@ export function AnalyticsPage() {
       </div>
       {error && <p className="alert">{error}</p>}
       {!data ? (
-        !error && <p className="muted">Loading…</p>
+        !error && <Skeleton rows={5} />
       ) : (
         <>
           <div className="stats">
@@ -119,6 +120,7 @@ export function AnalyticsPage() {
           </div>
         </>
       )}
+      <CuratorAnalytics />
     </>
   )
 }

@@ -1,0 +1,494 @@
+/* ================================================================== */
+/* Entry / loading screen (EntryScreen.tsx)                            */
+/* Shown while the museum's assets load; fades into the gallery on     */
+/* Enter. The pre-boot shell (.ui-boot) is in src/styles.css.          */
+/* ================================================================== */
+
+.ui-entry {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(96px + var(--safe-t)) calc(24px + var(--safe-r)) calc(64px + var(--safe-b)) calc(24px + var(--safe-l));
+  background:
+    radial-gradient(120% 90% at 50% 38%, rgba(255, 252, 245, 0.95) 0%, rgba(245, 241, 232, 0.97) 55%, rgba(233, 225, 212, 0.99) 100%),
+    var(--paper);
+  pointer-events: auto;
+  overflow-y: auto;
+  font-family: var(--font-ui);
+  transition: opacity 1.1s var(--ease), visibility 0s linear 1.1s;
+}
+
+.ui-entry.is-leaving {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* faint block-printed motif field */
+.ui-entry__motif {
+  position: absolute;
+  inset: 0;
+  opacity: 0.06;
+  color: var(--accent);
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(70% 60% at 50% 45%, transparent 30%, #000 100%);
+  mask-image: radial-gradient(70% 60% at 50% 45%, transparent 30%, #000 100%);
+  transition: transform 1.4s var(--ease);
+}
+
+.ui-entry__motif svg {
+  width: 100%;
+  height: 100%;
+}
+
+.ui-entry.is-leaving .ui-entry__motif {
+  transform: scale(1.06);
+}
+
+.ui-entry__inner {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  margin: auto;
+  text-align: center;
+  animation: ui-rise 1.4s var(--ease) both;
+}
+
+.ui-entry.is-leaving .ui-entry__inner {
+  transform: translateY(-10px) scale(0.99);
+  transition: transform 1.1s var(--ease);
+}
+
+/* ------------------------------------------------------------------ */
+/* Hand-block stamping motif: a carved block prints a four-repeat row  */
+/* ------------------------------------------------------------------ */
+
+.ui-stamp {
+  display: block;
+  width: 132px;
+  height: auto;
+  margin: 0 auto 22px;
+  overflow: visible;
+}
+
+.ui-stamp__cloth {
+  fill: #f8f2e6;
+  stroke: rgba(43, 38, 33, 0.14);
+  stroke-width: 0.75;
+}
+
+.ui-stamp__hem {
+  stroke: rgba(138, 90, 59, 0.28);
+  stroke-width: 0.75;
+  stroke-dasharray: 2 2.5;
+}
+
+.ui-stamp__print {
+  opacity: 0;
+  animation: 6s var(--ease) infinite both;
+}
+.ui-stamp__print--0 { animation-name: ui-stamp-p0; }
+.ui-stamp__print--1 { animation-name: ui-stamp-p1; }
+.ui-stamp__print--2 { animation-name: ui-stamp-p2; }
+.ui-stamp__print--3 { animation-name: ui-stamp-p3; }
+
+.ui-stamp__madder { fill: #a34a33; }
+.ui-stamp__indigo { fill: #34506e; }
+
+.ui-stamp__block {
+  transform: translate(38px, 48px);
+  animation: ui-stamp-block 6s infinite both;
+}
+
+.ui-stamp__wood { fill: #9b6a45; }
+.ui-stamp__wood-dark { fill: #6e472c; }
+.ui-stamp__grain {
+  fill: none;
+  stroke: rgba(60, 36, 20, 0.35);
+  stroke-width: 0.6;
+}
+@keyframes ui-stamp-block {
+  0% { transform: translate(38px, 48px); animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.4); }
+  7% { transform: translate(38px, 82px); }
+  11% { transform: translate(38px, 82px); animation-timing-function: cubic-bezier(0.2, 0.6, 0.35, 1); }
+  17% { transform: translate(38px, 48px); animation-timing-function: var(--ease); }
+  22% { transform: translate(86px, 48px); animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.4); }
+  29% { transform: translate(86px, 82px); }
+  33% { transform: translate(86px, 82px); animation-timing-function: cubic-bezier(0.2, 0.6, 0.35, 1); }
+  39% { transform: translate(86px, 48px); animation-timing-function: var(--ease); }
+  44% { transform: translate(134px, 48px); animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.4); }
+  51% { transform: translate(134px, 82px); }
+  55% { transform: translate(134px, 82px); animation-timing-function: cubic-bezier(0.2, 0.6, 0.35, 1); }
+  61% { transform: translate(134px, 48px); animation-timing-function: var(--ease); }
+  66% { transform: translate(182px, 48px); animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.4); }
+  73% { transform: translate(182px, 82px); }
+  77% { transform: translate(182px, 82px); animation-timing-function: cubic-bezier(0.2, 0.6, 0.35, 1); }
+  83% { transform: translate(182px, 48px); animation-timing-function: var(--ease); }
+  96%, 100% { transform: translate(38px, 48px); }
+}
+
+@keyframes ui-stamp-p0 { 0%, 7.9% { opacity: 0; } 8.5%, 86% { opacity: 1; } 94%, 100% { opacity: 0; } }
+@keyframes ui-stamp-p1 { 0%, 29.9% { opacity: 0; } 30.5%, 87% { opacity: 1; } 95%, 100% { opacity: 0; } }
+@keyframes ui-stamp-p2 { 0%, 51.9% { opacity: 0; } 52.5%, 88% { opacity: 1; } 96%, 100% { opacity: 0; } }
+@keyframes ui-stamp-p3 { 0%, 73.9% { opacity: 0; } 74.5%, 89% { opacity: 1; } 97%, 100% { opacity: 0; } }
+
+/* Ready: the row is complete and the block rests beside it. */
+.ui-entry.is-ready .ui-stamp__print { animation: none; opacity: 1; }
+.ui-entry.is-ready .ui-stamp__block,
+.ui-entry.is-still .ui-stamp__block {
+  animation: none;
+  transform: translate(234px, 82px);
+  transition: transform 0.9s var(--ease);
+}
+.ui-entry.is-still .ui-stamp__print { animation: none; opacity: 1; }
+
+/* ------------------------------------------------------------------ */
+/* Titles                                                              */
+/* ------------------------------------------------------------------ */
+
+.ui-entry__title {
+  margin: 12px 0 0;
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: clamp(44px, 8.4vw, 86px);
+  line-height: 0.98;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.ui-entry__subtitle {
+  margin: 18px auto 0;
+  max-width: 28em;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(17px, 2.2vw, 21px);
+  line-height: 1.4;
+  color: var(--muted);
+  text-wrap: balance;
+}
+
+.ui-entry__rule {
+  width: 56px;
+  height: 1px;
+  margin: 30px auto 26px;
+  background: var(--hairline-strong);
+}
+
+/* ------------------------------------------------------------------ */
+/* Status: progress → actions (same footprint, no layout jump)         */
+/* ------------------------------------------------------------------ */
+
+.ui-entry__status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ui-entry__stage {
+  display: grid;
+  width: 100%;
+  min-height: 128px;
+  align-items: start;
+  justify-items: center;
+}
+
+.ui-entry__stage > * {
+  grid-area: 1 / 1;
+}
+
+.ui-entry__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.ui-progress {
+  width: min(320px, 78vw);
+  animation: ui-fade-in 0.6s var(--ease) both;
+}
+
+.ui-progress__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+
+.ui-progress__label {
+  text-align: left;
+}
+
+.ui-progress__pct {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+}
+
+.ui-progress__track {
+  position: relative;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--hairline);
+  overflow: hidden;
+}
+
+.ui-progress__bar {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 50%;
+  background: var(--accent);
+  border-radius: inherit;
+}
+
+/* a soft sheen travels the filled part while work is in progress */
+.ui-progress__bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 244, 228, 0.7) 50%, transparent 100%);
+  transform: translateX(-100%);
+  animation: ui-progress-sheen 2.2s var(--ease) infinite;
+}
+
+@keyframes ui-progress-sheen {
+  to { transform: translateX(100%); }
+}
+
+.ui-progress__steps {
+  display: flex;
+  justify-content: space-between;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(111, 102, 92, 0.6);
+}
+
+.ui-progress__steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: color 0.4s var(--ease);
+}
+
+.ui-progress__steps li::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  transition: background 0.4s var(--ease), border-color 0.4s var(--ease);
+}
+
+.ui-progress__steps li.is-done {
+  color: var(--muted);
+}
+.ui-progress__steps li.is-done::before {
+  background: currentColor;
+}
+
+.ui-progress__steps li.is-current {
+  color: var(--accent);
+}
+.ui-progress__steps li.is-current::before {
+  background: currentColor;
+  box-shadow: 0 0 0 3px rgba(138, 90, 59, 0.16);
+}
+
+.ui-entry__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  animation: ui-rise-sm 0.8s var(--ease) both;
+}
+
+.ui-entry__enter,
+.ui-entry__tour {
+  min-width: 220px;
+  min-height: 48px;
+}
+
+.ui-entry__tour {
+  animation: ui-fade-in 1.1s var(--ease) 0.12s both;
+}
+
+.ui-entry__ready-note {
+  flex-basis: 100%;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+/* rotating tip + friendly wait message */
+.ui-entry__tip {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  width: min(420px, 86vw);
+  min-height: 2.9em;
+  margin: 24px auto 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.ui-entry__tip-label {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.ui-entry__tip-text {
+  text-align: left;
+  animation: ui-rise-sm 0.6s var(--ease) both;
+}
+
+.ui-entry__wait {
+  margin: 0;
+  font-size: 11.5px;
+  color: rgba(111, 102, 92, 0.85);
+  animation: ui-fade-in 0.8s var(--ease) both;
+}
+
+.ui-entry__note {
+  margin: 22px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.ui-entry__hint {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  color: rgba(111, 102, 92, 0.85);
+  letter-spacing: 0.02em;
+}
+
+.ui-entry__footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(18px + var(--safe-b));
+  text-align: center;
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(111, 102, 92, 0.7);
+  pointer-events: none;
+}
+
+/* Partner marks: DC Handicrafts (top-left), IIT Kharagpur (top-right) */
+.ui-entry__brand {
+  position: absolute;
+  top: calc(20px + var(--safe-t));
+  left: calc(24px + var(--safe-l));
+  right: calc(24px + var(--safe-r));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  pointer-events: none;
+  animation: ui-fade-in 1.2s var(--ease) 0.2s both;
+}
+
+.ui-entry__logo {
+  display: block;
+  width: auto;
+  max-width: 42vw;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.ui-entry__logo--dc {
+  height: 54px;
+}
+
+.ui-entry__logo--iit {
+  height: 64px;
+  opacity: 0.92;
+}
+
+.ui-sr-live {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .ui-entry {
+    padding-top: calc(80px + var(--safe-t));
+    padding-bottom: calc(72px + var(--safe-b));
+  }
+  .ui-entry__brand {
+    top: calc(14px + var(--safe-t));
+    left: calc(16px + var(--safe-l));
+    right: calc(16px + var(--safe-r));
+  }
+  .ui-entry__logo--dc { height: 36px; }
+  .ui-entry__logo--iit { height: 44px; }
+  .ui-stamp { width: 112px; margin-bottom: 16px; }
+  .ui-entry__tip { font-size: 12.5px; }
+}
+
+@media (max-width: 520px) {
+  .ui-entry__actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .ui-entry__stage { min-height: 136px; }
+}
+
+@media (max-height: 560px) {
+  .ui-entry { padding-top: calc(64px + var(--safe-t)); padding-bottom: calc(24px + var(--safe-b)); }
+  .ui-entry__brand { top: calc(12px + var(--safe-t)); }
+  .ui-entry__logo--dc { height: 30px; }
+  .ui-entry__logo--iit { height: 36px; }
+  .ui-stamp { display: none; }
+  .ui-entry__rule { margin: 18px auto 16px; }
+  .ui-entry__note { margin-top: 12px; }
+  .ui-entry__footer { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-stamp__block,
+  .ui-stamp__print,
+  .ui-progress__bar::after {
+    animation: none !important;
+  }
+  .ui-stamp__print { opacity: 1; }
+  .ui-stamp__block { transform: translate(234px, 82px); }
+}
+
+.ui-entry.is-still .ui-progress__bar::after,
+.ui-entry.is-still .ui-entry__inner,
+.ui-entry.is-still .ui-entry__tip-text {
+  animation: none;
+}

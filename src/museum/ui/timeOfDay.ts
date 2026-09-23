@@ -6,6 +6,8 @@ export const TIME_OPTIONS: { value: TimeOfDay; label: string; note: string }[] =
   { value: 'morning', label: 'Morning', note: 'Cool, low sun' },
   { value: 'midday', label: 'Midday', note: 'Bright, overhead' },
   { value: 'golden', label: 'Golden hour', note: 'Warm, raking light' },
+  { value: 'dusk', label: 'Dusk', note: 'Deep blue hour' },
+  { value: 'night', label: 'Night', note: 'Moonlit, lamps lit' },
 ]
 
 export const timeLabel = (t: TimeOfDay) => TIME_OPTIONS.find((o) => o.value === t)?.label ?? t
@@ -13,7 +15,7 @@ export const timeLabel = (t: TimeOfDay) => TIME_OPTIONS.find((o) => o.value === 
 const KEY = 'museum.timeOfDay'
 const isTime = (v: unknown): v is TimeOfDay => TIME_OPTIONS.some((o) => o.value === v)
 
-/** T shortcut: morning → midday → golden hour → morning. */
+/** T shortcut: morning → midday → golden hour → dusk → night → morning. */
 export function cycleTimeOfDay() {
   const s = useMuseum.getState()
   const i = TIME_OPTIONS.findIndex((o) => o.value === s.timeOfDay)

@@ -57,17 +57,21 @@ export const postComment = route(async (c) => {
   const body = typeof b.body === 'string' ? b.body.trim() : ''
   if (body.length < 1 || body.length > 1000) return fail(400, 'Comment must be 1–1000 characters')
   if (!commentLimit(user.id)) return fail(429, 'You are commenting too fast, please wait a minute')
-  const row: Row = { id: randomUUID(), item_kind: kind, item_id: id, body, hidden: 0, created_at: nowIso(), display_name: user.displayName }
-  await c.db.run('INSERT INTO comments (id, user_id, item_kind, item_id, body, hidden, created_at) VALUES ($1, $2, $3, $4, $5, 0, $6)', [
+  // Password accounts are not email-verified: their posts wait for moderation (anti-spam).
+  const v = await c.db.one<{ email_verified: number }>('SELECT email_verified FROM users WHERE id = $1', [user.id])
+  const hidden = user.role === 'visitor' && !Number(v?.email_verified) ? 1 : 0
+  const row: Row = { id: randomUUID(), item_kind: kind, item_id: id, body, hidden, created_at: nowIso(), display_name: user.displayName }
+  await c.db.run('INSERT INTO comments (id, user_id, item_kind, item_id, body, hidden, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
     row.id,
     user.id,
     kind,
     id,
     body,
+    hidden,
     row.created_at,
   ])
   c.status = 201
-  return toComment(row)
+  return { ...toComment(row), pending: hidden === 1 }
 })
 
 /** GET /api/admin/comments */

@@ -1,0 +1,335 @@
+/* ================================================================== */
+/* Multilingual typography + accessibility modes                       */
+/* (imported by app/layout.tsx after src/styles.css)                   */
+/* ================================================================== */
+
+/* Devanagari / Bengali: the Latin faces (Cormorant, Inter) have no Indic glyphs, so the
+   browser falls through the stack per glyph — Noto if installed, else the OS faces
+   (Nirmala UI / Mangal / Vrinda on Windows, Kohinoor / Bangla MN on Apple). */
+:root {
+  --font-indic-sans: 'Noto Sans Devanagari', 'Noto Sans Bengali', 'Nirmala UI', 'Mangal', 'Vrinda', 'Kohinoor Devanagari', 'Kohinoor Bangla', 'Devanagari Sangam MN', 'Bangla Sangam MN', 'Shonar Bangla';
+  --font-indic-serif: 'Noto Serif Devanagari', 'Noto Serif Bengali', var(--font-indic-sans);
+  --font-display: 'Cormorant Garamond', 'Cormorant', Garamond, var(--font-indic-serif), 'Times New Roman', serif;
+  --font-ui: 'Inter', var(--font-indic-sans), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Indic scripts: letter-spacing breaks the headline (shirorekha) and conjuncts, and all-caps
+   styling does not exist — neutralise both, and give the taller glyphs more line height. */
+html:lang(hi) .ui-root,
+html:lang(bn) .ui-root,
+html:lang(hi) .inspect-root,
+html:lang(bn) .inspect-root {
+  line-height: 1.6;
+}
+html:lang(hi) .ui-root *,
+html:lang(bn) .ui-root *,
+html:lang(hi) .inspect-root *,
+html:lang(bn) .inspect-root * {
+  letter-spacing: normal !important;
+}
+html:lang(hi) .ui-kicker,
+html:lang(bn) .ui-kicker {
+  text-transform: none;
+  font-size: 12.5px;
+}
+/* Display serif headings look best a touch larger in Indic scripts (the fallback faces are smaller). */
+html:lang(hi) .ui-entry__title,
+html:lang(bn) .ui-entry__title {
+  line-height: 1.25;
+}
+
+/* ------------------------------------------------------------------ */
+/* Screen-reader only / skip link                                      */
+/* ------------------------------------------------------------------ */
+
+.ui-sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.ui-skip {
+  position: fixed;
+  left: 50%;
+  top: calc(8px + var(--safe-t));
+  z-index: 1000;
+  transform: translate(-50%, -160%);
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--paper);
+  font: 500 14px/1.3 var(--font-ui);
+  text-decoration: none;
+  pointer-events: auto;
+}
+.ui-skip:focus,
+.ui-skip:focus-visible {
+  transform: translate(-50%, 0);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Visible focus rings (keyboard only)                                 */
+/* ------------------------------------------------------------------ */
+
+.ui-root :focus-visible,
+.inspect-root :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(251, 247, 240, 0.85);
+}
+.ui-root .ui-icon-btn:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Language switch (entry screen / settings)                           */
+/* ------------------------------------------------------------------ */
+
+.ui-langswitch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 999px;
+  background: rgba(251, 247, 240, 0.55);
+  pointer-events: auto;
+}
+.ui-langswitch__opt {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font: 500 13px/1.3 var(--font-ui);
+  cursor: pointer;
+}
+.ui-langswitch__opt:hover {
+  background: rgba(43, 38, 33, 0.07);
+}
+.ui-langswitch__opt.is-on {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.ui-entry__lang {
+  position: absolute;
+  right: calc(var(--edge) + var(--safe-r));
+  bottom: calc(var(--edge) + var(--safe-b) + 28px);
+  z-index: 2;
+}
+.ui-entry__guide {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  pointer-events: auto;
+}
+.ui-entry__guide:hover {
+  color: var(--ink);
+}
+@media (max-width: 640px) {
+  .ui-entry__lang {
+    right: 50%;
+    transform: translateX(50%);
+    bottom: calc(var(--edge) + var(--safe-b) + 22px);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Help: display & accessibility settings                              */
+/* ------------------------------------------------------------------ */
+
+.ui-a11y {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline);
+}
+.ui-a11y > h3 {
+  margin: 0 0 8px;
+}
+.ui-a11y__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 6px 22px;
+}
+.ui-a11y__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+.ui-a11y__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ui-a11y__text small {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+.ui-a11y__guide {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+.ui-a11y__guide a {
+  color: var(--accent);
+  text-underline-offset: 3px;
+}
+
+.ui-switch {
+  flex: none;
+  position: relative;
+  width: 38px;
+  height: 22px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--hairline-strong);
+  background: rgba(43, 38, 33, 0.12);
+  cursor: pointer;
+  transition: background 0.2s var(--ease);
+}
+.ui-switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s var(--ease);
+}
+.ui-switch.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.ui-switch.is-on .ui-switch__knob {
+  transform: translateX(16px);
+}
+
+/* ------------------------------------------------------------------ */
+/* Reduced motion (visitor setting — the OS preference is also the     */
+/* default for it; styles.css already honours the media query)         */
+/* ------------------------------------------------------------------ */
+
+html.a11y-reduce-motion *,
+html.a11y-reduce-motion *::before,
+html.a11y-reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* High contrast                                                       */
+/* ------------------------------------------------------------------ */
+
+html.a11y-contrast {
+  --ink: #111;
+  --muted: #3a342e;
+  --accent: #6b3f22;
+  --hairline: rgba(17, 17, 17, 0.45);
+  --hairline-strong: rgba(17, 17, 17, 0.7);
+  --panel: #fffdf8;
+  --panel-solid: #fffdf8;
+  --blur: none;
+  --shadow: 0 0 0 1px rgba(17, 17, 17, 0.55), 0 10px 26px -10px rgba(0, 0, 0, 0.45);
+}
+html.a11y-contrast .ui-panel,
+html.a11y-contrast .ui-help__card,
+html.a11y-contrast .ui-info__sheet,
+html.a11y-contrast .inspect-info {
+  background: #fffdf8 !important;
+  color: #111;
+  border-color: rgba(17, 17, 17, 0.7);
+}
+html.a11y-contrast .ui-root small,
+html.a11y-contrast .ui-root .ui-kicker {
+  color: #2b2621;
+  opacity: 1;
+}
+html.a11y-contrast .ui-root :focus-visible,
+html.a11y-contrast .inspect-root :focus-visible {
+  outline: 3px solid #000;
+  box-shadow: 0 0 0 5px #ffd400;
+}
+html.a11y-contrast .ui-btn {
+  border: 1.5px solid #111;
+}
+html.a11y-contrast [data-tip]::after {
+  background: #111 !important;
+  color: #fff !important;
+}
+@media (forced-colors: active) {
+  .ui-switch.is-on {
+    background: Highlight;
+  }
+  .ui-langswitch__opt.is-on {
+    background: Highlight;
+    color: HighlightText;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Larger text — scales the whole HTML UI layer                        */
+/* ------------------------------------------------------------------ */
+
+/* `zoom` also scales a box's resolved size, so full-screen layers (inset: 0) and
+   top/bottom-anchored sheets are not zoomed themselves — their inner card is, with its
+   size limits divided by the zoom factor. */
+html.a11y-large {
+  --a11y-zoom: 1.2;
+}
+html.a11y-large .ui-root > :not(.ui-help):not(.ui-entry):not(.ui-fade):not(.ui-crosshair):not(.ui-info):not(.ui-drawer):not(.ui-photo):not(.ui-skip):not(.ui-sr-only),
+html.a11y-large .ui-photo__bar,
+html.a11y-large .ui-photo__hint,
+html.a11y-large .inspect-info {
+  zoom: var(--a11y-zoom);
+}
+html.a11y-large .ui-help__card {
+  zoom: var(--a11y-zoom);
+  max-height: calc(100% / var(--a11y-zoom));
+}
+html.a11y-large .ui-info,
+html.a11y-large .ui-drawer {
+  width: min(480px, calc(100vw - 2 * var(--edge)));
+}
+html.a11y-large .ui-info__sheet,
+html.a11y-large .ui-drawer > * {
+  zoom: var(--a11y-zoom);
+}
+html.a11y-large .ui-info__sheet {
+  max-height: calc(100% / var(--a11y-zoom));
+}
+
+/* Synthetic italics skew Devanagari/Bengali badly — keep Indic text upright. */
+html:lang(hi) .ui-root em,
+html:lang(hi) .ui-root i,
+html:lang(hi) .ui-entry__subtitle,
+html:lang(bn) .ui-root em,
+html:lang(bn) .ui-root i,
+html:lang(bn) .ui-entry__subtitle,
+html:lang(hi) .ui-thread__empty,
+html:lang(bn) .ui-thread__empty,
+html:lang(hi) .ui-tour__text--muted,
+html:lang(bn) .ui-tour__text--muted {
+  font-style: normal;
+}

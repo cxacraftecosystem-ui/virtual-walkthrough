@@ -1,0 +1,64 @@
+# Pull-request checks that need a running production build (deploy.yml handles typecheck/lint + deploys).
+#
+# visual regression: next build → next start → scripts/visual-regression.mjs (SwiftShader, headless
+# Chrome preinstalled on ubuntu-latest) against the committed baselines in tests/visual/baseline/.
+# Diffs are uploaded as the "visual-diff" artifact. Baselines are captured from the production
+# deployment: `npm run test:visual:update -- https://hand-block-museum.vercel.app` (tests/visual/README.md).
+name: ci
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  visual:
+    name: visual regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - id: baselines
+        run: |
+          if ls tests/visual/baseline/*.png >/dev/null 2>&1; then echo "present=1" >> "$GITHUB_OUTPUT"
+          else echo "::warning::no visual baselines committed (tests/visual/baseline) — skipping"; echo "present=0" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/setup-node@v4
+        if: steps.baselines.outputs.present == '1'
+        with:
+          node-version: 24
+          cache: npm
+      - if: steps.baselines.outputs.present == '1'
+        run: npm ci
+      # No DATABASE_URL / S3 env: the app falls back to SQLite + local disk; the test uses ?static content.
+      - if: steps.baselines.outputs.present == '1'
+        run: npm run build
+      - name: start production server
+        if: steps.baselines.outputs.present == '1'
+        run: |
+          nohup npm run start -- -p 3000 > next-start.log 2>&1 &
+          for i in $(seq 1 60); do curl -fsS http://localhost:3000/api/health >/dev/null && exit 0; sleep 2; done
+          cat next-start.log; exit 1
+      - name: npm run test:visual
+        if: steps.baselines.outputs.present == '1'
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+          VR_TIMEOUT_MS: '600000'
+        run: npm run test:visual -- http://localhost:3000
+      - uses: actions/upload-artifact@v4
+        if: failure() || steps.baselines.outputs.present == '1'
+        with:
+          name: visual-diff
+          path: |
+            tests/visual/diff/
+            next-start.log
+          if-no-files-found: ignore
+          retention-days: 14

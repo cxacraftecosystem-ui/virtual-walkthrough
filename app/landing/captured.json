@@ -1,0 +1,10 @@
+{
+  "note": "Written by scripts/capture-landing.mjs — the landing-page images that exist in public/brand/landing/.",
+  "files": [
+    "f-examine.jpg",
+    "f-info.jpg",
+    "f-studio.jpg",
+    "f-tour.jpg",
+    "f-walk.jpg"
+  ]
+}

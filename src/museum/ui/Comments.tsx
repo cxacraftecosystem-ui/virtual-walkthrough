@@ -3,6 +3,7 @@
  * Renders nothing in static mode (backend offline).
  */
 import { useEffect, useRef, useState } from 'react'
+import { rich, useT } from '../i18n'
 import { api, errorMessage, type Comment, type ItemKind } from '../api/client'
 import { useMuseum } from '../state/store'
 import { formatDate } from './items'
@@ -18,7 +19,10 @@ interface Props {
   compact?: boolean
 }
 
-export function CommentThread({ item, title = 'Visitor notes', placeholder = 'Share a thought about this work…', tabIndex, compact }: Props) {
+export function CommentThread({ item, title: titleProp, placeholder: placeholderProp, tabIndex, compact }: Props) {
+  const t = useT()
+  const title = titleProp ?? t('comments.title')
+  const placeholder = placeholderProp ?? t('comments.placeholder')
   const online = useMuseum((s) => s.online)
   const user = useMuseum((s) => s.user)
   const openAuth = useMuseum((s) => s.openAuth)
@@ -59,9 +63,10 @@ export function CommentThread({ item, title = 'Visitor notes', placeholder = 'Sh
     try {
       const c = await api.comments.post(body, kind && id ? { kind, id } : undefined)
       setDraft('')
-      setJustPosted(c?.id ?? 'posted')
+      const pending = !!(c as { pending?: boolean } | undefined)?.pending
+      setJustPosted(pending ? 'pending' : (c?.id ?? 'posted'))
       // Only approved comments are listed; show ours right away when the server returns it.
-      if (c && c.body) setList((l) => [c, ...(l ?? []).filter((x) => x.id !== c.id)])
+      if (c && c.body && !pending) setList((l) => [c, ...(l ?? []).filter((x) => x.id !== c.id)])
     } catch (e) {
       setPostError(errorMessage(e))
     } finally {
@@ -103,34 +108,34 @@ export function CommentThread({ item, title = 'Visitor notes', placeholder = 'Sh
           />
           <div className="ui-thread__row">
             <span className="ui-thread__as">
-              as <strong>{user.displayName}</strong>
-              {draft.length > MAX * 0.8 && <em> · {MAX - draft.length} left</em>}
+              {rich(t('comments.as'), { name: <strong>{user.displayName}</strong> })}
+              {draft.length > MAX * 0.8 && <em> · {t('comments.left', { n: MAX - draft.length })}</em>}
             </span>
             <button type="submit" className="ui-btn ui-btn--sm" disabled={!body || posting} tabIndex={tabIndex}>
-              {posting ? 'Posting…' : 'Post'}
+              {posting ? t('comments.posting') : t('comments.post')}
             </button>
           </div>
           {postError && <p className="ui-thread__error" role="alert">{postError}</p>}
-          {justPosted && !postError && <p className="ui-thread__ok" role="status">Thank you — your note has been added.</p>}
+          {justPosted && !postError && <p className="ui-thread__ok" role="status">{t(justPosted === 'pending' ? 'comments.pending' : 'comments.thanks')}</p>}
         </form>
       ) : (
-        <button type="button" className="ui-thread__signin" tabIndex={tabIndex} onClick={() => openAuth('Sign in to leave a note for other visitors.')}>
-          Sign in to leave a note
+        <button type="button" className="ui-thread__signin" tabIndex={tabIndex} onClick={() => openAuth(t('social.signInNotes'))}>
+          {t('comments.signIn')}
         </button>
       )}
 
       {error ? (
-        <p className="ui-thread__empty">Notes are unavailable right now.</p>
+        <p className="ui-thread__empty">{t('comments.unavailable')}</p>
       ) : list === null ? (
-        <p className="ui-thread__empty">Loading…</p>
+        <p className="ui-thread__empty">{t('comments.loading')}</p>
       ) : list.length === 0 ? (
-        <p className="ui-thread__empty">{item ? 'No notes yet — be the first.' : 'The guestbook is waiting for its first entry.'}</p>
+        <p className="ui-thread__empty">{item ? t('comments.empty') : t('comments.emptyGuestbook')}</p>
       ) : (
         <ol className="ui-thread__list">
           {list.map((c) => (
             <li key={c.id} className="ui-thread__item">
               <div className="ui-thread__meta">
-                <span className="ui-thread__name">{c.displayName || 'Visitor'}</span>
+                <span className="ui-thread__name">{c.displayName || t('comments.visitor')}</span>
                 <time dateTime={c.createdAt}>{formatDate(c.createdAt)}</time>
               </div>
               <p className="ui-thread__body">{c.body}</p>

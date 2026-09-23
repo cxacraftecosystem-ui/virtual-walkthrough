@@ -21,6 +21,10 @@ export function getDb(): Db {
     void cur.close().catch(() => undefined)
     g.__museumDb = undefined
   }
+  // Serverless file systems are ephemeral: a missing DATABASE_URL on Vercel would silently lose data.
+  if (!config.databaseUrl && process.env.VERCEL && process.env.NEXT_PHASE !== 'phase-production-build') {
+    throw new Error('DATABASE_URL is not set — refusing to use the SQLite fallback on Vercel')
+  }
   g.__museumDb ??= config.databaseUrl
     ? new PostgresDb({ connectionString: config.databaseUrl, ssl: config.databaseSsl, max: config.databasePoolMax })
     : new SqliteDb(config.dbPath) // migrates itself on open

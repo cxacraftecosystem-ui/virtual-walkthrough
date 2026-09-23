@@ -1,0 +1,96 @@
+/* "Meet the maker" card (InfoPanel) — uses the museum UI tokens from src/styles.css */
+.ui-maker {
+  margin-top: 4px;
+  padding-top: 2px;
+}
+
+.ui-maker__row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.ui-maker__portrait {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--paper-2);
+  border: 1px solid var(--hairline);
+}
+
+.ui-maker__portrait--empty {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--muted);
+  border-style: dashed;
+}
+
+.ui-maker__who {
+  min-width: 0;
+}
+
+.ui-maker__name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.ui-maker__meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.ui-maker__badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 1px 8px;
+  font-size: 11px;
+  border: 1px dashed rgba(138, 90, 59, 0.55);
+  border-radius: 999px;
+  color: var(--muted);
+}
+
+.ui-maker__badge--ok {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ui-maker__bio {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.ui-maker__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.ui-maker__btn {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.ui-maker__more {
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.ui-maker__more:hover,
+.ui-maker__more:focus-visible {
+  text-decoration: underline;
+}

@@ -10,7 +10,14 @@ import { AccountMenu } from './Social'
 import { isCoarsePointer } from './HelpOverlay'
 import { tour, useTour } from '../tour/engine'
 import { enterPhotoMode } from './PhotoMode'
-import { TIME_OPTIONS, timeLabel } from './timeOfDay'
+import { TIME_OPTIONS } from './timeOfDay'
+import { useLang, useLoc, useT } from '../i18n'
+import type { DictKey } from '../i18n/en'
+import { zoneName } from '../i18n/content'
+import { LanguageMenu } from './LanguageMenu'
+import { TrailButton } from '../trail/TrailUI'
+import { LiveHudButton } from '../live/LivePanel'
+import { VRHudButton } from '../xr/XRButtons'
 import {
   IconCamera,
   IconFullscreen,
@@ -26,20 +33,20 @@ import {
   IconTour,
 } from './icons'
 
-const QUALITY_OPTIONS: { value: QualitySetting; label: string; note?: string }[] = [
-  { value: 'auto', label: 'Auto', note: 'Adapts to device' },
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'ultra', label: 'Ultra', note: 'Reflections' },
+const QUALITY_OPTIONS: { value: QualitySetting; label: DictKey; note?: DictKey }[] = [
+  { value: 'auto', label: 'quality.auto', note: 'quality.autoNote' },
+  { value: 'low', label: 'quality.low' },
+  { value: 'medium', label: 'quality.medium' },
+  { value: 'high', label: 'quality.high' },
+  { value: 'ultra', label: 'quality.ultra', note: 'quality.ultraNote' },
 ]
 
 function useZoneName(enabled: boolean) {
-  const [name, setName] = useState(() => zoneAt(visitor.x, visitor.z)?.name ?? '')
+  const [name, setName] = useState(() => zoneAt(visitor.x, visitor.z)?.id ?? '')
   useEffect(() => {
     if (!enabled) return
     const id = window.setInterval(() => {
-      const n = zoneAt(visitor.x, visitor.z)?.name
+      const n = zoneAt(visitor.x, visitor.z)?.id
       // Keep the last known name while crossing thresholds/doorways.
       if (n) setName((prev) => (prev === n ? prev : n))
     }, 250)
@@ -97,6 +104,8 @@ function TimeMenu() {
   const time = useMuseum((s) => s.timeOfDay)
   const setTime = useMuseum((s) => s.setTimeOfDay)
   const { open, setOpen, rootRef } = usePopover()
+  const t = useT()
+  const timeLabel = (v: string) => t(`time.${v}` as DictKey)
   return (
     <div className="ui-quality ui-time" ref={rootRef}>
       <button
@@ -104,15 +113,15 @@ function TimeMenu() {
         className="ui-icon-btn"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Time of day: ${timeLabel(time)} (T)`}
+        aria-label={t('hud.timeOfDay', { time: timeLabel(time) })}
         data-tip={open ? undefined : `${timeLabel(time)} · T`}
         onClick={() => setOpen((v) => !v)}
       >
         <IconSun />
       </button>
       {open && (
-        <div className="ui-quality__menu ui-panel" role="menu" aria-label="Time of day">
-          <div className="ui-kicker ui-quality__menu-title">Time of day</div>
+        <div className="ui-quality__menu ui-panel" role="menu" aria-label={t('time.title')}>
+          <div className="ui-kicker ui-quality__menu-title">{t('time.title')}</div>
           {TIME_OPTIONS.map((o) => (
             <button
               key={o.value}
@@ -125,8 +134,8 @@ function TimeMenu() {
                 setOpen(false)
               }}
             >
-              <span>{o.label}</span>
-              {time !== o.value ? <small>{o.note}</small> : null}
+              <span>{timeLabel(o.value)}</span>
+              {time !== o.value ? <small>{t(`time.${o.value}Note` as DictKey)}</small> : null}
             </button>
           ))}
         </div>
@@ -141,8 +150,11 @@ function QualityMenu() {
   const setQuality = useMuseum((s) => s.setQuality)
   const { open, setOpen, rootRef } = usePopover()
 
-  const tierLabel = withDevOverrides(QUALITY_PRESETS[tier]).label
-  const label = quality === 'auto' ? `Auto · ${tierLabel}` : tierLabel
+  const t = useT()
+  const devLabel = withDevOverrides(QUALITY_PRESETS[tier]).label
+  // Preset labels are English ('Medium'…); translate the plain tier names, keep dev-override labels.
+  const tierLabel = devLabel === QUALITY_PRESETS[tier].label ? t(`quality.${tier}` as DictKey) : devLabel
+  const label = quality === 'auto' ? `${t('quality.auto')} · ${tierLabel}` : tierLabel
 
   return (
     <div className="ui-quality" ref={rootRef}>
@@ -151,15 +163,15 @@ function QualityMenu() {
         className="ui-quality__btn"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Graphics quality: ${label}`}
-        title="Graphics quality"
+        aria-label={t('hud.quality', { label })}
+        title={t('hud.qualityTitle')}
         onClick={() => setOpen((v) => !v)}
       >
         <IconQuality />
         <span className="ui-quality__label">
           {quality === 'auto' ? (
             <>
-              Auto <em>· {tierLabel}</em>
+              {t('quality.auto')} <em>· {tierLabel}</em>
             </>
           ) : (
             tierLabel
@@ -167,8 +179,8 @@ function QualityMenu() {
         </span>
       </button>
       {open && (
-        <div className="ui-quality__menu ui-panel" role="menu" aria-label="Graphics quality">
-          <div className="ui-kicker ui-quality__menu-title">Graphics</div>
+        <div className="ui-quality__menu ui-panel" role="menu" aria-label={t('hud.qualityTitle')}>
+          <div className="ui-kicker ui-quality__menu-title">{t('hud.graphics')}</div>
           {QUALITY_OPTIONS.map((o) => (
             <button
               key={o.value}
@@ -182,10 +194,10 @@ function QualityMenu() {
               }}
             >
               <span>
-                {o.label}
+                {t(o.label)}
                 {o.value === 'auto' && quality === 'auto' ? <small> · {tierLabel}</small> : null}
               </span>
-              {o.note && quality !== o.value ? <small>{o.note}</small> : null}
+              {o.note && quality !== o.value ? <small>{t(o.note)}</small> : null}
             </button>
           ))}
         </div>
@@ -208,35 +220,42 @@ export function HUD() {
   const setMouseLook = useMuseum((s) => s.setMouseLook)
   const touring = useTour((s) => s.active)
   const [coarse] = useState(isCoarsePointer)
+  const t = useT()
+  const L = useLoc()
+  const lang = useLang()
+  const zoneLabel = zone ? zoneName(zone, lang) : ''
 
   return (
-    <div className={`ui-hud${entered ? ' is-visible' : ''}`} aria-hidden={!entered || undefined}>
+    <div className={`ui-hud${entered ? ' is-visible' : ''}`} aria-hidden={!entered || undefined} inert={!entered || undefined}>
       <div className="ui-hud__title">
-        <div className="ui-hud__name">{EXHIBITION_TITLE.title}</div>
+        <div className="ui-hud__name">{L(EXHIBITION_TITLE, 'title')}</div>
         <div className="ui-hud__zone" aria-live="polite">
-          {zone ? <span key={zone}>{zone}</span> : <span>&nbsp;</span>}
+          {zoneLabel ? <span key={zone}>{zoneLabel}</span> : <span>&nbsp;</span>}
         </div>
       </div>
 
       <div className="ui-hud__right">
       <AccountMenu />
-      <nav className="ui-hud__actions ui-panel ui-interactive" aria-label="Exhibition controls">
+      <nav className="ui-hud__actions ui-panel ui-interactive" aria-label={t('hud.controls')}>
+        <TrailButton />
         <button
           type="button"
           className="ui-icon-btn"
-          aria-label={touring ? 'End the guided tour' : 'Take the guided tour'}
-          data-tip={touring ? 'End guided tour' : 'Guided tour'}
+          aria-label={touring ? t('hud.tourEnd') : t('hud.tourStart')}
+          data-tip={touring ? t('hud.tourEndTip') : t('hud.tourStartTip')}
           aria-pressed={touring}
           onClick={() => (touring ? tour.exit() : tour.start(0))}
         >
           <IconTour />
         </button>
+        <LiveHudButton />
+        <VRHudButton />
         {!coarse && (
           <button
             type="button"
             className="ui-icon-btn"
-            aria-label="Mouse look (L)"
-            data-tip="Mouse look (L)"
+            aria-label={t('hud.mouseLook')}
+            data-tip={t('hud.mouseLook')}
             aria-pressed={mouseLook}
             onClick={() => setMouseLook(!mouseLook)}
           >
@@ -244,14 +263,14 @@ export function HUD() {
           </button>
         )}
         <TimeMenu />
-        <button type="button" className="ui-icon-btn" aria-label="Photo mode (P)" data-tip="Photo mode · P" onClick={enterPhotoMode}>
+        <button type="button" className="ui-icon-btn" aria-label={t('hud.photo')} data-tip={t('hud.photoTip')} onClick={enterPhotoMode}>
           <IconCamera />
         </button>
         <button
           type="button"
           className="ui-icon-btn"
-          aria-label="Help (H)"
-          data-tip="Help · H"
+          aria-label={t('hud.help')}
+          data-tip={t('hud.helpTip')}
           aria-pressed={helpOpen}
           onClick={() => setHelpOpen(!helpOpen)}
         >
@@ -260,8 +279,8 @@ export function HUD() {
         <button
           type="button"
           className="ui-icon-btn"
-          aria-label={soundOn ? 'Mute ambient sound' : 'Play ambient sound'}
-          data-tip={soundOn ? 'Sound on' : 'Sound off'}
+          aria-label={soundOn ? t('hud.soundMute') : t('hud.soundPlay')}
+          data-tip={soundOn ? t('hud.soundOnTip') : t('hud.soundOffTip')}
           aria-pressed={soundOn}
           onClick={() => {
             if (!soundOn) requestAmbientStart()
@@ -274,8 +293,8 @@ export function HUD() {
           <button
             type="button"
             className="ui-icon-btn"
-            aria-label={fs.on ? 'Exit full screen' : 'Full screen'}
-            data-tip={fs.on ? 'Exit full screen' : 'Full screen'}
+            aria-label={fs.on ? t('hud.fullscreenExit') : t('hud.fullscreen')}
+            data-tip={fs.on ? t('hud.fullscreenExit') : t('hud.fullscreen')}
             aria-pressed={fs.on}
             onClick={fs.toggle}
           >
@@ -285,8 +304,8 @@ export function HUD() {
         <button
           type="button"
           className="ui-icon-btn"
-          aria-label="Return to entrance"
-          data-tip="Return to entrance"
+          aria-label={t('hud.reset')}
+          data-tip={t('hud.reset')}
           onClick={() => travel(resetVisitor)}
         >
           <IconReset />
@@ -294,13 +313,14 @@ export function HUD() {
         <button
           type="button"
           className="ui-icon-btn"
-          aria-label={mapOpen ? 'Hide map (M)' : 'Show map (M)'}
-          data-tip="Map · M"
+          aria-label={mapOpen ? t('hud.mapHide') : t('hud.mapShow')}
+          data-tip={t('hud.mapTip')}
           aria-pressed={mapOpen}
           onClick={() => setMapOpen(!mapOpen)}
         >
           <IconMap />
         </button>
+        <LanguageMenu />
         <span className="ui-hud__sep" aria-hidden="true" />
         <QualityMenu />
       </nav>

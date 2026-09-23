@@ -27,7 +27,7 @@ export const DECOR_TILE_METRES: Record<DecorTextureKind, [number, number]> = {
 
 /** Base pixel width at High (scaled per tier by the caller). Height follows the tile aspect. */
 export const DECOR_BASE_PX: Record<DecorTextureKind, number> = {
-  blockPrint: 576,
+  blockPrint: 512,
   indigoDamask: 512,
   friezePainted: 768,
   stoneFrieze: 512,
@@ -537,7 +537,7 @@ function genJali(W: number): DecorTextureSet {
  * values are re-sharpened around 0.5, so the piercings keep their size at a distance
  * instead of closing up (the classic alpha-test mip shrinkage).
  */
-function coverageMips(mask: HTMLCanvasElement, kind: DecorTextureKind): THREE.CanvasTexture {
+function coverageMips(mask: HTMLCanvasElement, kind: DecorTextureKind, lineArt = false): THREE.CanvasTexture {
   const levels: HTMLCanvasElement[] = [mask]
   let prev = mask
   while (prev.width > 1 || prev.height > 1) {
@@ -551,7 +551,8 @@ function coverageMips(mask: HTMLCanvasElement, kind: DecorTextureKind): THREE.Ca
       const img = ctx.getImageData(0, 0, w, h)
       const d = img.data
       for (let i = 0; i < d.length; i += 4) {
-        const v = clamp01((d[i] / 255 - 0.5) * 1.7 + 0.5) * 255
+        // screens: re-sharpen around 0.5; line art: boost so fine strokes survive minification
+        const v = (lineArt ? clamp01((d[i] / 255) * 1.8) : clamp01((d[i] / 255 - 0.5) * 1.7 + 0.5)) * 255
         d[i] = d[i + 1] = d[i + 2] = v
         d[i + 3] = 255
       }
@@ -611,3 +612,88 @@ export function disposeDecorTextures(keep: Set<string>) {
 }
 
 export const decorTextureKey = (kind: DecorTextureKind, width: number) => `${kind}:${width}`
+
+/* ------------------------------------------------------------------ */
+/* SVG medallions (config/decor.ts 'medallion')                        */
+/* ------------------------------------------------------------------ */
+
+export interface MedallionTextures {
+  /** Silhouette mask for alphaMap/alphaTest (coverage-preserving mips). */
+  alphaMap: THREE.Texture
+  /** Relief normal map derived from the softened silhouette. */
+  normalMap: THREE.Texture
+}
+
+const medallionCache = new Map<string, Promise<MedallionTextures>>()
+
+function unTile(t: THREE.Texture) {
+  t.wrapS = THREE.ClampToEdgeWrapping
+  t.wrapT = THREE.ClampToEdgeWrapping
+  t.repeat.set(1, 1)
+  t.needsUpdate = true
+  return t
+}
+
+/**
+ * Rasterise a single-colour SVG (fill="currentColor") into a square mask at `size` px and
+ * derive a relief normal map (`normalSize` px) from it. Cached per (url, sizes); the SVG
+ * is fetched once, drawn through an <img> (no DOM insertion, no script execution).
+ * `sizeM` is the physical diameter the relief depth is calibrated to.
+ */
+export function loadMedallionTextures(url: string, size: number, normalSize: number, sizeM: number, anisotropy: number): Promise<MedallionTextures> {
+  const key = `${url}:${size}:${normalSize}`
+  let p = medallionCache.get(key)
+  if (!p) {
+    p = (async () => {
+      const src = await (await fetch(url)).text()
+      // white silhouette, strokes slightly dilated so the fine line work reads across a room
+      const svg = src.replace(/currentColor/g, '#ffffff').replace(/<svg\b/,'<svg stroke="#ffffff" stroke-width="1.3" stroke-linejoin="round"')
+      const blobUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
+      try {
+        const img = new Image()
+        img.decoding = 'async'
+        img.src = blobUrl
+        await img.decode()
+        const [mc, m] = makeCanvas(size, size)
+        m.fillStyle = '#000000'
+        m.fillRect(0, 0, size, size)
+        m.drawImage(img, 0, 0, size, size)
+        const alphaMap = unTile(coverageMips(mc, 'jali', true))
+        alphaMap.name = `medallion-alpha-${size}`
+        // relief: softened silhouette → rounded, hand-chased edges
+        const [nc, n] = makeCanvas(normalSize, normalSize)
+        n.drawImage(mc, 0, 0, normalSize, normalSize)
+        const [bc, b] = makeCanvas(normalSize, normalSize)
+        if ('filter' in b) b.filter = `blur(${Math.max(1, normalSize / 400)}px)`
+        b.drawImage(nc, 0, 0)
+        const normalMap = unTile(normalTexture(readHeight(bc), normalSize, normalSize, sizeM / normalSize, 0.008, 'jali'))
+        normalMap.name = `medallion-normal-${normalSize}`
+        for (const t of [alphaMap, normalMap]) t.anisotropy = anisotropy
+        return { alphaMap, normalMap }
+      } finally {
+        URL.revokeObjectURL(blobUrl)
+      }
+    })()
+    p.catch(() => medallionCache.delete(key))
+    medallionCache.set(key, p)
+  }
+  return p
+}
+
+/** Soft radial halo (shared) for backlit medallions. */
+let halo: THREE.CanvasTexture | null = null
+export function getHaloTexture(): THREE.CanvasTexture {
+  if (halo) return halo
+  const [c, ctx] = makeCanvas(128, 128)
+  const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64)
+  g.addColorStop(0, 'rgba(255,255,255,0.0)')
+  g.addColorStop(0.42, 'rgba(255,255,255,0.55)')
+  g.addColorStop(0.62, 'rgba(255,255,255,0.35)')
+  g.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, 128, 128)
+  halo = new THREE.CanvasTexture(c)
+  halo.colorSpace = THREE.SRGBColorSpace
+  halo.name = 'medallion-halo'
+  return halo
+}

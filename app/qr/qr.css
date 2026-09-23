@@ -1,0 +1,107 @@
+/* Printable QR label (/qr/<kind>/<id>). */
+.qr-page {
+  min-height: 100vh;
+  margin: 0;
+  padding: 32px 20px 48px;
+  background: #efe9df;
+  color: #2b2621;
+  font-family: Inter, system-ui, sans-serif;
+}
+.qr-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+.qr-tool,
+.qr-page .guide-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid rgba(43, 38, 33, 0.24);
+  border-radius: 6px;
+  background: #fbf8f2;
+  color: #2b2621;
+  font: 500 14px/1 Inter, system-ui, sans-serif;
+  text-decoration: none;
+  cursor: pointer;
+}
+.qr-label {
+  display: flex;
+  align-items: center;
+  gap: 6mm;
+  box-sizing: border-box;
+  width: 100mm;
+  margin: 0 auto;
+  padding: 6mm;
+  background: #fff;
+  border: 0.3mm solid #cfc6b8;
+  border-radius: 2mm;
+}
+.qr-page--large .qr-label {
+  flex-direction: column;
+  align-items: flex-start;
+  width: 148mm;
+  padding: 10mm;
+}
+.qr-label__code {
+  flex: none;
+  width: 34mm;
+  height: 34mm;
+}
+.qr-page--large .qr-label__code {
+  width: 80mm;
+  height: 80mm;
+}
+.qr-label__kicker {
+  font-size: 7.5pt;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8a4a33;
+}
+.qr-label__title {
+  margin: 1.5mm 0 2mm;
+  font: 500 15pt/1.1 'Cormorant Garamond', Georgia, serif;
+}
+.qr-page--large .qr-label__title {
+  font-size: 26pt;
+}
+.qr-label__note,
+.qr-label__cta,
+.qr-label__url {
+  margin: 0 0 1.2mm;
+  font-size: 7.5pt;
+  line-height: 1.35;
+}
+.qr-label__note {
+  font-style: italic;
+  color: #6f665c;
+}
+.qr-label__url {
+  color: #6f665c;
+  word-break: break-all;
+}
+.qr-page--large .qr-label__cta,
+.qr-page--large .qr-label__url,
+.qr-page--large .qr-label__note {
+  font-size: 11pt;
+}
+
+@media print {
+  @page {
+    margin: 12mm;
+  }
+  .qr-page {
+    padding: 0;
+    background: #fff;
+  }
+  .qr-tools {
+    display: none;
+  }
+  .qr-label {
+    break-inside: avoid;
+  }
+}

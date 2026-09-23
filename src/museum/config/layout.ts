@@ -95,8 +95,8 @@ export const WALLS: WallBox[] = [
   { id: 'divider-lintel', kind: 'divider', min: [-passageHalf, RH, 0], max: [passageHalf, H, DIV], collide: false },
 
   // ── Reception shell ───────────────────────────────────────────────
-  { id: 'reception-west', kind: 'reception', min: [-rx - T, 0, DIV], max: [-rx, RH, rzSouth] },
-  { id: 'reception-east', kind: 'reception', min: [rx, 0, DIV], max: [rx + T, RH, rzSouth] },
+  ...wallZWithDoor('reception-west', 'reception', -rx - T, -rx, DIV, rzSouth, RH, D.receptionToLibrary),
+  ...wallZWithDoor('reception-east', 'reception', rx, rx + T, DIV, rzSouth, RH, D.receptionToShop),
 
   // ── Central tunnel passage partitions (artwork display walls) ────
   { id: 'passage-west', kind: 'partition', min: [-partitionOuter, 0, passageNorthZ], max: [-passageHalf, PH, 0] },
@@ -155,6 +155,11 @@ function wingWalls(): WallBox[] {
 
     // ── Gallery D (west, north row): west/north = shell, east = gallery west wall, south = theatre north wall
 
+    // ── Courtyard enclosure: lift its west (gallery) and south (workshop) walls to the full
+    //    10 m shell height so the open court is enclosed like the rest of the cuboid ──
+    { id: 'courtyard-west-upper', kind: 'shell', min: [W.courtyard.minX - T, H, W.courtyard.minZ - T], max: [W.courtyard.minX, SH, W.courtyard.maxZ + T], collide: false },
+    { id: 'courtyard-south-upper', kind: 'shell', min: [W.courtyard.minX - T, ws.height, W.courtyard.maxZ], max: [W.courtyard.maxX, SH, W.courtyard.maxZ + T], collide: false },
+
     // ── Craft Workshop (east, south row) ──
     { id: 'workshop-west', kind: 'wing', min: [ws.minX - T, 0, ws.minZ - T], max: [ws.minX, ws.height, rzSouth] },
     ...wallXWithDoor('workshop-north', 'wing', ws.minX - T, ws.maxX, ws.minZ - T, ws.minZ, ws.height, D.workshopToCourtyard),
@@ -207,6 +212,12 @@ export type SurfaceId =
   | 'courtyard-east'
   | 'courtyard-north'
   | 'courtyard-west'
+  | 'shop-north'
+  | 'shop-south'
+  | 'shop-east'
+  | 'library-north'
+  | 'library-south'
+  | 'library-west'
 
 export interface DisplaySurface {
   id: SurfaceId
@@ -287,6 +298,12 @@ export const SURFACES: Record<SurfaceId, DisplaySurface> = {
   'court-east': S('court-east', 'Craft court — east wall', 'reveal', 'z', gx, [-1, 0], [gzNorth, passageNorthZ], H),
   'reception-west': S('reception-west', 'Reception — west wall', 'reception', 'z', -rx, [1, 0], [DIV, rzSouth], RH),
   'reception-east': S('reception-east', 'Reception — east wall', 'reception', 'z', rx, [-1, 0], [DIV, rzSouth], RH),
+  'shop-north': S('shop-north', 'Shop — north wall', 'shop', 'x', DIV, [0, 1], [rx + T, gx], RH),
+  'shop-south': S('shop-south', 'Shop — south wall', 'shop', 'x', rzSouth, [0, -1], [rx + T, gx], RH),
+  'shop-east': S('shop-east', 'Shop — east wall', 'shop', 'z', gx, [-1, 0], [DIV, rzSouth], RH),
+  'library-north': S('library-north', 'Library — north wall', 'library', 'x', DIV, [0, 1], [-gx, -rx - T], RH),
+  'library-south': S('library-south', 'Library — south wall', 'library', 'x', rzSouth, [0, -1], [-gx, -rx - T], RH),
+  'library-west': S('library-west', 'Library — west wall', 'library', 'z', -gx, [1, 0], [DIV, rzSouth], RH),
 }
 
 /** World transform for a point on a display surface. */
@@ -303,7 +320,7 @@ export function surfacePoint(surfaceId: SurfaceId, at: number, y: number, standO
 /* Zones (minimap, orientation, teleport, culling)                     */
 /* ------------------------------------------------------------------ */
 
-export type ZoneId = 'reception' | 'passage' | 'gallery-a' | 'gallery-b' | 'gallery-c' | 'gallery-d' | 'reveal' | 'atrium' | 'theatre' | 'workshop' | 'courtyard'
+export type ZoneId = 'reception' | 'passage' | 'gallery-a' | 'gallery-b' | 'gallery-c' | 'gallery-d' | 'reveal' | 'atrium' | 'theatre' | 'workshop' | 'courtyard' | 'shop' | 'library'
 
 export interface Zone {
   id: ZoneId
@@ -316,12 +333,20 @@ export interface Zone {
   height: number
 }
 
+/** Side rooms flanking the reception (between the reception walls and the gallery/wing walls). */
+export const SIDE_ROOMS = {
+  shop: { minX: rx + T, maxX: gx, minZ: DIV, maxZ: rzSouth },
+  library: { minX: -gx, maxX: -rx - T, minZ: DIV, maxZ: rzSouth },
+}
+
 function wingRect(w: { minX: number; maxX: number; minZ: number; maxZ: number }) {
   return { minX: w.minX, maxX: w.maxX, minZ: w.minZ, maxZ: w.maxZ }
 }
 
 export const ZONES: Zone[] = [
   { id: 'atrium', name: 'Grand Atrium', short: 'Atrium', rect: wingRect(W.atrium), spawn: { x: 0, z: MUSEUM.visitor.start.z, yawDeg: 0 }, height: W.atrium.height },
+  { id: 'shop', name: 'Museum Shop', short: 'Shop', rect: SIDE_ROOMS.shop, spawn: { x: rx + T + 1.2, z: D.receptionToShop.z, yawDeg: 90 }, height: RH },
+  { id: 'library', name: 'Reading Room & Library', short: 'Library', rect: SIDE_ROOMS.library, spawn: { x: -rx - T - 1.2, z: D.receptionToLibrary.z, yawDeg: 270 }, height: RH },
   { id: 'reception', name: 'Reception', short: 'Reception', rect: { minX: -rx, maxX: rx, minZ: DIV, maxZ: rzSouth }, spawn: { x: 0, z: rzSouth - 1.4, yawDeg: 0 }, height: RH },
   { id: 'theatre', name: 'Immersive Theatre', short: 'Theatre', rect: wingRect(W.theatre), spawn: { x: W.theatre.maxX - 1.2, z: D.atriumToTheatre.z, yawDeg: 270 }, height: W.theatre.height },
   { id: 'gallery-d', name: 'Gallery D — Regional Gallery', short: 'Gallery D', rect: wingRect(W.galleryD), spawn: { x: W.galleryD.maxX - 1.4, z: D.galleryToGalleryD.z, yawDeg: 270 }, height: W.galleryD.height },
@@ -344,7 +369,9 @@ export function zoneAt(x: number, z: number): Zone | undefined {
  */
 export const ZONE_VISIBILITY: Record<ZoneId, ZoneId[]> = {
   atrium: ['atrium', 'reception', 'passage', 'theatre', 'workshop'],
-  reception: ['reception', 'atrium', 'passage', 'reveal'],
+  reception: ['reception', 'atrium', 'passage', 'reveal', 'shop', 'library'],
+  shop: ['shop', 'reception', 'atrium'],
+  library: ['library', 'reception', 'atrium'],
   passage: ['passage', 'reception', 'reveal', 'atrium'],
   reveal: ['reveal', 'passage', 'gallery-a', 'gallery-b', 'gallery-c'],
   'gallery-a': ['gallery-a', 'reveal', 'gallery-d', 'passage'],
@@ -385,10 +412,10 @@ export const BENCHES: BenchPlacement[] = [
 export const COURT_CENTER = { x: 0, z: courtZ }
 
 export const RECEPTION_DESK = {
-  /** Desk sits against the east reception wall. */
+  /** Desk sits against the east reception wall, south of the shop door (v3.1: z 4.4, 2 m wide). */
   x: rx - 0.5,
-  z: DIV + MUSEUM.reception.length * 0.55,
-  length: 3.0,
+  z: DIV + MUSEUM.reception.length * 0.85,
+  length: 2.2,
   depth: 0.75,
   height: 1.05,
 }

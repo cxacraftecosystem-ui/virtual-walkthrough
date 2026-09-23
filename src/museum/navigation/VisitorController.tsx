@@ -170,6 +170,8 @@ export function VisitorController() {
   )
 
   useFrame((_, rawDt) => {
+    // In WebXR the headset owns the camera; src/museum/xr/VRRig.tsx drives `visitor` instead.
+    if (gl.xr.isPresenting) return
     const dt = Math.min(rawDt, 0.05)
     const st = useMuseum.getState()
     const L = look.current

@@ -13,6 +13,11 @@ export const DEFAULT_ASPECT = 16 / 9
 export const MASK = { side: 0.42, top: 0.36, bottom: 0.18 }
 
 export function screenPlacement(cfg: VideoConfig) {
+  if (cfg.stand) {
+    // free-standing ("Meet the maker" portrait stands): origin at the screen centre
+    const r = (cfg.stand.rotationDeg * Math.PI) / 180
+    return { position: [cfg.stand.x, cfg.placement.centerHeight, cfg.stand.z] as Vec3, rotationY: r, normal: [Math.sin(r), 0, Math.cos(r)] as Vec3 }
+  }
   return surfacePoint(cfg.placement.surface, cfg.placement.at, cfg.placement.centerHeight, 0.004)
 }
 

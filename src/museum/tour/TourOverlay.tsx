@@ -5,6 +5,8 @@ import { useMuseum } from '../state/store'
 import { IconClose, IconInfo, IconNarration, IconNext, IconPause, IconPlay, IconPrev } from '../ui/icons'
 import { narrationSupported, tour, useTour } from './engine'
 import { usePhoto } from '../ui/PhotoMode'
+import { useLang, useT } from '../i18n'
+import { tourField } from '../i18n/tourText'
 
 export function TourOverlay() {
   const active = useTour((s) => s.active)
@@ -19,6 +21,8 @@ export function TourOverlay() {
   const select = useMuseum((s) => s.select)
   const mapOpen = useMuseum((s) => s.mapOpen)
   const panelOpen = useMuseum((s) => !!s.selection)
+  const t = useT()
+  const lang = useLang()
 
   // Leaving the museum view (e.g. hot reload back to entry) ends the tour.
   useEffect(() => {
@@ -52,40 +56,40 @@ export function TourOverlay() {
   return (
     <section
       className={`ui-tour ui-panel${walking ? ' is-walking' : ''}${mapOpen ? ' has-map' : ''}${panelOpen ? ' has-panel' : ''}`}
-      aria-label="Guided tour"
+      aria-label={t('tour.label')}
       aria-live="polite"
     >
       <div className="ui-tour__top">
         <span className="ui-kicker">
-          Guided tour · {Math.min(index + 1, total)} / {total}
-          <span className="ui-tour__place"> · {stop.place}</span>
+          {t('tour.progress', { i: Math.min(index + 1, total), n: total })}
+          <span className="ui-tour__place"> · {tourField(stop, 'place', lang)}</span>
         </span>
-        <button type="button" className="ui-icon-btn ui-tour__exit" aria-label="End the tour (Esc)" data-tip="End tour · Esc" onClick={() => tour.exit()}>
+        <button type="button" className="ui-icon-btn ui-tour__exit" aria-label={t('tour.exit')} data-tip={t('tour.exitTip')} onClick={() => tour.exit()}>
           <IconClose />
         </button>
       </div>
 
       {done ? (
         <div className="ui-tour__content" key="done">
-          <h2 className="ui-tour__title">That concludes the tour</h2>
-          <p className="ui-tour__text">Thank you for joining. The museum is yours to explore — use the map to return to any room.</p>
+          <h2 className="ui-tour__title">{t('tour.doneTitle')}</h2>
+          <p className="ui-tour__text">{t('tour.doneText')}</p>
         </div>
       ) : (
         <div className="ui-tour__content" key={stop.id}>
-          <h2 className="ui-tour__title">{stop.title}</h2>
+          <h2 className="ui-tour__title">{tourField(stop, 'title', lang)}</h2>
           {walking ? (
             <p className="ui-tour__text ui-tour__text--muted">
               <span className="ui-tour__walking" aria-hidden="true" />
-              On the way to {stop.place}…
+              {t('tour.onTheWay', { place: tourField(stop, 'place', lang) })}
             </p>
           ) : (
-            <p className="ui-tour__text">{stop.text}</p>
+            <p className="ui-tour__text">{tourField(stop, 'text', lang)}</p>
           )}
           {paused && (
             <p className="ui-tour__paused">
-              {pauseReason === 'manual' ? 'Paused while you look around.' : 'Paused.'}{' '}
+              {pauseReason === 'manual' ? t('tour.pausedManual') : t('tour.paused')}{' '}
               <button type="button" className="ui-info__link" onClick={() => tour.resume()}>
-                Continue the tour
+                {t('tour.continue')}
               </button>
             </p>
           )}
@@ -100,28 +104,28 @@ export function TourOverlay() {
         {done ? (
           <>
             <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm" onClick={() => tour.restart()}>
-              Start again
+              {t('tour.restart')}
             </button>
             <button type="button" className="ui-btn ui-btn--sm" onClick={() => tour.exit()}>
-              Explore freely
+              {t('tour.explore')}
             </button>
           </>
         ) : (
           <>
             <div className="ui-tour__transport">
-              <button type="button" className="ui-icon-btn" aria-label="Previous stop" data-tip="Previous" disabled={index === 0} onClick={() => tour.prev()}>
+              <button type="button" className="ui-icon-btn" aria-label={t('tour.prev')} data-tip={t('tour.prevTip')} disabled={index === 0} onClick={() => tour.prev()}>
                 <IconPrev />
               </button>
               <button
                 type="button"
                 className="ui-icon-btn ui-tour__play"
-                aria-label={paused ? 'Resume tour' : 'Pause tour'}
-                data-tip={paused ? 'Resume · Space' : 'Pause · Space'}
+                aria-label={paused ? t('tour.resume') : t('tour.pause')}
+                data-tip={paused ? t('tour.resumeTip') : t('tour.pauseTip')}
                 onClick={() => tour.toggle()}
               >
                 {paused ? <IconPlay /> : <IconPause />}
               </button>
-              <button type="button" className="ui-icon-btn" aria-label="Next stop" data-tip="Next" disabled={index >= total - 1} onClick={() => tour.next()}>
+              <button type="button" className="ui-icon-btn" aria-label={t('tour.next')} data-tip={t('tour.nextTip')} disabled={index >= total - 1} onClick={() => tour.next()}>
                 <IconNext />
               </button>
               {narrationSupported() && (
@@ -129,8 +133,8 @@ export function TourOverlay() {
                   type="button"
                   className="ui-icon-btn"
                   aria-pressed={narration}
-                  aria-label={narration ? 'Turn narration off' : 'Turn narration on'}
-                  data-tip={narration ? 'Narration on' : 'Narration off'}
+                  aria-label={narration ? t('tour.narrationOff') : t('tour.narrationOn')}
+                  data-tip={narration ? t('tour.narrationOnTip') : t('tour.narrationOffTip')}
                   onClick={() => tour.setNarration(!narration)}
                 >
                   <IconNarration />
@@ -144,8 +148,8 @@ export function TourOverlay() {
                 className="ui-btn ui-btn--ghost ui-btn--sm ui-tour__more"
                 onClick={() => select({ kind: stop.item!.kind, id: stop.item!.id })}
               >
-                <IconInfo /> <span className="ui-tour__more-long">More about this</span>
-                <span className="ui-tour__more-short">Details</span>
+                <IconInfo /> <span className="ui-tour__more-long">{t('tour.more')}</span>
+                <span className="ui-tour__more-short">{t('tour.moreShort')}</span>
               </button>
             )}
           </>

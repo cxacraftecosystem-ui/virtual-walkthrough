@@ -44,10 +44,16 @@ function nearestZone(x: number, z: number): ZoneId | null {
   return best
 }
 
+/** Show every zone regardless of the visitor (e.g. the arrival flight over the roofs). */
+let forceAll = false
+export function setCullingOverride(all: boolean) {
+  forceAll = all
+}
+
 export function ZoneCuller({ enabled = true }: { enabled?: boolean }) {
   const last = useRef('')
   useFrame(() => {
-    if (!enabled) {
+    if (!enabled || forceAll) {
       if (last.current !== 'all') {
         visible = new Set(ZONES.map((z) => z.id))
         applyVisibility()
@@ -90,4 +96,20 @@ export function ZoneGroup({ zones, children }: { zones: ZoneId[]; children: Reac
 
 export function isZoneVisible(z: ZoneId) {
   return visible.has(z)
+}
+
+/**
+ * Temporarily show exactly the zones visible from `zone` (or every zone for null), run `fn`,
+ * then restore the visitor's culling set. Used for off-screen captures (probes, path tracing).
+ */
+export function withZonesVisible<T>(zone: ZoneId | null, fn: () => T): T {
+  const saved = visible
+  visible = new Set<ZoneId>(zone ? (ZONE_VISIBILITY[zone] ?? [zone]) : ZONES.map((z) => z.id))
+  applyVisibility()
+  try {
+    return fn()
+  } finally {
+    visible = saved
+    applyVisibility()
+  }
 }

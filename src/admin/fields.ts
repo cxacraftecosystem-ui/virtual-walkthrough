@@ -1,15 +1,15 @@
 /** Form field definitions per content collection (the raw JSON editor covers everything else). */
 import type { ContentCollection } from '../museum/content/types'
 import { FRAME_STYLES } from '../museum/config/frames'
-import { SURFACES } from '../museum/config/layout'
+import { SURFACES, ZONES } from '../museum/config/layout'
 
-export type FieldType = 'text' | 'textarea' | 'number' | 'checkbox' | 'select' | 'media' | 'frame' | 'kv' | 'lines' | 'vec3' | 'color'
+export type FieldType = 'text' | 'textarea' | 'number' | 'checkbox' | 'select' | 'media' | 'frame' | 'kv' | 'lines' | 'vec3' | 'color' | 'surface' | 'at'
 
 export interface FieldDef {
   path: string
   label: string
   type: FieldType
-  group: 'Details' | 'Media' | 'Placement' | 'Display' | 'Flags' | 'Metadata'
+  group: 'Details' | 'Media' | 'Placement' | 'Display' | 'Flags' | 'Metadata' | 'Translations'
   options?: readonly string[]
   /** media picker filter */
   accept?: 'image' | 'model' | 'video' | 'audio'
@@ -19,10 +19,27 @@ export interface FieldDef {
 }
 
 export const SURFACE_IDS = Object.keys(SURFACES)
+/** Surfaces grouped by zone for a labelled <select> (zone name → [id, human label][]). */
+export const SURFACE_GROUPS: { zone: string; surfaces: { id: string; label: string }[] }[] = (() => {
+  const zoneName = new Map<string, string>(ZONES.map((z) => [z.id, z.name]))
+  const groups = new Map<string, { id: string; label: string }[]>()
+  for (const s of Object.values(SURFACES)) {
+    const name = zoneName.get(s.zone) ?? s.zone
+    if (!groups.has(name)) groups.set(name, [])
+    groups.get(name)!.push({ id: s.id, label: s.label })
+  }
+  return [...groups.entries()].map(([zone, surfaces]) => ({ zone, surfaces }))
+})()
+/** Valid `at` range [min, max] (m) along a surface's run axis, and which world axis that is. */
+export function surfaceRange(id: unknown): { min: number; max: number; axis: 'x' | 'z'; label: string } | null {
+  const s = typeof id === 'string' ? SURFACES[id as keyof typeof SURFACES] : undefined
+  if (!s) return null
+  return { min: Math.min(...s.range), max: Math.max(...s.range), axis: s.runAxis, label: s.label }
+}
 export const FRAME_STYLE_IDS = Object.keys(FRAME_STYLES)
 
-const surface: FieldDef = { path: 'placement.surface', label: 'Surface (wall)', type: 'select', group: 'Placement', options: SURFACE_IDS, required: true }
-const at: FieldDef = { path: 'placement.at', label: 'Position along wall (m)', type: 'number', group: 'Placement', step: 0.05, required: true, hint: 'world z for side walls, x for reveal/product walls' }
+const surface: FieldDef = { path: 'placement.surface', label: 'Wall / surface', type: 'surface', group: 'Placement', options: SURFACE_IDS, required: true }
+const at: FieldDef = { path: 'placement.at', label: 'Position along wall (m)', type: 'at', group: 'Placement', step: 0.05, required: true }
 const centerHeight: FieldDef = { path: 'placement.centerHeight', label: 'Centre height (m)', type: 'number', group: 'Placement', step: 0.05, hint: 'default 1.6' }
 const placeholder: FieldDef = { path: 'placeholder', label: 'Placeholder (shows “Placeholder” badge)', type: 'checkbox', group: 'Flags' }
 const title: FieldDef = { path: 'title', label: 'Title', type: 'text', group: 'Details', required: true }
@@ -30,11 +47,15 @@ const description: FieldDef = { path: 'description', label: 'Description', type:
 const text = (path: string, label: string, group: FieldDef['group'] = 'Details'): FieldDef => ({ path, label, type: 'text', group })
 const num = (path: string, label: string, group: FieldDef['group'] = 'Display', step = 0.05, hint?: string): FieldDef => ({ path, label, type: 'number', group, step, hint })
 
+/** "Meet the maker" profile (admin → Makers). */
+const artisanId: FieldDef = { path: 'artisanId', label: 'Maker profile id (Meet the maker)', type: 'text', group: 'Details', hint: 'id from the Makers page; empty = no maker card' }
+
 export const FIELDS: Record<ContentCollection, FieldDef[]> = {
   artworks: [
     title,
     text('tradition', 'Tradition'),
     text('artisan', 'Artisan'),
+    artisanId,
     text('region', 'Region'),
     text('material', 'Material'),
     text('technique', 'Technique'),
@@ -42,6 +63,8 @@ export const FIELDS: Record<ContentCollection, FieldDef[]> = {
     description,
     { path: 'context', label: 'Context', type: 'textarea', group: 'Details' },
     { path: 'image', label: 'Image', type: 'media', accept: 'image', group: 'Media', required: true },
+    { path: 'deepZoom', label: 'Deep zoom (.dzi)', type: 'text', group: 'Media', hint: 'Examine-closely pyramid — create one in Capture tools → Deep zoom' },
+    { path: 'highRes', label: 'High-res image (no pyramid)', type: 'media', accept: 'image', group: 'Media', hint: 'optional ≤ 8k px image for the deep-zoom viewer when there is no .dzi' },
     surface,
     at,
     centerHeight,
@@ -59,6 +82,7 @@ export const FIELDS: Record<ContentCollection, FieldDef[]> = {
     text('tradition', 'Tradition'),
     text('artworkId', 'Related artwork id'),
     text('artisan', 'Artisan'),
+    artisanId,
     text('region', 'Region'),
     text('material', 'Material'),
     text('technique', 'Technique'),
@@ -112,6 +136,66 @@ export const FIELDS: Record<ContentCollection, FieldDef[]> = {
     placeholder,
   ],
 }
+
+/* ---------------------- alt text + translations ---------------------- */
+
+const ALT_LANGS = [
+  ['hi', 'Hindi · हिन्दी'],
+  ['bn', 'Bengali · বাংলা'],
+] as const
+
+/** Optional per-language overrides stored under `i18n.<lang>.<field>` (the museum falls back to English). */
+function translations(fields: [path: string, label: string, type?: 'text' | 'textarea' | 'lines'][]): FieldDef[] {
+  return ALT_LANGS.flatMap(([lang, name]) =>
+    fields.map(([path, label, type = 'text']): FieldDef => ({ path: `i18n.${lang}.${path}`, label: `${label} — ${name}`, type, group: 'Translations' })),
+  )
+}
+
+const alt = (what: string): FieldDef => ({
+  path: 'alt',
+  label: 'Alt text',
+  type: 'textarea',
+  group: 'Details',
+  hint: `short description of the ${what} for screen readers and the text-only guide`,
+})
+
+FIELDS.artworks.push(
+  alt('image'),
+  ...translations([
+    ['title', 'Title'],
+    ['tradition', 'Tradition'],
+    ['artisan', 'Artisan'],
+    ['region', 'Region'],
+    ['material', 'Material'],
+    ['technique', 'Technique'],
+    ['description', 'Description', 'textarea'],
+    ['context', 'Context', 'textarea'],
+    ['alt', 'Alt text', 'textarea'],
+  ]),
+)
+FIELDS.exhibits.push(
+  alt('block'),
+  ...translations([
+    ['title', 'Title'],
+    ['tradition', 'Tradition'],
+    ['artisan', 'Artisan'],
+    ['region', 'Region'],
+    ['material', 'Material'],
+    ['technique', 'Technique'],
+    ['description', 'Description', 'textarea'],
+    ['alt', 'Alt text', 'textarea'],
+  ]),
+)
+FIELDS.infographics.push(
+  ...translations([
+    ['kicker', 'Kicker'],
+    ['title', 'Title'],
+    ['body', 'Body', 'textarea'],
+    ['steps', 'Process steps (one per line)', 'lines'],
+  ]),
+)
+FIELDS.videos.push(alt('film'), ...translations([['title', 'Title'], ['description', 'Description', 'textarea'], ['alt', 'Alt text', 'textarea']]))
+FIELDS.objects.push(alt('object'), ...translations([['title', 'Title'], ['description', 'Description', 'textarea'], ['alt', 'Alt text', 'textarea']]))
 
 /** Minimal valid new item per collection. */
 export function template(c: ContentCollection, id: string): Record<string, unknown> {

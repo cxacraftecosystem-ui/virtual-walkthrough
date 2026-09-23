@@ -7,11 +7,13 @@ import { Bloom, EffectComposer, N8AO, SMAA, ToneMapping } from '@react-three/pos
 import { ToneMappingMode } from 'postprocessing'
 import { QUALITY_PRESETS, withDevOverrides } from '../config/quality'
 import { useMuseum } from '../state/store'
+import { isWebGPU } from '../utils/renderer'
 
 export function PostFX() {
   const tier = useMuseum((s) => s.tier)
   const p = withDevOverrides(QUALITY_PRESETS[tier])
-  if (!p.postprocessing) return null
+  // The postprocessing library is WebGL-only (experimental WebGPU renderer: native tone mapping only).
+  if (!p.postprocessing || isWebGPU()) return null
   return (
     <EffectComposer multisampling={0} enableNormalPass={false}>
       {p.ambientOcclusion && <N8AO aoRadius={0.9} distanceFalloff={0.7} intensity={2.2} quality={p.aoQuality} halfRes={tier !== 'ultra'} color="#1c1510" />}

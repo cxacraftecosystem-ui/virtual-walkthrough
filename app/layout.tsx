@@ -9,6 +9,8 @@ import '@fontsource/inter/400.css'
 import '@fontsource/inter/500.css'
 import '@fontsource/inter/600.css'
 import '../src/styles.css'
+import '../src/museum/a11y/a11y.css'
+import { ServiceWorkerRegistration } from '../src/museum/pwa/ServiceWorkerRegistration'
 
 const SHARE_TITLE = 'Hand Block Printing — Virtual Exhibition'
 const SHARE_DESCRIPTION =
@@ -46,7 +48,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <ServiceWorkerRegistration />
+      </body>
     </html>
   )
 }

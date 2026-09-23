@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type AdminComment } from '../api'
-import { errMsg, formatDate, useToast } from '../ui'
+import { EmptyState, Skeleton, errMsg, formatDate, useConfirm, useToast } from '../ui'
 
 type Filter = 'all' | 'visible' | 'hidden'
 
@@ -10,6 +10,7 @@ export function CommentsPage() {
   const [filter, setFilter] = useState<Filter>('all')
   const [q, setQ] = useState('')
   const toast = useToast()
+  const confirm = useConfirm()
 
   useEffect(() => {
     api.comments().then(setItems).catch((e) => setError(errMsg(e)))
@@ -26,7 +27,7 @@ export function CommentsPage() {
   }
 
   async function remove(c: AdminComment) {
-    if (!window.confirm('Delete this comment permanently?')) return
+    if (!(await confirm({ title: 'Delete this comment?', body: `“${c.body.length > 140 ? c.body.slice(0, 137) + '…' : c.body}” by ${c.displayName} is removed permanently. Hiding it instead keeps a record.`, confirmLabel: 'Delete comment', danger: true }))) return
     try {
       await api.deleteComment(c.id)
       setItems((list) => (list ?? []).filter((x) => x.id !== c.id))
@@ -67,9 +68,11 @@ export function CommentsPage() {
       </div>
       <section className="card" style={{ padding: 0 }}>
         {!items ? (
-          <div className="empty">Loading…</div>
+          <div style={{ padding: 16 }}><Skeleton rows={6} /></div>
         ) : shown.length === 0 ? (
-          <div className="empty">No comments{filter !== 'all' ? ` (${filter})` : ''}.</div>
+          <EmptyState title={q ? 'No matching comments' : filter === 'hidden' ? 'Nothing hidden' : 'No comments yet'}>
+            {q ? `Nothing matches “${q}”.` : filter === 'hidden' ? 'Comments you hide from visitors appear here.' : 'Guestbook entries and item comments from visitors appear here as soon as they are posted.'}
+          </EmptyState>
         ) : (
           <div className="table-wrap">
             <table>

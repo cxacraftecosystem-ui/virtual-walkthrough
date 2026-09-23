@@ -76,7 +76,11 @@ export function SpotPool({ size }: { size: number }) {
     timer.current += dt
     if (timer.current > 0.2) {
       timer.current = 0
-      const ranked = [...spotRequests.entries()].map(([id, r]) => [id, score(r)] as const).sort((a, b) => a[1] - b[1])
+      // Switched-off requests (e.g. courtyard lanterns by day) never take a slot.
+      const ranked = [...spotRequests.entries()]
+        .filter(([, r]) => r.intensity > 0)
+        .map(([id, r]) => [id, score(r)] as const)
+        .sort((a, b) => a[1] - b[1])
       desired.current = new Set(ranked.slice(0, size).map(([id]) => id))
     }
     const want = desired.current

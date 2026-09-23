@@ -36,6 +36,8 @@ import { inkTraceTexture, woodGrainTexture } from '../exhibits/HandBlockPlacehol
 import { motifToShapes } from '../exhibits/motifs'
 import { Builder, cyl, Parts, rbox, useBuilt } from './kit'
 import { useModelMaterials } from './modelMaterials'
+import { useMuseum } from '../state/store'
+import { VR_MODE } from '../utils/vr'
 import { InMuseumScene } from './sceneContext'
 import { fp, num, str, type ModelProps } from './types'
 
@@ -455,7 +457,7 @@ export function Centrepiece({ config }: ModelProps) {
   const spin = num(config, 'spin', 0.15)
   const turn = useRef<THREE.Group>(null)
   useFrame((_, dt) => {
-    if (inMuseum && turn.current) turn.current.rotation.y += spin * Math.min(dt, 0.1)
+    if (inMuseum && turn.current && !VR_MODE && !useMuseum.getState().reducedMotion) turn.current.rotation.y += spin * Math.min(dt, 0.1)
   })
 
   if (!inMuseum) {

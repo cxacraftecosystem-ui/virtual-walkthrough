@@ -14,6 +14,10 @@ import { ZONES, zoneAt } from '../config/layout'
 import { visitor } from '../state/visitor'
 import { QUALITY_PRESETS, withDevOverrides } from '../config/quality'
 import { useMuseum } from '../state/store'
+import { patchNightSky } from './nightSky'
+import { lightAngles } from './timeOfDayState'
+import { isWebGPU, makeWebGPUSky } from '../utils/renderer'
+import { VR_MODE } from '../utils/vr'
 
 const DEG = Math.PI / 180
 
@@ -28,11 +32,13 @@ const SUN_TARGET = new THREE.Vector3(0, 0, KEY.gzNorth / 2)
 
 function useSky() {
   return useMemo(() => {
-    const sky = new Sky()
+    // Experimental WebGPU path: TSL SkyMesh (GLSL patches below are WebGL-only).
+    const gpuSky = isWebGPU() ? makeWebGPUSky() : null
+    const sky = gpuSky ?? new Sky()
     sky.scale.setScalar(2000)
     const mat = sky.material as THREE.ShaderMaterial
-    mat.uniforms.skyExposure = { value: LIGHTING.sky.exposure }
-    mat.fragmentShader = mat.fragmentShader
+    mat.uniforms.skyExposure = mat.uniforms.skyExposure ?? { value: LIGHTING.sky.exposure }
+    if (!gpuSky) mat.fragmentShader = mat.fragmentShader
       .replace('uniform float time;', 'uniform float time;\nuniform float skyExposure;')
       .replace('gl_FragColor = vec4( texColor, 1.0 );', 'gl_FragColor = vec4( texColor * skyExposure, 1.0 );')
     const u = mat.uniforms
@@ -47,6 +53,7 @@ function useSky() {
     u.cloudScale.value = s.clouds.scale
     u.cloudSpeed.value = s.clouds.speed
     u.sunPosition.value.copy(sunDirection())
+    if (!gpuSky) patchNightSky(mat)
     sky.frustumCulled = false
     sky.renderOrder = -10
     return sky
@@ -94,9 +101,14 @@ export function SkyAndSun() {
   // Time of day: move the sun (direction, colour, intensity) and re-tune the atmosphere.
   useEffect(() => {
     const p = LIGHTING.timeOfDay[timeOfDay]
-    dir.copy(sunDirection(p.elevationDeg, p.azimuthDeg))
+    // Dusk/night: the sky's sun sets below the horizon while the directional light becomes
+    // a faint cool sky light / the moon (same light, so light counts never change).
+    const a = lightAngles(timeOfDay)
+    dir.copy(sunDirection(a.lightEl, a.lightAz))
     const u = (sky.material as THREE.ShaderMaterial).uniforms
-    u.sunPosition.value.copy(dir)
+    u.sunPosition.value.copy(sunDirection(a.skyEl, a.skyAz))
+    if (u.moonDir) u.moonDir.value.copy(dir)
+    if (u.duskSunDir) u.duskSunDir.value.copy(u.sunPosition.value)
     u.turbidity.value = p.turbidity
     u.rayleigh.value = p.rayleigh
     u.skyExposure.value = p.skyExposure
@@ -113,7 +125,7 @@ export function SkyAndSun() {
   // gets crisp sun shadows without an enormous shadow map. Re-rendered only on change.
   const currentZone = useRef<string>('')
   useFrame((_, dt) => {
-    ;(sky.material as THREE.ShaderMaterial).uniforms.time.value += dt
+    if (!VR_MODE) (sky.material as THREE.ShaderMaterial).uniforms.time.value += dt
     const z = zoneAt(visitor.x, visitor.z)
     const id = z?.id ?? currentZone.current
     if (id && id !== currentZone.current) {

@@ -79,18 +79,25 @@ jobs:
       - run: npm ci
       - run: npx --yes $VERCEL_CLI pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
       - run: npx --yes $VERCEL_CLI build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
       - id: deploy
         run: |
           url="$(npx --yes $VERCEL_CLI deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})"
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Production: $url" >> "$GITHUB_STEP_SUMMARY"
       - name: smoke test
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
         run: |
-          for i in 1 2 3 4 5; do
-            if curl -fsS "${{ steps.deploy.outputs.url }}/api/health" | tee /dev/stderr | grep -q '"db":"postgres"'; then exit 0; fi
-            sleep 5
+          # The production alias (deployment URLs can sit behind Vercel deployment protection).
+          base="${SITE_URL:-https://hand-block-museum.vercel.app}"
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS "$base/api/health" | tee /dev/stderr | grep -q '"db":"postgres"'               && curl -fsS -o /dev/null "$base/" && curl -fsS -o /dev/null "$base/gallery"; then exit 0; fi
+            sleep 10
           done
-          echo "::warning::health check did not report db=postgres"
+          echo "::error::smoke test failed ($base): health must report db=postgres and / and /gallery must return 200"
+          exit 1
 
   preview:
     name: deploy preview

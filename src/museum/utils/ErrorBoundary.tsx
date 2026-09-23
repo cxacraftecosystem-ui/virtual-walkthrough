@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { reportError } from './errorReporter'
 
 interface Props {
   fallback: ReactNode
@@ -16,6 +17,7 @@ export class ErrorBoundary extends Component<Props, { failed: boolean }> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     if (process.env.NODE_ENV !== 'production') console.warn('[museum] contained error:', error.message)
+    reportError(error, { kind: 'react', componentStack: info.componentStack ?? undefined })
     this.props.onError?.(error, info)
   }
 

@@ -15,6 +15,11 @@ import { SURFACES, WALLS } from './config/layout'
 import { INFOGRAPHICS } from './config/infographics'
 import { DebugScene } from './debug/DebugScene'
 import { PostFX } from './effects/PostFX'
+import { RayTraceManager } from './effects/PathTracer'
+import { ArrivalFlight } from './navigation/ArrivalFlight'
+import { PresenceLayer } from './live/PresenceLayer'
+import { XRRoot } from './xr/XRRoot'
+import { useXRMode } from './xr/xrStore'
 import { Precompile } from './effects/Precompile'
 import { StaticMerge } from './effects/StaticMerge'
 import { ZoneCuller, ZoneGroup } from './navigation/zoneCulling'
@@ -28,6 +33,7 @@ import { TrackRail } from './lighting/TrackLight'
 import { RAILS } from './lighting/tracks'
 import { VisitorController } from './navigation/VisitorController'
 import { SceneObjects } from './models/SceneObjects'
+import { Amenities } from './amenities/Amenities'
 import { useMuseum } from './state/store'
 import { ErrorBoundary } from './utils/ErrorBoundary'
 
@@ -88,9 +94,11 @@ function Content() {
 
 export function MuseumScene() {
   const debug = useMuseum((s) => s.debug)
+  const inXR = useXRMode((s) => s.mode === 'vr')
   return (
     <>
       <VisitorController />
+      <ArrivalFlight />
       <ZoneCuller />
       <Lighting />
       <Architecture />
@@ -98,10 +106,17 @@ export function MuseumScene() {
         <Content />
         <VideoScreens />
         <SceneObjects />
+        <ErrorBoundary fallback={null}>
+          <Amenities />
+        </ErrorBoundary>
       </Suspense>
-      <PostFX />
+      {/* post-processing can't render into a WebXR framebuffer: off while in VR */}
+      {!inXR && <PostFX />}
+      {!inXR && <RayTraceManager />}
       {debug && <DebugScene />}
       <Precompile />
+      <PresenceLayer />
+      <XRRoot />
     </>
   )
 }

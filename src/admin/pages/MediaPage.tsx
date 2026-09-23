@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, uploadMedia, type MediaConfig, type MediaRecord } from '../api'
-import { errMsg, formatBytes, formatDate, useToast } from '../ui'
+import { EmptyState, Skeleton, errMsg, formatBytes, formatDate, useConfirm, useToast } from '../ui'
 
 interface UploadJob {
   id: number
@@ -20,6 +20,7 @@ export function MediaPage() {
   const [over, setOver] = useState(false)
   const input = useRef<HTMLInputElement>(null)
   const toast = useToast()
+  const confirm = useConfirm()
 
   const load = useCallback(() => {
     api.media().then(setItems).catch((e) => setError(errMsg(e)))
@@ -47,7 +48,7 @@ export function MediaPage() {
   }
 
   async function remove(m: MediaRecord) {
-    if (!window.confirm(`Delete ${m.filename}? Content that references ${m.url} will show a missing file.`)) return
+    if (!(await confirm({ title: `Delete ${m.filename}?`, body: <>Content that references <code>{m.url}</code> will show a missing file.</>, confirmLabel: 'Delete file', danger: true }))) return
     try {
       await api.deleteMedia(m.id)
       setItems((list) => (list ?? []).filter((x) => x.id !== m.id))
@@ -63,7 +64,7 @@ export function MediaPage() {
       await navigator.clipboard.writeText(url)
       toast(`Copied ${url.length > 60 ? url.slice(0, 57) + '…' : url}`)
     } catch {
-      window.prompt('Copy this URL', abs)
+      toast(`Copy failed — the URL is ${abs}`, 'info')
     }
   }
 
@@ -153,7 +154,15 @@ export function MediaPage() {
         <input type="search" placeholder="Filter by name or folder…" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ width: 260 }} aria-label="Filter media" />
       </div>
 
-      {items && items.length === 0 && <div className="card empty">No uploads yet. Files in /public (e.g. /artworks/hero-01.jpg) can also be used directly.</div>}
+      {!items && !error && <Skeleton kind="cards" rows={8} />}
+      {items && items.length === 0 && (
+        <div className="card">
+          <EmptyState title="No uploads yet" action={<button className="btn primary" onClick={() => input.current?.click()} disabled={!cfg}>Upload files…</button>}>
+            Drop files above or choose them from your computer. Files in /public (e.g. /artworks/hero-01.jpg) can also be used directly.
+          </EmptyState>
+        </div>
+      )}
+      {items && items.length > 0 && shown.length === 0 && <div className="card"><EmptyState title="No matching files">Nothing matches “{filter}”. Try a different name or folder.</EmptyState></div>}
       <div className="media-grid">
         {shown.map((m) => (
           <article className="media-card" key={m.id}>

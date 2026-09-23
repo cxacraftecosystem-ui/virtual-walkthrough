@@ -80,6 +80,79 @@ const MIGRATIONS: string[] = [
   DROP TABLE access_list;
   ALTER TABLE access_list_new RENAME TO access_list;
   `,
+  // #4 client error reporting (supabase/migrations/20260923040000_client_errors.sql)
+  `
+  CREATE TABLE client_errors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, fingerprint TEXT NOT NULL, kind TEXT NOT NULL, message TEXT NOT NULL,
+    stack TEXT, url TEXT, ua TEXT, tier TEXT, gpu TEXT, release TEXT, created_at INTEGER NOT NULL
+  );
+  CREATE INDEX client_errors_fp ON client_errors(fingerprint, created_at);
+  CREATE INDEX client_errors_created ON client_errors(created_at);
+  CREATE TABLE client_error_groups (
+    fingerprint TEXT PRIMARY KEY, kind TEXT NOT NULL, message TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0,
+    first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL, resolved_at INTEGER,
+    last_stack TEXT, last_url TEXT, last_ua TEXT, last_tier TEXT, last_gpu TEXT, last_release TEXT
+  );
+  CREATE INDEX client_error_groups_last ON client_error_groups(last_seen);
+  `,
+  // visitor prints — "Print it yourself" studio → Visitors' Wall (supabase/migrations/20260923110000_visitor_prints.sql)
+  `
+  CREATE TABLE IF NOT EXISTS visitor_prints (
+    id TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    display_name TEXT NOT NULL DEFAULT '', motif TEXT NOT NULL DEFAULT '', meta TEXT NOT NULL DEFAULT '{}',
+    storage_key TEXT NOT NULL, url TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, size INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+    created_at TEXT NOT NULL, reviewed_at TEXT, reviewed_by TEXT
+  );
+  CREATE INDEX IF NOT EXISTS visitor_prints_status ON visitor_prints(status, created_at);
+  CREATE INDEX IF NOT EXISTS visitor_prints_session ON visitor_prints(session_id, created_at);
+  `,
+  // exhibitions (multi-exhibition), artisans ("Meet the maker"), analytics heatmap rollup
+  // (supabase/migrations/20260923100000_exhibitions_makers_heatmap.sql). content_items is rebuilt
+  // for the new primary key (exhibition_id, collection, id); existing rows → 'hand-block-printing'.
+  `
+  CREATE TABLE IF NOT EXISTS exhibitions (
+    id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, title TEXT NOT NULL, subtitle TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published')),
+    is_default INTEGER NOT NULL DEFAULT 0, theme TEXT NOT NULL DEFAULT '{}',
+    exhibition_text TEXT NOT NULL DEFAULT '{}', welcome TEXT NOT NULL DEFAULT '{"title":"","body":""}', tour TEXT,
+    sort INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS exhibitions_one_default ON exhibitions(is_default) WHERE is_default = 1;
+  INSERT INTO exhibitions (id, slug, title, subtitle, status, is_default, theme, exhibition_text, welcome, sort, created_at, updated_at)
+    SELECT 'hand-block-printing', 'hand-block-printing', 'Hand Block Printing', 'Carved wood, natural dye and cloth', 'published', 1,
+           '{"accent":"#8a5a3b"}',
+           COALESCE((SELECT value FROM meta WHERE key = 'exhibition'), '{}'),
+           COALESCE((SELECT value FROM meta WHERE key = 'welcome'), '{"title":"","body":""}'),
+           0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE NOT EXISTS (SELECT 1 FROM exhibitions);
+  CREATE TABLE content_items_new (
+    exhibition_id TEXT NOT NULL DEFAULT 'hand-block-printing',
+    collection TEXT NOT NULL, id TEXT NOT NULL, json TEXT NOT NULL,
+    sort INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL,
+    PRIMARY KEY (exhibition_id, collection, id)
+  );
+  INSERT INTO content_items_new (exhibition_id, collection, id, json, sort, updated_at)
+    SELECT 'hand-block-printing', collection, id, json, sort, updated_at FROM content_items;
+  DROP TABLE content_items;
+  ALTER TABLE content_items_new RENAME TO content_items;
+  CREATE TABLE IF NOT EXISTS artisans (
+    id TEXT PRIMARY KEY, name TEXT NOT NULL, cluster TEXT NOT NULL DEFAULT '', craft TEXT NOT NULL DEFAULT '',
+    bio TEXT NOT NULL DEFAULT '', portrait TEXT NOT NULL DEFAULT '', contact TEXT NOT NULL DEFAULT '',
+    website TEXT NOT NULL DEFAULT '', shop_url TEXT NOT NULL DEFAULT '', commission_url TEXT NOT NULL DEFAULT '',
+    verified INTEGER NOT NULL DEFAULT 0, placeholder INTEGER NOT NULL DEFAULT 0, sort INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  );
+  ALTER TABLE analytics_events ADD COLUMN exhibition_id TEXT;
+  UPDATE analytics_events SET exhibition_id = 'hand-block-printing' WHERE exhibition_id IS NULL;
+  CREATE INDEX IF NOT EXISTS analytics_exhibition ON analytics_events(exhibition_id, t);
+  CREATE INDEX IF NOT EXISTS analytics_type ON analytics_events(type, t);
+  CREATE TABLE IF NOT EXISTS analytics_heat (
+    exhibition_id TEXT NOT NULL, day TEXT NOT NULL, zone TEXT NOT NULL DEFAULT '',
+    cx INTEGER NOT NULL, cz INTEGER NOT NULL, samples INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (exhibition_id, day, zone, cx, cz)
+  );
+  `,
 ]
 
 /** Schema version of this code (a dev-server singleton opened by older code is reopened). */

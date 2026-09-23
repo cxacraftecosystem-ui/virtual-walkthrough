@@ -6,6 +6,7 @@
 import { BENCHES, BENCH_SIZE, RECEPTION_DESK, WALLS } from '../config/layout'
 import { EXHIBITS } from '../config/exhibits'
 import { SCENE_OBJECTS } from '../config/objects'
+import { VIDEOS } from '../config/videos'
 import { tablePlacement, type Rect2 } from '../exhibits/placement'
 
 export interface Collider extends Rect2 {
@@ -32,6 +33,11 @@ function build(): Collider[] {
     const hz = (swap ? o.footprint[0] : o.footprint[1]) / 2
     const [x, , z] = o.position
     list.push({ id: `object-${o.id}`, minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz })
+  }
+  // free-standing screens ("Meet the maker" portrait stands): their weighted base
+  for (const v of VIDEOS) {
+    if (!v.stand) continue
+    list.push({ id: `video-stand-${v.id}`, minX: v.stand.x - 0.22, maxX: v.stand.x + 0.22, minZ: v.stand.z - 0.22, maxZ: v.stand.z + 0.22 })
   }
   const d = RECEPTION_DESK
   list.push({ id: 'reception-desk', minX: d.x - d.depth / 2, maxX: d.x + d.depth / 2, minZ: d.z - d.length / 2, maxZ: d.z + d.length / 2 })

@@ -30,6 +30,9 @@ Useful URL parameters:
 | `?static` | ignore the backend (bundled content, social features hidden) |
 | `?debug` | **dev only** — FPS/GPU stats, collision boxes, coordinates |
 | `?quality=high&fx=0&shadows=0&area=0&ao=0&dpr=1` | **dev only** — profiling overrides |
+| `?renderer=webgpu` | **experimental** — three's WebGPURenderer when `navigator.gpu` exists (falls back to WebGL); see *Graphics features* |
+| `?probes` | **experimental** — per-zone irradiance probes (Medium and up) |
+| `?noarrival` | skip the cinematic arrival flight (also skipped with `?autostart`, reduced motion, or after the first visit of the session) |
 
 Controls: drag to look (or **L** for mouse-look with a crosshair), **WASD**/arrows to walk, click the floor to
 walk there, click artworks/objects for details, **E** for the nearby item, **M** map, **H** help.
@@ -50,12 +53,20 @@ Vercel (native Next.js). Production uses Supabase Postgres (`DATABASE_URL`) and 
 `infra/setup-s3.sh` and `.env.example`. Without those env vars the app still runs (SQLite + local disk), which
 is fine for demos on a single machine but not on Vercel (ephemeral filesystem).
 
+**Error monitoring:** browser errors, unhandled rejections, contained React errors and WebGL context loss are reported
+(sampled, PII-scrubbed) to `POST /api/errors` and grouped on the admin **Errors** page (`/admin#/errors`, admin+), where they
+can be resolved (a recurrence reopens them). Set `NEXT_PUBLIC_SENTRY_DSN` to also forward them to Sentry (no SDK) — see
+`docs/API.md` → *Errors / monitoring*.
+
 ## Validation scripts (optional, need Chrome installed)
 
 ```bash
 node scripts/screenshots.mjs http://localhost:3000 auto   # demo-path + wing screenshots + fps → scripts/out/
 node scripts/interaction-test.mjs http://localhost:3000    # walking, collision, click → panel, 3D inspect
-node scripts/load-profile.mjs http://localhost:3000        # load-time & long tasks
+node scripts/load-profile.mjs http://localhost:3000 medium --json=scripts/out/load.json  # load time, long tasks, transfer MB by type
+npm run optimize:assets                                     # meshopt+WebP GLBs → public/models/opt, artwork WebP variants (+ render check)
+npm run test:visual -- http://localhost:3000                # visual regression vs tests/visual/baseline (see tests/visual/README.md)
+node scripts/live-presence-test.mjs http://localhost:3000  # presence + live docent tour (two browsers)
 ```
 
 ---
@@ -161,6 +172,16 @@ Bay centres are available as `BAY.southZ` (−3.43) and `BAY.northZ` (−10.29).
 `placement.centerHeight` defaults to **1.6 m** (PDF mounting height).
 The accent light snaps to the nearest ceiling track automatically.
 
+## Real content: deep zoom & 3D scans
+
+Field guide for photographing textiles, scanning blocks and writing text: **`docs/CONTENT_CAPTURE.md`**.
+Admin → **Capture tools**: *Deep zoom* tiles a large photo into a DZI pyramid in the browser and assigns it
+to an artwork's `deepZoom` (visitors: **Examine closely** in the info panel, or double-click the artwork —
+OpenSeadragon viewer with zoom/pan/fullscreen/keyboard and a cm scale bar when `physicalWidth` is set);
+*3D scan import* optimises a Polycam/RealityScan glTF (weld, meshopt simplify, WebP textures ≤ 2048, metres)
+and assigns it to an exhibit or object `model`. Demo pyramids for the hero placeholders:
+`node scripts/generate-deepzoom.mjs` → `public/deepzoom/`.
+
 ## How to add / replace a hand-block 3D model
 
 1. Export the block as **GLB** (metres, Y-up; Draco not required) into `public/models/`, e.g. `block-01.glb`.
@@ -203,6 +224,54 @@ Direct sun enters only through the glass (the roof and lantern cast shadows).
 
 Real `SpotLight`s come from a shared pool (`lighting/SpotPool.tsx`, size per quality tier) that assigns them to
 the fixtures nearest the visitor with soft cross-fades; every fixture keeps its visible track head.
+
+## Graphics features (time of day, probes, ray tracing, arrival, WebGPU)
+
+- **Time of day** (HUD sun icon, **T** cycles): Morning · Midday · Golden hour · **Dusk** · **Night**
+  (`LIGHTING.timeOfDay` + `LIGHTING.ambience`). Dusk/night extend the Preetham sky with a blue-hour gradient,
+  moon disc and a procedural starfield (`lighting/nightSky.ts`); the sun becomes a faint sky light / moonlight
+  (same directional light), daylight fills fade, exposure adapts, courtyard wall lanterns light up
+  (`lighting/NightLights.tsx` — their downlights are SpotPool *requests*, so no light is ever added) and the
+  glazing glows warm when seen from outside. Only intensities/uniforms change — no shader recompiles.
+- **Per-zone irradiance probes** (*experimental*, Medium+ with `?probes`, `lighting/ZoneProbes.tsx`): after the shaders compile, each zone is
+  captured once into a small cube map (one face per frame, only the zones visible from there), prefiltered
+  with PMREM into the same CubeUV layout as the light-former environment, and `scene.environment` cross-fades
+  per room (warm oak galleries, dark theatre, indigo Gallery D, sunlit courtyard). Re-captured after a
+  time-of-day change and once per room after the visitor arrives (second bounce + the room's spots). Chosen over
+  in-browser lightmap baking: no second UV set, no stale IndexedDB cache, no shader variants, ~0 ms per frame.
+- **Ray-traced view** (photo mode, `effects/PathTracer.tsx`, three-gpu-pathtracer): hold still in photo mode and
+  the view is progressively path-traced (sample counter in the photo bar; the raster frame cross-fades to the
+  converging image; any movement cancels). The BVH is built lazily — on a worker when possible — from the zones
+  zone-culling currently shows, and rebuilt only when that set changes. *Experimental*: off by default on
+  every tier — the photo-bar **Ray-trace** toggle opts in (remembered); scene builds time out (25 s worker →
+  main-thread retry, 60 s → disabled); Capture waits for convergence so
+  the PNG is the path-traced image. Needs float render targets; any failure falls back to raster silently.
+- **Cinematic arrival** (`navigation/ArrivalFlight.tsx`, `ui/ArrivalOverlay.tsx`): ~11 s drone flight over the
+  lawns and roof lights, down to the facade and through the entrance, with letterbox + title card. First visit
+  per session only; skipped on any key/click/Skip, with `?autostart`/`?tour`/`?noarrival` and reduced motion.
+- **WebGPU** (`?renderer=webgpu`, `utils/renderer.ts`) — *experimental*. Uses `three/webgpu` WebGPURenderer
+  with the TSL `SkyMesh` and WebGPU PMREM; the postprocessing composer, zone probes, path tracer and GLSL
+  patches (dusk/night sky terms, foliage sway) are WebGL-only and are skipped. Falls back to WebGL on any error.
+
+## Live tours, presence, VR & AR
+
+- **Presence** (`live/`, Supabase Realtime — set `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`): other
+  visitors appear as soft translucent silhouettes with a glowing head orb and name tag ("Visitor 12" or the signed-in
+  name). Positions are sent at ~5 Hz while moving and smoothed; at most 40 are drawn (nearest, in zones visible from
+  you); beyond 14 m only the orb, beyond 32 m nothing. Hidden entirely when Realtime isn't configured/reachable.
+- **Live docent tours**: curators/admins get **Start live tour** (HUD). Visitors see "Live tour by *name* — Join";
+  joined visitors auto-follow the docent (walk target nearby, faded teleport when far / in another room; walking
+  yourself pauses it → "Rejoin docent"), see a pulsing ring on what the docent is showing, chat (rate-limited,
+  filtered; the docent can mute) and can raise a hand. Docent messages are cryptographically verified — see
+  `docs/API.md → Live guided tours` (`POST /api/live/token`, `GET /api/live/verify`, `LIVE_TOKEN_SECRET`).
+- **VR** (HUD **Enter VR**, only when `navigator.xr` supports `immersive-vr`; `xr/`): the museum at 1:1. Thumbstick
+  forward → teleport arc (walls block it, landing is collision-checked), left/right → 30° snap turn, trigger → select
+  an artwork/object (world-space info card; trigger on the card or B/Y closes), comfort vignette on teleport/turn,
+  zone culling follows the headset, post-processing is paused while presenting.
+- **AR** (inspection viewer → **View in your space**): Android/Chrome WebXR `immersive-ar` with hit-test placement at
+  real scale; iOS/iPadOS AR Quick Look with a USDZ generated at runtime (`USDZExporter`); otherwise the button is
+  hidden and the 3D viewer is the experience.
+- Test: `node scripts/live-presence-test.mjs http://localhost:3000` (two browser contexts: docent + visitor).
 
 ## How to change quality settings
 
@@ -353,6 +422,48 @@ least-privilege IAM user `hand-block-museum-app`, Vercel project `hand-block-mus
   (or leave it unset to keep SQLite on a persistent disk) and optionally `S3_BUCKET`. Put it behind
   HTTPS (the session cookie is `Secure` when `NODE_ENV=production`; set `COOKIE_SECURE=0` only for
   plain-HTTP testing).
+
+### Exhibitions, makers & curator analytics
+
+- **Multi-exhibition**: one building, several exhibitions (table `exhibitions`; `content_items.exhibition_id`).
+  The default exhibition opens at `/gallery`, others at `/gallery/<slug>`; each has its own artworks, exhibits,
+  panels, films, objects, reveal-wall / welcome text, optional tour-stop override and accent colour. Admin → header
+  *Exhibition* switcher scopes every content page; admin → *Exhibitions* creates / duplicates / publishes / sets the
+  default (admin role) and edits the tour (curators). The entry screen lists exhibitions when more than one is
+  published. Demo: `textile-traditions` ("Textile Traditions — coming soon", draft) was made with *Duplicate*.
+- **Meet the maker**: profiles in table `artisans` (admin → *Makers*, curators); artworks / exhibits reference one
+  with `artisanId`. The info panel shows a maker card with *Visit the maker* / *Commission* / *Buy (fair trade)*
+  when those URLs exist; `/makers/<id>` is the accessible profile page. Seed profiles are placeholders only
+  ("Artisan profile — to be supplied by the workshop") — enter only what the workshop supplies.
+- **Curator analytics** (admin → *Analytics*): the tracker samples the visitor position every 2 s (`pos`) and tour
+  arrivals (`tour_step`). Positions are aggregated on arrival into `analytics_heat` (0.5 m cells per exhibition /
+  day / zone) and never stored raw. Floor-plan heatmap (walls from `config/layout.ts`), zone filter, date range,
+  tour funnel, attention ranking, CSV export.
+- **Retention**: analytics older than the retention setting (default **180 days**, admin → Analytics → *Privacy &
+  retention*) are deleted automatically at most once a day, and by `POST /api/admin/analytics/cleanup` (admin) or
+  `GET|POST` with `Authorization: Bearer $CRON_SECRET` for a scheduled job, e.g. a Vercel Cron Job
+  (`"crons": [{ "path": "/api/admin/analytics/cleanup", "schedule": "0 3 * * *" }]` + `CRON_SECRET` env var).
+
+### Print it yourself, Visitors' Wall & artisan presence
+
+- **Studio** (`src/museum/studio/`): the small printing table in front of the Craft Workshop's west wall
+  (scene object kind `print-studio`) shows the visitor's current cloth live; selecting it opens a full-screen studio
+  (blocks from the placeholder motif library + a border block with corner blocks, outline / filler / both faces,
+  colour-named dyes, ground cloths, colourways, grid / half-drop guides with snapping, hold-to-press pressure, ink that
+  runs dry and is re-inked, undo / redo / clear, PNG download). Designs are deterministic op lists (per-stamp seeds),
+  kept in `localStorage`. The museum canvas pauses while the studio is open.
+- **Visitors' Wall** (kind `visitors-wall`, props `cols`, `rows`, `width`, `bottom`): the 24 latest approved prints
+  (`GET /api/prints`) as box-framed textiles (one atlas texture). *Hang it on the Visitors' Wall* posts to
+  `POST /api/prints` (pending); curators approve / reject in admin → *Visitor prints*. Offline / `?static`: the
+  studio still works (download only) and the wall shows empty frames. Table `visitor_prints`
+  (`supabase/migrations/20260923110000_visitor_prints.sql`).
+- **Meet the maker screens**: `VIDEOS` entries with `kind: 'portrait'`, `stand: { x, z, rotationDeg }` and
+  `cropAspect` (default 9 / 16) render a small vertical screen on a free-standing stand with spatial audio. The two
+  placeholders beside printing tables II and IV centre-crop the placeholder process films — replace `src` with the
+  portrait films.
+- **Artisan captures** (kind `splat`): set `model` to a Gaussian-splat `.splat` file (drei `<Splat>`; `.ksplat` /
+  `.ply` must be converted first) with optional props `splatScale`, `splatY`, `splatRotDeg`. Without a capture a
+  clearly labelled placeholder (translucent seated figure + "Artisan capture — coming soon" card) is shown.
 
 ### Security notes
 

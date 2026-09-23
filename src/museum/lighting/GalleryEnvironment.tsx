@@ -11,6 +11,7 @@ import { useLayoutEffect } from 'react'
 import * as THREE from 'three'
 import { LIGHTING } from '../config/lighting'
 import { KEY, MUSEUM } from '../config/museum'
+import { makePMREM } from '../utils/renderer'
 
 interface Former {
   color: string
@@ -56,7 +57,7 @@ export function GalleryEnvironment() {
       mesh.scale.set(f.size[0], f.size[1], 1)
       env.add(mesh)
     }
-    const pmrem = new THREE.PMREMGenerator(gl)
+    const pmrem = makePMREM(gl)
     // Probe from roughly the visitor's eye position in the centre of the gallery.
     const target = pmrem.fromScene(env, 0.02, 0.1, 100, { position: new THREE.Vector3(0, 1.6, GZ) })
     pmrem.dispose()

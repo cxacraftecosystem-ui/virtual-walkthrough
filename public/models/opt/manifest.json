@@ -1,0 +1,355 @@
+{
+  "generatedAt": "2026-09-22T22:01:56.065Z",
+  "models": [
+    {
+      "source": "public/models/cc0/antique_ceramic_vase_01/antique_ceramic_vase_01_1k.gltf",
+      "output": "public/models/opt/cc0/antique_ceramic_vase_01.glb",
+      "before": 525941,
+      "after": 265036
+    },
+    {
+      "source": "public/models/cc0/brass_diya_lantern/brass_diya_lantern_1k.gltf",
+      "output": "public/models/opt/cc0/brass_diya_lantern.glb",
+      "before": 2506376,
+      "after": 488792
+    },
+    {
+      "source": "public/models/cc0/brass_pot_01/brass_pot_01_1k.gltf",
+      "output": "public/models/opt/cc0/brass_pot_01.glb",
+      "before": 1523474,
+      "after": 305440
+    },
+    {
+      "source": "public/models/cc0/ceramic_vase_01/ceramic_vase_01_1k.gltf",
+      "output": "public/models/opt/cc0/ceramic_vase_01.glb",
+      "before": 418457,
+      "after": 168316
+    },
+    {
+      "source": "public/models/cc0/ceramic_vase_03/ceramic_vase_03_1k.gltf",
+      "output": "public/models/opt/cc0/ceramic_vase_03.glb",
+      "before": 765159,
+      "after": 509960
+    },
+    {
+      "source": "public/models/cc0/planter_pot_clay/planter_pot_clay_1k.gltf",
+      "output": "public/models/opt/cc0/planter_pot_clay.glb",
+      "before": 1797158,
+      "after": 414452
+    },
+    {
+      "source": "public/models/cc0/potted_plant_01/potted_plant_01_1k.gltf",
+      "output": "public/models/opt/cc0/potted_plant_01.glb",
+      "before": 2005461,
+      "after": 1281712
+    },
+    {
+      "source": "public/models/cc0/potted_plant_02/potted_plant_02_1k.gltf",
+      "output": "public/models/opt/cc0/potted_plant_02.glb",
+      "before": 1494451,
+      "after": 937812
+    },
+    {
+      "source": "public/models/cc0/potted_plant_04/potted_plant_04_1k.gltf",
+      "output": "public/models/opt/cc0/potted_plant_04.glb",
+      "before": 2122625,
+      "after": 653912
+    },
+    {
+      "source": "public/models/cc0/wicker_basket_01/wicker_basket_01_1k.gltf",
+      "output": "public/models/opt/cc0/wicker_basket_01.glb",
+      "before": 2730151,
+      "after": 800468
+    },
+    {
+      "source": "public/models/cc0/wicker_basket_02/wicker_basket_02_1k.gltf",
+      "output": "public/models/opt/cc0/wicker_basket_02.glb",
+      "before": 3064509,
+      "after": 1040032
+    },
+    {
+      "source": "public/models/cc0/wooden_bucket_01/wooden_bucket_01_1k.gltf",
+      "output": "public/models/opt/cc0/wooden_bucket_01.glb",
+      "before": 2331642,
+      "after": 630504
+    },
+    {
+      "source": "public/models/cc0/wooden_crate_01/wooden_crate_01_1k.gltf",
+      "output": "public/models/opt/cc0/wooden_crate_01.glb",
+      "before": 2277087,
+      "after": 605244
+    },
+    {
+      "source": "public/models/cc0/wooden_stool_01/wooden_stool_01_1k.gltf",
+      "output": "public/models/opt/cc0/wooden_stool_01.glb",
+      "before": 961720,
+      "after": 742300
+    }
+  ],
+  "artworks": [
+    {
+      "source": "public/artworks/drape-01.jpg",
+      "before": 435820,
+      "webp1024": 73416,
+      "webp2048": 290068
+    },
+    {
+      "source": "public/artworks/drape-02.jpg",
+      "before": 386585,
+      "webp1024": 62116,
+      "webp2048": 205810
+    },
+    {
+      "source": "public/artworks/drape-03.jpg",
+      "before": 439331,
+      "webp1024": 74818,
+      "webp2048": 294754
+    },
+    {
+      "source": "public/artworks/feature-01.jpg",
+      "before": 983938,
+      "webp1024": 185070,
+      "webp2048": 659488
+    },
+    {
+      "source": "public/artworks/feature-02.jpg",
+      "before": 696055,
+      "webp1024": 122368,
+      "webp2048": 347610
+    },
+    {
+      "source": "public/artworks/feature-03.jpg",
+      "before": 891821,
+      "webp1024": 142742,
+      "webp2048": 576776
+    },
+    {
+      "source": "public/artworks/feature-04.jpg",
+      "before": 962855,
+      "webp1024": 156114,
+      "webp2048": 618972
+    },
+    {
+      "source": "public/artworks/feature-05.jpg",
+      "before": 716253,
+      "webp1024": 100852,
+      "webp2048": 304128
+    },
+    {
+      "source": "public/artworks/feature-06.jpg",
+      "before": 845415,
+      "webp1024": 151138,
+      "webp2048": 582364
+    },
+    {
+      "source": "public/artworks/feature-07.jpg",
+      "before": 960579,
+      "webp1024": 152580,
+      "webp2048": 611712
+    },
+    {
+      "source": "public/artworks/feature-08.jpg",
+      "before": 769442,
+      "webp1024": 149374,
+      "webp2048": 405688
+    },
+    {
+      "source": "public/artworks/feature-09.jpg",
+      "before": 921979,
+      "webp1024": 144818,
+      "webp2048": 589140
+    },
+    {
+      "source": "public/artworks/feature-10.jpg",
+      "before": 917378,
+      "webp1024": 150182,
+      "webp2048": 609852
+    },
+    {
+      "source": "public/artworks/feature-11.jpg",
+      "before": 698342,
+      "webp1024": 117122,
+      "webp2048": 333890
+    },
+    {
+      "source": "public/artworks/feature-12.jpg",
+      "before": 801730,
+      "webp1024": 137908,
+      "webp2048": 516366
+    },
+    {
+      "source": "public/artworks/feature-13.jpg",
+      "before": 802440,
+      "webp1024": 140884,
+      "webp2048": 553882
+    },
+    {
+      "source": "public/artworks/hero-01.jpg",
+      "before": 980648,
+      "webp1024": 168078,
+      "webp2048": 651046
+    },
+    {
+      "source": "public/artworks/hero-02.jpg",
+      "before": 791357,
+      "webp1024": 109496,
+      "webp2048": 517782
+    },
+    {
+      "source": "public/artworks/hero-03.jpg",
+      "before": 1293574,
+      "webp1024": 224844,
+      "webp2048": 843934
+    },
+    {
+      "source": "public/artworks/hero-04.jpg",
+      "before": 529654,
+      "webp1024": 91062,
+      "webp2048": 357926
+    },
+    {
+      "source": "public/artworks/hero-05.jpg",
+      "before": 456282,
+      "webp1024": 77120,
+      "webp2048": 246138
+    },
+    {
+      "source": "public/artworks/panel-01.jpg",
+      "before": 560225,
+      "webp1024": 90486,
+      "webp2048": 390730
+    },
+    {
+      "source": "public/artworks/panel-02.jpg",
+      "before": 581517,
+      "webp1024": 97744,
+      "webp2048": 381312
+    },
+    {
+      "source": "public/artworks/panel-03.jpg",
+      "before": 408422,
+      "webp1024": 71156,
+      "webp2048": 209310
+    },
+    {
+      "source": "public/artworks/runner-01.jpg",
+      "before": 259377,
+      "webp1024": 53950,
+      "webp2048": 181318
+    },
+    {
+      "source": "public/artworks/study-01.jpg",
+      "before": 462257,
+      "webp1024": 150256,
+      "webp2048": 314672
+    },
+    {
+      "source": "public/artworks/study-02.jpg",
+      "before": 639377,
+      "webp1024": 194288,
+      "webp2048": 406894
+    },
+    {
+      "source": "public/artworks/study-03.jpg",
+      "before": 455832,
+      "webp1024": 146224,
+      "webp2048": 303854
+    },
+    {
+      "source": "public/artworks/study-04.jpg",
+      "before": 367549,
+      "webp1024": 88004,
+      "webp2048": 198890
+    },
+    {
+      "source": "public/artworks/study-05.jpg",
+      "before": 367581,
+      "webp1024": 110728,
+      "webp2048": 244542
+    },
+    {
+      "source": "public/artworks/study-06.jpg",
+      "before": 506115,
+      "webp1024": 164860,
+      "webp2048": 332992
+    },
+    {
+      "source": "public/artworks/study-07.jpg",
+      "before": 434177,
+      "webp1024": 138028,
+      "webp2048": 280108
+    },
+    {
+      "source": "public/artworks/study-08.jpg",
+      "before": 288561,
+      "webp1024": 83054,
+      "webp2048": 129062
+    },
+    {
+      "source": "public/artworks/study-09.jpg",
+      "before": 369013,
+      "webp1024": 116538,
+      "webp2048": 228848
+    },
+    {
+      "source": "public/artworks/study-10.jpg",
+      "before": 452100,
+      "webp1024": 154148,
+      "webp2048": 311280
+    },
+    {
+      "source": "public/artworks/study-11.jpg",
+      "before": 434307,
+      "webp1024": 130474,
+      "webp2048": 264718
+    },
+    {
+      "source": "public/artworks/study-12.jpg",
+      "before": 414912,
+      "webp1024": 125180,
+      "webp2048": 268230
+    },
+    {
+      "source": "public/artworks/study-13.jpg",
+      "before": 263710,
+      "webp1024": 65450,
+      "webp2048": 121078
+    },
+    {
+      "source": "public/artworks/study-14.jpg",
+      "before": 442841,
+      "webp1024": 137004,
+      "webp2048": 286210
+    },
+    {
+      "source": "public/artworks/study-15.jpg",
+      "before": 446496,
+      "webp1024": 151714,
+      "webp2048": 302400
+    },
+    {
+      "source": "public/artworks/study-16.jpg",
+      "before": 421752,
+      "webp1024": 153268,
+      "webp2048": 281418
+    },
+    {
+      "source": "public/artworks/tri-01.jpg",
+      "before": 592427,
+      "webp1024": 102194,
+      "webp2048": 399808
+    },
+    {
+      "source": "public/artworks/tri-02.jpg",
+      "before": 452668,
+      "webp1024": 83392,
+      "webp2048": 246190
+    },
+    {
+      "source": "public/artworks/tri-03.jpg",
+      "before": 573087,
+      "webp1024": 96914,
+      "webp2048": 386580
+    }
+  ]
+}

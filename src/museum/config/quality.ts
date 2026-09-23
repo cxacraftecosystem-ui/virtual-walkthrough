@@ -35,6 +35,12 @@ export interface QualityPreset {
   /** Procedural texture resolution (px). */
   textureSize: number
   antialias: boolean
+  /** Per-zone irradiance/reflection probes (lighting/ZoneProbes.tsx) — experimental, also needs `?probes`. */
+  zoneProbes: boolean
+  /** Probe cube resolution (px per face). */
+  probeSize: number
+  /** Photo mode path-traces the still view by default (experimental: off everywhere; photo-bar toggle opts in). */
+  pathTracing: boolean
 }
 
 export const QUALITY_PRESETS: Record<QualityTier, QualityPreset> = {
@@ -56,6 +62,9 @@ export const QUALITY_PRESETS: Record<QualityTier, QualityPreset> = {
     textureAnisotropy: 2,
     textureSize: 512,
     antialias: false,
+    zoneProbes: false,
+    probeSize: 32,
+    pathTracing: false,
   },
   medium: {
     label: 'Medium',
@@ -76,6 +85,9 @@ export const QUALITY_PRESETS: Record<QualityTier, QualityPreset> = {
     textureAnisotropy: 4,
     textureSize: 1024,
     antialias: true,
+    zoneProbes: true,
+    probeSize: 64,
+    pathTracing: false,
   },
   high: {
     label: 'High',
@@ -95,6 +107,9 @@ export const QUALITY_PRESETS: Record<QualityTier, QualityPreset> = {
     textureAnisotropy: 8,
     textureSize: 1024,
     antialias: false,
+    zoneProbes: true,
+    probeSize: 128,
+    pathTracing: false,
   },
   ultra: {
     label: 'Ultra',
@@ -114,6 +129,9 @@ export const QUALITY_PRESETS: Record<QualityTier, QualityPreset> = {
     textureAnisotropy: 16,
     textureSize: 2048,
     antialias: false,
+    zoneProbes: true,
+    probeSize: 128,
+    pathTracing: false,
   },
 }
 
@@ -153,6 +171,9 @@ export function gpuClass(): GpuClass {
  * holds 60 fps on Medium but ~20 fps on High), only discrete GPUs may climb.
  */
 export function autoCeiling(): QualityTier {
+  // Touch devices (phones/tablets; iOS reports an 'unknown' "Apple GPU") never climb: each tier
+  // change rebuilds the WebGL context, and repeated rebuilds get the tab killed on iOS Safari.
+  if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) return detectInitialTier()
   const c = gpuClass()
   if (c === 'flagship' || c === 'discrete') return 'ultra'
   if (c === 'integrated') return 'medium'

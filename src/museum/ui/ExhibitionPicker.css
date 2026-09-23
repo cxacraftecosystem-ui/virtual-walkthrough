@@ -1,0 +1,49 @@
+/* Entry-screen exhibition selector (ExhibitionPicker.tsx) */
+.ui-expick {
+  margin-top: 18px;
+  text-align: center;
+}
+
+.ui-expick__label {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.ui-expick__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.ui-expick__item {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 999px;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.35);
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.ui-expick__item:hover,
+.ui-expick__item:focus-visible {
+  border-color: var(--ink);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.ui-expick__item.is-current {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: transparent;
+}

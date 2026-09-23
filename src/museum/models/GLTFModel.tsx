@@ -7,6 +7,10 @@
  *   The merged set is cached per URL and shared by every placement (no scene clones).
  * - Fits it: scale = `modelScale`, else `height / bbox height` (else 1); bottom at y = 0,
  *   centred on the footprint origin. Shadows on.
+ * - Optimised files (scripts/optimize-assets.mjs → public/models/opt/) use EXT_meshopt_compression +
+ *   KHR_mesh_quantization + EXT_texture_webp: drei's useGLTF enables MeshoptDecoder by default, and
+ *   quantised attributes are converted to float before transforms are baked. Legacy Poly Haven paths
+ *   (content stored in the DB before the switch) are mapped to their optimised GLB.
  */
 import { useGLTF } from '@react-three/drei'
 import { useMemo } from 'react'
@@ -20,6 +24,24 @@ interface MergedModel {
 
 const merged = new Map<string, MergedModel>()
 
+/** '/models/cc0/<id>/<id>_1k.gltf' → '/models/opt/cc0/<id>.glb' (verified by scripts/verify-optimized-models.mjs). */
+export function resolveModelUrl(url: string) {
+  const m = /^\/models\/cc0\/([\w-]+)\/\1_1k\.gltf$/.exec(url)
+  return m ? `/models/opt/cc0/${m[1]}.glb` : url
+}
+
+/** Quantised (normalized int) attributes → Float32, so applyMatrix4 cannot clamp and merges match. */
+function dequantize(g: THREE.BufferGeometry) {
+  for (const [name, a] of Object.entries(g.attributes)) {
+    // meshopt output is often interleaved (int16 vec3 padded to an 8-byte stride)
+    if (a instanceof THREE.BufferAttribute && a.array instanceof Float32Array) continue
+    const out = new Float32Array(a.count * a.itemSize)
+    for (let i = 0; i < a.count; i++) for (let k = 0; k < a.itemSize; k++) out[i * a.itemSize + k] = a.getComponent(i, k)
+    g.setAttribute(name, new THREE.BufferAttribute(out, a.itemSize))
+  }
+  return g
+}
+
 function mergeScene(url: string, scene: THREE.Object3D): MergedModel {
   const hit = merged.get(url)
   if (hit) return hit
@@ -30,7 +52,7 @@ function mergeScene(url: string, scene: THREE.Object3D): MergedModel {
     if (!mesh.isMesh || (mesh as unknown as THREE.SkinnedMesh).isSkinnedMesh) return
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
     if (mats.length !== 1) return
-    const g = mesh.geometry.clone()
+    const g = dequantize(mesh.geometry.clone())
     g.applyMatrix4(mesh.matrixWorld)
     let list = groups.get(mats[0])
     if (!list) groups.set(mats[0], (list = []))
@@ -81,8 +103,11 @@ export interface GLTFModelProps {
 }
 
 export function GLTFModel({ url, scale, height }: GLTFModelProps) {
-  const { scene } = useGLTF(url)
-  const model = useMemo(() => mergeScene(url, scene), [url, scene])
+  // Draco + meshopt decoders on: admin "3D scan import" output is EXT_meshopt_compression +
+  // KHR_mesh_quantization + EXT_texture_webp (all handled by three-stdlib's GLTFLoader).
+  const src = resolveModelUrl(url)
+  const { scene } = useGLTF(src, true, true)
+  const model = useMemo(() => mergeScene(src, scene), [src, scene])
   const fit = useMemo(() => {
     const size = model.box.getSize(new THREE.Vector3())
     const c = model.box.getCenter(new THREE.Vector3())
@@ -100,5 +125,5 @@ export function GLTFModel({ url, scale, height }: GLTFModelProps) {
 
 /** Start fetching a model early (e.g. while the entry screen is up). */
 export function preloadModel(url: string) {
-  useGLTF.preload(url)
+  useGLTF.preload(resolveModelUrl(url), true, true)
 }

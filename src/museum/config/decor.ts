@@ -36,6 +36,7 @@ import { ARTWORKS } from './artworks'
 import { INFOGRAPHICS } from './infographics'
 import { SURFACES, type SurfaceId, type ZoneId } from './layout'
 import { MUSEUM } from './museum'
+import { SCENE_OBJECTS } from './objects'
 import { VIDEOS } from './videos'
 
 export type Range = [number, number]
@@ -124,7 +125,39 @@ export interface WrapTreatment {
   minTier?: QualityTier
 }
 
-export type DecorTreatment = FieldTreatment | ReliefTreatment | JaliTreatment | FrameTreatment | WrapTreatment
+/**
+ * SVG medallion hung on a display surface (curator-movable): a single-colour SVG
+ * (fill="currentColor", under /public) rasterised to a crisp alpha-tested relief,
+ * recoloured per location, with an optional slow "breathing" backlight halo.
+ * Placements that would touch hung content or floor objects against the wall are dropped.
+ */
+export interface MedallionTreatment {
+  type: 'medallion'
+  /** Public URL of the SVG. */
+  svg: string
+  surface: SurfaceId
+  at: number
+  centerHeight: number
+  /** Diameter (m). */
+  size: number
+  color: string
+  metalness?: number
+  roughness?: number
+  /** Relief strength (normal-map scale, default 1). */
+  relief?: number
+  /**
+   * 'relief' (default): alpha-tested, chased metal / carved look.
+   * 'paint': alpha-blended stencil — soft, alias-free edges on light walls at a distance.
+   */
+  finish?: 'relief' | 'paint'
+  /** Distance off the wall face (default 6 mm). */
+  offset?: number
+  /** Slow backlight: halo colour, peak intensity, period (s). */
+  glow?: { color: string; intensity: number; period?: number }
+  minTier?: QualityTier
+}
+
+export type DecorTreatment = FieldTreatment | ReliefTreatment | JaliTreatment | FrameTreatment | WrapTreatment | MedallionTreatment
 
 export interface DecorGroup {
   id: string
@@ -208,6 +241,32 @@ function clearOf(surface: SurfaceId, ts: JaliTreatment[]): JaliTreatment[] {
     return !busy.some((b) => overlaps(b, r))
   })
 }
+
+/** Face of a display surface (for renderers). */
+export const surfaceFace = (id: SurfaceId): DecorFace => surf(id).face
+
+/**
+ * Medallion placement, kept only if its disc (plus a margin) is clear of hung content on
+ * the surface and of floor objects standing within 1 m of the wall that reach its height.
+ */
+function medallion(m: Omit<MedallionTreatment, 'type'>): MedallionTreatment[] {
+  const r = m.size / 2 + 0.15
+  const rect: DecorRect = { run: [m.at - r, m.at + r], y: [m.centerHeight - r, m.centerHeight + r] }
+  if (contentReserves(m.surface, 0.05).some((b) => overlaps(b, rect))) return []
+  const s = SURFACES[m.surface]
+  const blocked = SCENE_OBJECTS.some((o) => {
+    if (!o.footprint) return false
+    const half = Math.max(o.footprint[0], o.footprint[1]) / 2
+    const [ox, oy, oz] = o.position
+    const along = s.runAxis === 'z' ? oz : ox
+    const across = s.runAxis === 'z' ? ox : oz
+    const top = oy + (o.height ?? 1)
+    return Math.abs(across - s.face) - half < 1.0 && Math.abs(along - m.at) < r + half && top > rect.y[0] && oy < rect.y[1]
+  })
+  return blocked ? [] : [{ type: 'medallion', ...m }]
+}
+
+const MANDALA = '/decor/mandala.svg'
 
 /** Brass fillet frames around every piece hung on a surface (the atrium's gallery-scale works). */
 function frameContent(surface: SurfaceId, f: DecorFace): FrameTreatment[] {
@@ -403,6 +462,9 @@ const court: DecorTreatment[] = [
   // deep madder lime behind the centrepiece
   { type: 'field', ...CN, y: [0.12, 4.36], material: 'madderPlaster' },
   ...[CW, CE, CN].flatMap((s) => paintedFrieze(s.face, s.run, 4.4, 5.2)),
+  // a pair of madder mandalas on lime, facing each other across the court's entry
+  ...medallion({ svg: MANDALA, surface: 'court-west', at: -20.9, centerHeight: 2.3, size: 2.2, color: '#8a3526', roughness: 0.85, relief: 0.35, finish: 'paint' }),
+  ...medallion({ svg: MANDALA, surface: 'court-east', at: -20.9, centerHeight: 2.3, size: 2.2, color: '#8a3526', roughness: 0.85, relief: 0.35, finish: 'paint' }),
 ]
 
 /* ── Gallery D — regional gallery ─────────────────────────────────── */
@@ -431,6 +493,8 @@ const galleryD: DecorTreatment[] = [
   ...galleryDWall(DS, [GD.minX, GD.maxX]),
   ...doorSurround(DE, D.galleryToGalleryD.z, D.galleryToGalleryD.width, D.galleryToGalleryD.height, 'brass', 0.05, 0.022, 0.05),
   ...doorSurround(DS, D.theatreToGalleryD.x, D.theatreToGalleryD.width, D.theatreToGalleryD.height, 'brass', 0.05, 0.022, 0.05),
+  // chased-brass mandala on the indigo, above the two pedestal vessels, softly backlit
+  ...medallion({ svg: MANDALA, surface: 'gallery-d-south', at: -19.1, centerHeight: 2.7, size: 2.9, color: '#c9a35a', metalness: 0.85, roughness: 0.34, relief: 1.2, glow: { color: '#ffc27a', intensity: 0.5, period: 9 } }),
 ]
 
 /* ── Craft workshop ───────────────────────────────────────────────── */
@@ -517,7 +581,7 @@ function protectContent(ts: DecorTreatment[]): DecorTreatment[] {
     return r
   }
   return ts.map((t) => {
-    if (t.type === 'wrap' || t.type === 'field') return t
+    if (t.type === 'wrap' || t.type === 'field' || t.type === 'medallion') return t
     const b = busy(t.face)
     return b.length ? { ...t, reserve: [...(t.reserve ?? []), ...b] } : t
   })

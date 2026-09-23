@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 
 import { useMuseum } from '../state/store'
 import { visitor } from '../state/visitor'
 import { usePhoto } from './PhotoMode'
+import { tr } from '../i18n'
 
 const DEADZONE = 0.08
 
@@ -90,7 +91,7 @@ export function TouchJoystick() {
       ref={rootRef}
       className={`ui-joy ui-interactive${active ? ' is-active' : ''}${hidden ? ' is-hidden' : ''}`}
       role="application"
-      aria-label="Walk joystick"
+      aria-label={tr('a11y.joystick')}
       onPointerDown={(e) => {
         e.preventDefault()
         e.stopPropagation()

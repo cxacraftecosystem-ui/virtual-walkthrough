@@ -1,22 +1,30 @@
 import { useEffect } from 'react'
 import { useMuseum } from '../state/store'
 import { EntryScreen } from './EntryScreen'
+import { DeepZoomViewer } from './deepzoom/DeepZoomViewer'
 import { HUD } from './HUD'
 import { InfoPanel } from './InfoPanel'
 import { Minimap, TravelFade } from './Minimap'
 import { HelpOverlay } from './HelpOverlay'
+import { DeepLinkHandler } from '../share/DeepLinkHandler'
+import { TrailLayer } from '../trail/TrailUI'
 import { ProximityPrompt } from './ProximityPrompt'
 import { TouchJoystick } from './TouchJoystick'
 import { useAmbientAudio } from './audio'
 import { AuthModal } from './AuthModal'
 import { SocialDrawer } from './Social'
 import { TourOverlay } from '../tour/TourOverlay'
+import { LivePanel } from '../live/LivePanel'
 import { tour, useTour } from '../tour/engine'
+import { ArrivalOverlay } from './ArrivalOverlay'
 import { PhotoMode, capturePhoto, exitPhotoMode, togglePhotoMode, usePhoto } from './PhotoMode'
 import { cycleTimeOfDay, useTimeOfDayPersistence } from './timeOfDay'
 import { initSocial } from '../api/social'
 import { startAnalytics } from '../analytics/tracker'
 import { isCoarsePointer } from './HelpOverlay'
+import { A11yLayer } from '../a11y/A11yLayer'
+import { PrintStudio } from '../studio/PrintStudio'
+import { ErrorBoundary } from '../utils/ErrorBoundary'
 
 function isTypingTarget(t: EventTarget | null) {
   if (!(t instanceof HTMLElement)) return false
@@ -122,19 +130,66 @@ export function UIOverlay() {
   const photo = usePhoto((s) => s.on)
   return (
     <div className={`ui-root${photo ? ' is-photo' : ''}`}>
-      <HUD />
-      <Minimap />
-      <ProximityPrompt />
-      <TouchJoystick />
-      <TourOverlay />
-      <InfoPanel />
-      <SocialDrawer />
-      <HelpOverlay />
-      <Crosshair />
-      <AuthModal />
-      <PhotoMode />
-      <TravelFade />
-      <EntryScreen />
+      <ErrorBoundary fallback={null}>
+        <A11yLayer />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <HUD />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <Minimap />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <ProximityPrompt />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <TouchJoystick />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <TourOverlay />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <LivePanel />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <InfoPanel />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <SocialDrawer />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <HelpOverlay />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <DeepLinkHandler />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <TrailLayer />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <Crosshair />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <AuthModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <PhotoMode />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <PrintStudio />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <TravelFade />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <ArrivalOverlay />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <EntryScreen />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <DeepZoomViewer />
+      </ErrorBoundary>
     </div>
   )
 }

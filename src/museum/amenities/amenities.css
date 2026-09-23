@@ -1,0 +1,302 @@
+/* Visitor amenities UI: info-panel links, share popover + QR, discovery trail. */
+
+/* ── Info panel: links (shop products, resources) ─────────────────── */
+.ui-links {
+  margin-top: 18px;
+}
+.ui-links__list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.ui-links__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+.ui-links__btn {
+  text-decoration: none;
+}
+.ui-links__btn.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+.ui-links__note {
+  flex: 1 1 180px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* ── Share ─────────────────────────────────────────────────────────── */
+.ui-share {
+  position: absolute;
+  top: 12px;
+  right: 52px;
+}
+.ui-info__fav ~ .ui-share {
+  right: 92px;
+}
+.ui-info__head:has(.ui-info__fav ~ .ui-share) {
+  padding-right: 136px;
+}
+.ui-share__btn {
+  color: var(--muted);
+}
+.ui-share__pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: -40px;
+  z-index: 5;
+  width: min(300px, calc(100vw - 48px));
+  padding: 14px;
+  background: var(--panel-solid);
+  animation: ui-drop 0.22s var(--ease) both;
+}
+.ui-share__row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.ui-share__url {
+  flex: 1;
+  min-width: 0;
+  font: 12px/1.3 var(--font-ui);
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+}
+.ui-share__copy {
+  flex: none;
+}
+.ui-share__status {
+  display: block;
+  min-height: 16px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.ui-share__qr {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 6px;
+}
+.ui-share__qr p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.ui-share__qr a {
+  color: var(--accent);
+}
+.ui-qr {
+  flex: none;
+  border-radius: 3px;
+}
+
+@media (max-width: 720px) {
+  .ui-share {
+    top: 8px;
+  }
+  .ui-share__pop {
+    right: -80px;
+  }
+}
+
+/* ── Discovery trail ───────────────────────────────────────────────── */
+.ui-trail__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: rgba(138, 90, 59, 0.1);
+  color: var(--ink);
+  font: 600 12px/1 var(--font-ui);
+  cursor: pointer;
+}
+.ui-trail__btn svg {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+.ui-trail__btn:hover,
+.ui-trail__btn[aria-expanded='true'] {
+  background: rgba(138, 90, 59, 0.18);
+}
+.ui-trail__count {
+  font-variant-numeric: tabular-nums;
+}
+.ui-trail__menu {
+  width: 260px;
+  padding: 8px 10px 12px;
+}
+.ui-trail__lede {
+  margin: 0 10px 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.ui-trail__rooms {
+  list-style: none;
+  margin: 0;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.ui-trail__rooms li {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.ui-trail__rooms li.is-done {
+  color: var(--accent);
+}
+.ui-trail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 10px 0;
+}
+
+.ui-trail-card {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline);
+}
+.ui-trail-card p {
+  margin: 6px 0 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ui-entry__trail {
+  display: block;
+  flex-basis: 100%;
+  margin: 0 auto;
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: 500 13px/1.3 var(--font-ui);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(138, 90, 59, 0.35);
+}
+.ui-entry__trail:hover {
+  text-decoration-color: currentColor;
+}
+
+.ui-trail-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--edge) + var(--safe-b) + 64px);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 8px 10px;
+  font-size: 13px;
+  color: var(--ink);
+  transform: translate(-50%, 12px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s var(--ease), transform 0.3s var(--ease);
+}
+.ui-trail-toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.ui-trail-toast canvas {
+  width: 32px;
+  height: 32px;
+}
+
+.ui-trail-done {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(43, 38, 33, 0.28);
+  pointer-events: auto;
+  animation: ui-fade-in 0.3s var(--ease) both;
+}
+.ui-trail-done__card {
+  width: min(460px, 100%);
+  padding: 28px 28px 24px;
+  text-align: center;
+  background: var(--panel-solid);
+}
+.ui-trail-done__motifs {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+.ui-trail-done__motifs canvas {
+  width: 34px;
+  height: 34px;
+}
+.ui-trail-done__title {
+  margin: 6px 0 8px;
+  font: 400 32px/1.1 var(--font-display);
+}
+.ui-trail-done__card p {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.ui-trail-done__label {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  font-size: 12px;
+  color: var(--muted);
+}
+.ui-trail-done__label input {
+  font: 15px/1.3 var(--font-ui);
+  padding: 8px 10px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink);
+}
+.ui-trail-done__actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+/* ── PWA update toast ──────────────────────────────────────────────── */
+.ui-sw-toast {
+  position: fixed;
+  right: calc(var(--edge) + var(--safe-r));
+  bottom: calc(var(--edge) + var(--safe-b));
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 16px;
+  font: 13px/1.3 var(--font-ui);
+  color: var(--ink);
+  background: var(--panel-solid);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}

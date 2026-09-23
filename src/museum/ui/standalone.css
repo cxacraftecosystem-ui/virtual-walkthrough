@@ -1,0 +1,160 @@
+/* Server-rendered standalone pages (maker profile, "coming soon") — scrollable layer above the
+   museum's fixed, overflow-hidden body. Uses the tokens from src/styles.css. */
+.sp-root {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.sp-wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: calc(32px + var(--safe-t)) calc(20px + var(--safe-r)) calc(56px + var(--safe-b)) calc(20px + var(--safe-l));
+}
+
+.sp-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+  margin-bottom: 32px;
+}
+
+.sp-nav a,
+.sp-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.sp-nav a:hover,
+.sp-nav a:focus-visible,
+.sp-link:hover,
+.sp-link:focus-visible {
+  text-decoration: underline;
+}
+
+.sp-kicker {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sp-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(30px, 6vw, 44px);
+  line-height: 1.1;
+  margin: 6px 0 10px;
+}
+
+.sp-sub {
+  color: var(--muted);
+  margin: 0 0 20px;
+}
+
+.sp-head {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sp-portrait {
+  width: 144px;
+  height: 144px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--hairline);
+  background: var(--paper-2);
+}
+
+.sp-portrait--empty {
+  display: grid;
+  place-items: center;
+  border-style: dashed;
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 48px;
+}
+
+.sp-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px dashed rgba(138, 90, 59, 0.6);
+  color: var(--muted);
+}
+
+.sp-badge--ok {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sp-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 18px;
+  margin: 24px 0;
+}
+
+.sp-facts dt {
+  color: var(--muted);
+}
+
+.sp-facts dd {
+  margin: 0;
+}
+
+.sp-bio {
+  white-space: pre-line;
+}
+
+.sp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 24px 0;
+}
+
+.sp-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.sp-btn--primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.sp-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sp-note {
+  font-size: 13px;
+  color: var(--muted);
+  border-top: 1px solid var(--hairline);
+  padding-top: 16px;
+  margin-top: 32px;
+}
+
+.sp-list {
+  padding-left: 18px;
+}

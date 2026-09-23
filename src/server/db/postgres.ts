@@ -26,9 +26,21 @@ export interface PgOptions {
   max?: number
 }
 
+const STALE_RE = /Connection terminated unexpectedly|ECONNRESET|Client has encountered a connection error/i
+
 function wrap(client: pg.Pool | pg.PoolClient): Queryable {
   // No params → simple query protocol (allows multi-statement migration files).
-  const exec = (sql: string, params: Param[] = []) => (params.length ? client.query(sql, params) : client.query(sql))
+  const once = (sql: string, params: Param[]) => (params.length ? client.query(sql, params) : client.query(sql))
+  // A serverless function thawed after a freeze can hand out a pooled socket the server already
+  // closed: retry once on a fresh connection (pool only — never inside a transaction).
+  const exec = async (sql: string, params: Param[] = []) => {
+    try {
+      return await once(sql, params)
+    } catch (err) {
+      if (!(client instanceof pg.Pool) || !STALE_RE.test((err as Error).message ?? '')) throw err
+      return once(sql, params)
+    }
+  }
   return {
     query: async <T = Row>(sql: string, params?: Param[]) => (await exec(sql, params)).rows as T[],
     one: async <T = Row>(sql: string, params?: Param[]) => (await exec(sql, params)).rows[0] as T | undefined,

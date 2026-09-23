@@ -4,6 +4,9 @@
  *  - SocialDrawer: "My favourites" list with Go to, and the museum guestbook
  */
 import { useEffect, useRef, useState } from 'react'
+import { useLang, useT } from '../i18n'
+import type { DictKey } from '../i18n/en'
+import { itemTitle } from '../i18n/content'
 import { useMuseum, type SelectionKind } from '../state/store'
 import { signOut, toggleFavorite } from '../api/social'
 import { goToItem } from '../tour/navigate'
@@ -29,6 +32,7 @@ export function AccountMenu() {
   const openAuth = useMuseum((s) => s.openAuth)
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const t = useT()
 
   useEffect(() => {
     if (!open) return
@@ -63,15 +67,15 @@ export function AccountMenu() {
         className={`ui-account__chip${user ? ' is-signed-in' : ''}`}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={user ? `Account: ${user.displayName}` : 'Visitor account'}
-        title={user ? user.displayName : 'Favourites, guestbook & sign in'}
+        aria-label={user ? t('social.account', { name: user.displayName }) : t('social.visitorAccount')}
+        title={user ? user.displayName : t('social.accountTip')}
         onClick={() => setOpen((v) => !v)}
       >
         {user ? <span className="ui-account__avatar">{initials(user.displayName)}</span> : <IconUser />}
-        <span className="ui-account__name">{user ? user.displayName : 'Sign in'}</span>
+        <span className="ui-account__name">{user ? user.displayName : t('auth.signIn')}</span>
       </button>
       {open && (
-        <div className="ui-quality__menu ui-panel ui-account__menu" role="menu" aria-label="Visitor account">
+        <div className="ui-quality__menu ui-panel ui-account__menu" role="menu" aria-label={t('social.visitorAccount')}>
           {user ? (
             <div className="ui-account__who">
               <span className="ui-account__avatar ui-account__avatar--lg">{initials(user.displayName)}</span>
@@ -81,41 +85,41 @@ export function AccountMenu() {
               </span>
             </div>
           ) : (
-            <div className="ui-kicker ui-quality__menu-title">Visitor</div>
+            <div className="ui-kicker ui-quality__menu-title">{t('social.visitor')}</div>
           )}
           <button
             type="button"
             role="menuitem"
             className="ui-quality__opt ui-account__opt"
             aria-pressed={drawer === 'favourites'}
-            onClick={pick(() => (user ? setDrawer('favourites') : openAuth('Sign in to keep a list of your favourite works.')))}
+            onClick={pick(() => (user ? setDrawer('favourites') : openAuth(t('social.signInFavs'))))}
           >
             <span>
-              <IconHeart /> My favourites
+              <IconHeart /> {t('social.favourites')}
             </span>
             {user && favCount > 0 ? <small>{favCount}</small> : null}
           </button>
           <button type="button" role="menuitem" className="ui-quality__opt ui-account__opt" onClick={pick(() => setDrawer('guestbook'))}>
             <span>
-              <IconBook /> Guestbook
+              <IconBook /> {t('social.guestbook')}
             </span>
           </button>
           <div className="ui-account__rule" />
           {user ? (
             <button type="button" role="menuitem" className="ui-quality__opt ui-account__opt" onClick={pick(() => void signOut())}>
               <span>
-                <IconSignOut /> Sign out
+                <IconSignOut /> {t('social.signOut')}
               </span>
             </button>
           ) : (
             <>
               <button type="button" role="menuitem" className="ui-quality__opt ui-account__opt" onClick={pick(() => openAuth())}>
                 <span>
-                  <IconUser /> Sign in
+                  <IconUser /> {t('auth.signIn')}
                 </span>
               </button>
               <button type="button" role="menuitem" className="ui-quality__opt ui-account__opt" onClick={pick(() => openAuth(undefined, 'register'))}>
-                <span className="ui-account__indent">Create an account</span>
+                <span className="ui-account__indent">{t('auth.register')}</span>
               </button>
             </>
           )}
@@ -139,17 +143,22 @@ function Favourites() {
   const favorites = useMuseum((s) => s.favorites)
   const setDrawer = useMuseum((s) => s.setDrawer)
   const select = useMuseum((s) => s.select)
+  const t = useT()
+  const lang = useLang()
   const items = favorites
     .map(parseKey)
     .filter((x): x is { kind: SelectionKind; id: string } => !!x)
-    .map((x) => itemSummary(x.kind, x.id) ?? { ...x, title: x.id, label: 'Item' })
+    .map((x) => {
+      const it = itemSummary(x.kind, x.id)
+      return it ? { ...it, title: itemTitle(x.kind, x.id, lang, it.title), label: t(`kind.${x.kind}` as DictKey) } : { ...x, title: x.id, label: t('social.item') }
+    })
 
   if (items.length === 0) {
     return (
       <div className="ui-drawer__empty">
         <IconHeart />
-        <p>Nothing saved yet.</p>
-        <p className="ui-drawer__hint">Open any work and tap the heart to keep it here.</p>
+        <p>{t('social.noFavsTitle')}</p>
+        <p className="ui-drawer__hint">{t('social.noFavsHint')}</p>
       </div>
     )
   }
@@ -183,9 +192,9 @@ function Favourites() {
               goToItem(it.kind, it.id)
             }}
           >
-            Go to <IconArrowRight />
+            {t('social.goTo')} <IconArrowRight />
           </button>
-          <button type="button" className="ui-icon-btn ui-favs__remove" aria-label={`Remove ${it.title} from favourites`} data-tip="Remove" onClick={() => void toggleFavorite(it.kind, it.id)}>
+          <button type="button" className="ui-icon-btn ui-favs__remove" aria-label={t('social.remove', { title: it.title })} data-tip={t('social.removeTip')} onClick={() => void toggleFavorite(it.kind, it.id)}>
             <IconClose />
           </button>
         </li>
@@ -200,6 +209,7 @@ export function SocialDrawer() {
   const setDrawer = useMuseum((s) => s.setDrawer)
   const user = useMuseum((s) => s.user)
   const entered = useMuseum((s) => s.phase === 'entered')
+  const t = useT()
 
   useEffect(() => {
     if (!drawer) return
@@ -224,11 +234,11 @@ export function SocialDrawer() {
     <aside className="ui-drawer ui-panel" role="dialog" aria-labelledby="ui-drawer-title">
       <div className="ui-info__grip" aria-hidden="true" />
       <header className="ui-drawer__head">
-        <div className="ui-kicker">{drawer === 'favourites' ? 'Your visit' : 'The museum'}</div>
+        <div className="ui-kicker">{drawer === 'favourites' ? t('social.yourVisit') : t('social.theMuseum')}</div>
         <h2 id="ui-drawer-title" className="ui-drawer__title">
-          {drawer === 'favourites' ? 'My favourites' : 'Guestbook'}
+          {drawer === 'favourites' ? t('social.favourites') : t('social.guestbook')}
         </h2>
-        <button type="button" className="ui-icon-btn ui-drawer__close" aria-label="Close (Esc)" onClick={() => setDrawer(null)}>
+        <button type="button" className="ui-icon-btn ui-drawer__close" aria-label={t('social.close')} onClick={() => setDrawer(null)}>
           <IconClose />
         </button>
       </header>
@@ -236,7 +246,7 @@ export function SocialDrawer() {
         {drawer === 'favourites' ? (
           <Favourites />
         ) : (
-          <CommentThread title="Leave a message" placeholder="Write a message in the guestbook…" />
+          <CommentThread title={t('social.leaveMessage')} placeholder={t('social.guestbookPlaceholder')} />
         )}
       </div>
     </aside>

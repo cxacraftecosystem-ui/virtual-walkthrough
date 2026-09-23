@@ -30,7 +30,7 @@ import { num } from './types'
 export const OBJECT_INSPECT_PREFIX = 'object:'
 
 // start fetching GLBs as soon as the scene module loads (browser only — safe under SSR)
-if (typeof window !== 'undefined') for (const url of new Set(SCENE_OBJECTS.map((o) => o.model).filter((u): u is string => !!u))) preloadModel(url)
+if (typeof window !== 'undefined') for (const url of new Set(SCENE_OBJECTS.map((o) => (o.kind === 'splat' ? undefined : o.model)).filter((u): u is string => !!u))) preloadModel(url)
 
 /** Default heights (m) for kinds whose config usually omits `height`. */
 const DEFAULT_HEIGHT: Partial<Record<SceneObjectConfig['kind'], number>> = {
@@ -54,7 +54,8 @@ export function objectBounds(o: SceneObjectConfig): { center: Vec3; size: Vec3 }
 export function ObjectModel({ config }: { config: SceneObjectConfig }) {
   const Procedural = PROCEDURAL_MODELS[config.kind]
   const fallback = Procedural ? <Procedural config={config} /> : null
-  if (!config.model) return fallback
+  // 'splat' reads its own `model` (a Gaussian splat, not a GLB)
+  if (!config.model || config.kind === 'splat') return fallback
   return (
     <ErrorBoundary key={config.model} fallback={fallback}>
       <Suspense fallback={fallback}>

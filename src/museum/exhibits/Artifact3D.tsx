@@ -14,7 +14,8 @@ import { ErrorBoundary } from '../utils/ErrorBoundary'
 import { HandBlockPlaceholder } from './HandBlockPlaceholder'
 
 function GLTFArtifact({ url, scale }: { url: string; scale: number }) {
-  const { scene } = useGLTF(url)
+  // Draco + meshopt on (admin scan-import output: meshopt + quantized + WebP textures).
+  const { scene } = useGLTF(url, true, true)
   const object = useMemo(() => {
     const root = scene.clone(true)
     root.scale.setScalar(scale)

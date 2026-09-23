@@ -15,6 +15,9 @@ import { useDecorMaterials } from '../materials/decorMaterials'
 import { ZoneGroup } from '../navigation/zoneCulling'
 import { useMuseum } from '../state/store'
 import { buildDecorGroup } from './decorGeometry'
+import { Medallion } from './Medallion'
+import { QUALITY_ORDER } from '../config/quality'
+import type { MedallionTreatment } from '../config/decor'
 
 const noRaycast = () => null
 
@@ -24,7 +27,16 @@ const disabled = process.env.NODE_ENV !== 'production' && typeof window !== 'und
 export function WallDecor() {
   const tier = useMuseum((s) => s.tier)
   const mats = useDecorMaterials()
-  const groups = useMemo(() => DECOR.map((g) => ({ id: g.id, zones: g.zones, buckets: buildDecorGroup(g, tier) })), [tier])
+  const groups = useMemo(
+    () =>
+      DECOR.map((g) => ({
+        id: g.id,
+        zones: g.zones,
+        buckets: buildDecorGroup(g, tier),
+        medallions: g.treatments.filter((t): t is MedallionTreatment => t.type === 'medallion' && (!t.minTier || QUALITY_ORDER.indexOf(tier) >= QUALITY_ORDER.indexOf(t.minTier))),
+      })),
+    [tier],
+  )
   useEffect(() => () => groups.forEach((g) => g.buckets.forEach((b) => b.geometry.dispose())), [groups])
   if (disabled) return null
   return (
@@ -42,6 +54,9 @@ export function WallDecor() {
               renderOrder={-1}
               raycast={noRaycast}
             />
+          ))}
+          {g.medallions.map((m, i) => (
+            <Medallion key={`${m.surface}:${m.at}:${i}`} m={m} />
           ))}
         </ZoneGroup>
       ))}

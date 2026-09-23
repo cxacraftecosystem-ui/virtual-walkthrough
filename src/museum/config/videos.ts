@@ -10,6 +10,7 @@
  */
 import { MUSEUM, type Vec3 } from './museum'
 import type { SurfaceId } from './layout'
+import type { ContentI18n } from '../i18n/core'
 
 export type SpeakerChannel = 'FL' | 'FR' | 'C' | 'LFE' | 'SL' | 'SR' | 'BL' | 'BR'
 
@@ -52,8 +53,23 @@ export interface VideoConfig {
   zone?: string
   loop: boolean
   placeholder?: boolean
+  /**
+   * 'portrait' = a small vertical "Meet the maker" screen on a free-standing stand beside a
+   * printing table (`stand`), the film centre-cropped to `cropAspect`. Default: a wall screen.
+   */
+  kind?: 'wall' | 'portrait'
+  /** Free-standing position (floor x/z; rotationDeg about +y, 0 = the screen faces +z). Overrides `placement` for positioning. */
+  stand?: { x: number; z: number; rotationDeg: number }
+  /** Portrait crop of a landscape source (width / height). Default 9 / 16. */
+  cropAspect?: number
+  /** Text description of the film (guide, screen readers). */
+  alt?: string
+  /** Optional Hindi / Bengali overrides of the text fields. */
+  i18n?: ContentI18n<'title' | 'description' | 'alt'>
 }
 
+const PORTRAIT_PLACEHOLDER =
+  'PLACEHOLDER — a short portrait film introducing a maker from the workshop will play here. Until it is filmed, the screen shows a crop of a placeholder process film.'
 const PLACEHOLDER = 'Placeholder film generated for layout and audio calibration. Replace `src` with the final footage.'
 
 /* ------------------------------------------------------------------ */
@@ -151,6 +167,44 @@ export const VIDEOS: VideoConfig[] = [
     audio: { mode: 'spatial', volume: 0.45, refDistance: 2, rolloff: 1.8, maxDistance: 18 },
     playback: 'proximity',
     activationDistance: 9,
+    loop: true,
+    placeholder: true,
+  },
+  // ── "Meet the maker" portrait screens at the east end of the workshop aisle, beside
+  //    printing tables II and IV (placeholder: centre crops of the process films)
+  {
+    id: 'maker-portrait-1',
+    title: 'Meet the Maker — Portrait I',
+    description: PORTRAIT_PLACEHOLDER,
+    src: '/videos/process-film-1.webm',
+    placement: { surface: 'workshop-east', at: 12.15, centerHeight: 1.45 },
+    kind: 'portrait',
+    stand: { x: 27.75, z: 12.15, rotationDeg: -70 },
+    cropAspect: 9 / 16,
+    width: 0.54,
+    screen: 'flat',
+    audio: { mode: 'spatial', volume: 0.38, refDistance: 1.2, rolloff: 2.2, maxDistance: 9 },
+    lightSpill: false,
+    playback: 'proximity',
+    activationDistance: 4.5,
+    loop: true,
+    placeholder: true,
+  },
+  {
+    id: 'maker-portrait-2',
+    title: 'Meet the Maker — Portrait II',
+    description: PORTRAIT_PLACEHOLDER,
+    src: '/videos/process-film-2.webm',
+    placement: { surface: 'workshop-east', at: 16.45, centerHeight: 1.45 },
+    kind: 'portrait',
+    stand: { x: 27.75, z: 16.45, rotationDeg: -110 },
+    cropAspect: 9 / 16,
+    width: 0.54,
+    screen: 'flat',
+    audio: { mode: 'spatial', volume: 0.38, refDistance: 1.2, rolloff: 2.2, maxDistance: 9 },
+    lightSpill: false,
+    playback: 'proximity',
+    activationDistance: 4.5,
     loop: true,
     placeholder: true,
   },

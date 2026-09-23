@@ -24,6 +24,8 @@
     <div class="grid" id="grid"></div>
     <script type="module">
       import { drawMotif, paintCottonGround, mulberry32, hashString } from '/src/museum/exhibits/motifs.ts'
+      import { tilePyramid, pyramidInfo, dziTileCount } from '/src/admin/pipeline/dziTiler.ts'
+      import { dziXml } from '/src/museum/deepzoom/dzi.ts'
 
       /* Natural-dye inspired palette (placeholder colours) */
       const C = {
@@ -223,7 +225,105 @@
         }
       }
 
-      function render(spec) {
+      /* ---------------- HIGH-RES MODE (scripts/generate-deepzoom.mjs) ----------------
+         At 10–12k px the normal ground (full-canvas gradients, per-thread lines sized to the
+         image) is both far too slow and far too coarse. Instead: low-frequency tone painted
+         small and upscaled, then a true plain-weave pattern at thread scale, slubs, loose
+         fibres and — after printing — the weave again so the ink sits IN the cloth. */
+      function weavePattern(threadPx, rng) {
+        const n = 48 // threads per pattern side (irregular enough not to read as a repeat)
+        const widths = (k) => Array.from({ length: k }, () => threadPx * (0.8 + rng() * 0.4))
+        const warp = widths(n), weft = widths(n)
+        const W = Math.round(warp.reduce((a, b) => a + b, 0)), H = Math.round(weft.reduce((a, b) => a + b, 0))
+        const cv = document.createElement('canvas')
+        cv.width = W; cv.height = H
+        const c = cv.getContext('2d')
+        c.fillStyle = '#fff'; c.fillRect(0, 0, W, H)
+        let y = 0
+        for (let j = 0; j < n; j++) {
+          let x = 0
+          for (let i = 0; i < n; i++) {
+            const over = (i + j) % 2 === 0 // plain weave: warp over weft on alternate crossings
+            const tw = warp[i], th = weft[j]
+            const g = over ? c.createLinearGradient(x, 0, x + tw, 0) : c.createLinearGradient(0, y, 0, y + th)
+            const shade = 0.78 + rng() * 0.12
+            const edge = Math.round(255 * (shade - 0.1)), mid = Math.round(255 * Math.min(1, shade + 0.18))
+            g.addColorStop(0, `rgb(${edge},${edge - 3},${edge - 12})`)
+            g.addColorStop(0.5, `rgb(${mid},${mid},${mid - 4})`)
+            g.addColorStop(1, `rgb(${edge},${edge - 3},${edge - 12})`)
+            c.fillStyle = g
+            c.fillRect(x, y, tw + 0.5, th + 0.5)
+            x += tw
+          }
+          y += weft[j]
+        }
+        return cv
+      }
+
+      function paintHiResGround(ctx, w, h, base, rng, threadPx) {
+        // 1) tone: painted on a small canvas, upscaled (it is low-frequency anyway)
+        const k = 8
+        const sw = Math.ceil(w / k), sh = Math.ceil(h / k)
+        const sm = document.createElement('canvas')
+        sm.width = sw; sm.height = sh
+        const s = sm.getContext('2d')
+        s.fillStyle = base; s.fillRect(0, 0, sw, sh)
+        for (let i = 0; i < 60; i++) {
+          const bx = rng() * sw, by = rng() * sh, br = Math.max(sw, sh) * (0.05 + rng() * 0.28)
+          const dark = rng() < 0.55, a = 0.025 + rng() * 0.05
+          const g = s.createRadialGradient(bx, by, 0, bx, by, br)
+          g.addColorStop(0, dark ? `rgba(110,82,40,${a})` : `rgba(255,252,240,${a * 1.2})`)
+          g.addColorStop(1, 'rgba(0,0,0,0)')
+          s.fillStyle = g; s.fillRect(bx - br, by - br, br * 2, br * 2)
+        }
+        ctx.save()
+        ctx.imageSmoothingQuality = 'high'
+        ctx.drawImage(sm, 0, 0, w, h)
+        // 2) weave
+        ctx.globalCompositeOperation = 'multiply'
+        ctx.globalAlpha = 0.45
+        ctx.fillStyle = ctx.createPattern(weavePattern(threadPx, rng), 'repeat')
+        ctx.fillRect(0, 0, w, h)
+        ctx.globalAlpha = 1
+        ctx.globalCompositeOperation = 'source-over'
+        // 3) slubs: thick, irregular yarn sections along warp or weft
+        const slubs = Math.floor((w * h) / (threadPx * threadPx * 900))
+        for (let i = 0; i < slubs; i++) {
+          const horizontal = rng() < 0.55
+          const sl = threadPx * (8 + rng() * 40), sw2 = threadPx * (0.7 + rng() * 0.8)
+          ctx.globalAlpha = 0.05 + rng() * 0.09
+          ctx.fillStyle = rng() < 0.6 ? '#fffcf4' : '#6b5638'
+          const x = rng() * w, y = rng() * h
+          if (horizontal) ctx.fillRect(x, y, sl, sw2)
+          else ctx.fillRect(x, y, sw2, sl)
+        }
+        ctx.restore()
+      }
+
+      /** After printing: the weave re-applied lightly (ink follows the threads) + loose fibres. */
+      function hiResFinish(ctx, w, h, rng, threadPx) {
+        ctx.save()
+        ctx.globalCompositeOperation = 'soft-light'
+        ctx.globalAlpha = 0.5
+        ctx.fillStyle = ctx.createPattern(weavePattern(threadPx, rng), 'repeat')
+        ctx.fillRect(0, 0, w, h)
+        ctx.globalCompositeOperation = 'source-over'
+        const fibres = Math.floor((w * h) / 3500)
+        ctx.lineCap = 'round'
+        for (let i = 0; i < fibres; i++) {
+          const x = rng() * w, y = rng() * h, a = rng() * Math.PI * 2, l = threadPx * (1.5 + rng() * 6)
+          ctx.globalAlpha = 0.06 + rng() * 0.14
+          ctx.strokeStyle = rng() < 0.6 ? '#fffaf0' : '#4a3a28'
+          ctx.lineWidth = 0.4 + rng() * 0.6
+          ctx.beginPath()
+          ctx.moveTo(x, y)
+          ctx.quadraticCurveTo(x + Math.cos(a + 0.6) * l * 0.5, y + Math.sin(a + 0.6) * l * 0.5, x + Math.cos(a) * l, y + Math.sin(a) * l)
+          ctx.stroke()
+        }
+        ctx.restore()
+      }
+
+      function render(spec, hi = null) {
         const { w, h } = spec
         const rng = mulberry32(hashString(spec.file))
         const cv = document.createElement('canvas')
@@ -231,8 +331,9 @@
         cv.height = h
         const ctx = cv.getContext('2d')
         const minD = Math.min(w, h)
-        const thread = Math.max(1.8, minD / 620)
-        paintCottonGround(ctx, w, h, spec.ground, rng, { threadPx: thread, unevenness: 1, noise: 7 })
+        const thread = hi ? hi.threadPx : Math.max(1.8, minD / 620)
+        if (hi) paintHiResGround(ctx, w, h, spec.ground, rng, thread)
+        else paintCottonGround(ctx, w, h, spec.ground, rng, { threadPx: thread, unevenness: 1, noise: 7 })
 
         // global misregistration of the fill block for this cloth (as if the printer's guide drifted)
         const reg = { x: (rng() - 0.5) * minD * 0.004 + 1.5, y: (rng() - 0.5) * minD * 0.004 + 1 }
@@ -426,6 +527,7 @@
           ctx.fillRect(rng() * w, rng() * h, 0.6 + rng() * 1.4, 0.6 + rng() * 1.4)
         }
         ctx.restore()
+        if (hi) hiResFinish(ctx, w, h, rng, thread)
         return cv
       }
 
@@ -434,6 +536,38 @@
         const spec = SPECS.find((s) => s.file === file)
         if (!spec) throw new Error('unknown ' + file)
         return render(spec).toDataURL('image/jpeg', quality)
+      }
+      /**
+       * High-res render + DZI tiling (scripts/generate-deepzoom.mjs). Tiles go to
+       * `window.saveDeepZoomTiles([[path, base64], …])` (exposed by puppeteer) in batches.
+       */
+      window.renderDeepZoom = async (file, { longSide = 10000, threadPx = 3.2, quality = 0.8 } = {}) => {
+        const spec = SPECS.find((s) => s.file === file)
+        if (!spec) throw new Error('unknown ' + file)
+        const k = longSide / Math.max(spec.w, spec.h)
+        const big = { ...spec, w: Math.round(spec.w * k), h: Math.round(spec.h * k) }
+        const t0 = performance.now()
+        const cv = render(big, { threadPx })
+        const renderMs = Math.round(performance.now() - t0)
+        const info = pyramidInfo(cv.width, cv.height, { format: 'jpg' })
+        const expected = dziTileCount(info)
+        let tiles = 0, bytes = 0, batch = []
+        const flush = async () => {
+          if (batch.length) await window.saveDeepZoomTiles(batch)
+          batch = []
+        }
+        for await (const t of tilePyramid(cv, { format: 'jpg', quality, background: spec.ground })) {
+          const buf = new Uint8Array(await t.blob.arrayBuffer())
+          let bin = ''
+          for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000))
+          batch.push([t.path, btoa(bin)])
+          bytes += buf.length
+          tiles++
+          if (batch.length >= 24) await flush()
+        }
+        await flush()
+        cv.width = cv.height = 1
+        return { xml: dziXml(info), width: info.width, height: info.height, tiles, expected, bytes, renderMs }
       }
       window.placeholderReady = true
 

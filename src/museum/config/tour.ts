@@ -13,7 +13,9 @@
 import { ARTWORKS } from './artworks'
 import { COURT_CENTER, SURFACES, surfacePoint } from './layout'
 import { MUSEUM } from './museum'
+import { TOUR_OVERRIDE } from '../content/exhibition'
 import type { SelectionKind } from '../state/store'
+import type { ContentI18n, Lang } from '../i18n/core'
 
 export interface TourView {
   x: number
@@ -33,6 +35,13 @@ export interface TourStop {
   item?: { kind: SelectionKind; id: string }
   /** Seconds to linger before moving on (default TOUR.dwellSec). */
   dwellSec?: number
+  /** Optional Hindi / Bengali captions (else src/museum/i18n/tourText.ts, else English). */
+  i18n?: ContentI18n<'place' | 'title' | 'text'>
+  /**
+   * Optional recorded audio-guide narration per language (e.g. { en: '/audio/tour/en/atrium.mp3' }).
+   * Without a file for the chosen language the caption is read with speechSynthesis.
+   */
+  narrationAudio?: Partial<Record<Lang, string>>
 }
 
 export const TOUR = {
@@ -96,10 +105,37 @@ export const TOUR_STOPS: TourStop[] = [
     id: 'reception',
     place: 'Reception',
     title: 'The reception',
-    text: 'A lower, quieter room between the atrium and the galleries. Small studies hang on either side, and the welcome text is on the west wall.',
+    text: 'A lower, quieter room between the atrium and the galleries. Small studies hang on either side, and the welcome text is on the north wall, beside the passage.',
     view: artworkView('study-12', 2.4, { x: 2.6, z: 1.5, yawDeg: 90 }),
     item: { kind: 'artwork', id: 'study-12' },
     dwellSec: 9,
+  },
+  {
+    id: 'credits',
+    place: 'Reception',
+    title: 'The partners wall',
+    text: 'Turning back towards the atrium, two stone panels either side of the doorway acknowledge the partners who present the exhibition.',
+    view: lookAt(0, 4.9, 0, 8.2, 3),
+    item: { kind: 'object', id: 'credits-presented' },
+    dwellSec: 8,
+  },
+  {
+    id: 'shop',
+    place: 'Museum Shop',
+    title: 'The museum shop',
+    text: 'Through the east doorway of the reception is the museum shop: timber shelves and low tables of folded printed cloth, cushions and stoles. The products shown are placeholders, to be supplied by the workshop.',
+    view: lookAt(5.9, 4.5, 9.6, 4.4, -6),
+    item: { kind: 'object', id: 'shop-table-1' },
+    dwellSec: 10,
+  },
+  {
+    id: 'library',
+    place: 'Reading Room & Library',
+    title: 'The reading room',
+    text: 'Across the reception is a quiet reading room: bookcases along the west wall, a long reading table with lamps, framed drawings for printing blocks, and a lectern holding an open sample book. The Resources board by the door lists the text guide and other material.',
+    view: lookAt(-5.95, 6.0, -8.4, 2.2, -5),
+    item: { kind: 'object', id: 'library-pattern-book' },
+    dwellSec: 11,
   },
   {
     id: 'passage',
@@ -237,6 +273,39 @@ export const TOUR_STOPS: TourStop[] = [
     item: { kind: 'object', id: 'printing-table-1' },
   },
   {
+    id: 'artisan-capture',
+    place: 'Craft Workshop Hall',
+    title: 'An artisan capture — coming soon',
+    text: 'Across the second printing table, a softly glowing seated figure marks the place where a three-dimensional recording of a printer at work will be shown. The recording has not been made yet; the figure and its card are placeholders.',
+    view: lookAt(23.0, 13.4, 23.4, 9.9, -6),
+    item: { kind: 'object', id: 'artisan-capture-2' },
+  },
+  {
+    id: 'meet-the-maker',
+    place: 'Craft Workshop Hall',
+    title: 'Meet the maker',
+    text: 'At the end of the aisle, two small portrait screens on stands will introduce makers from the workshop. For now they play placeholder films. Step close to one to hear it, or click a screen to pause it.',
+    view: lookAt(24.8, 14.3, 27.75, 14.3, 0),
+    item: { kind: 'video', id: 'maker-portrait-1' },
+  },
+  {
+    id: 'print-studio',
+    place: 'Craft Workshop Hall',
+    title: 'Print it yourself',
+    text: 'Now it is your turn. Click the small printing table to open the studio: choose a block and a dye, then click or tap the cloth to print. Hold longer for a firmer impression, use the repeat guides to line up a pattern, and download your cloth or send it to the Visitors’ Wall.',
+    view: lookAt(15.4, 8.5, 13.0, 8.5, -16),
+    item: { kind: 'object', id: 'print-studio' },
+    dwellSec: 13,
+  },
+  {
+    id: 'visitors-wall',
+    place: 'Craft Workshop Hall',
+    title: 'The Visitors’ Wall',
+    text: 'Behind the studio table hang prints made by visitors, framed like small textiles. Each one appears after a member of the museum team has reviewed it; the empty frames are waiting for the next prints.',
+    view: lookAt(14.6, 8.6, 10.3, 8.6, 6),
+    item: { kind: 'object', id: 'visitors-wall' },
+  },
+  {
     id: 'theatre',
     place: 'Immersive Theatre',
     title: 'The immersive theatre',
@@ -246,6 +315,11 @@ export const TOUR_STOPS: TourStop[] = [
     dwellSec: 14,
   },
 ]
+
+/** Bundled stops (the admin uses them as the template for a per-exhibition tour override). */
+export const BUNDLED_TOUR_STOPS: readonly TourStop[] = TOUR_STOPS.slice()
+// Per-exhibition tour override from the content API (src/museum/content/exhibition.ts).
+if (TOUR_OVERRIDE.stops?.length) TOUR_STOPS.splice(0, TOUR_STOPS.length, ...TOUR_OVERRIDE.stops)
 
 /**
  * Navigation waypoints [x, z] — room centres, aisles and both sides of each doorway.
@@ -263,6 +337,11 @@ export const NAV_WAYPOINTS: [number, number][] = [
   // reception + passage
   [0, 7.4],
   [0, 4.2],
+  // reception side doors → shop (east) / library (west)
+  [3.7, DR.receptionToShop.z],
+  [6.3, DR.receptionToShop.z],
+  [-3.7, DR.receptionToLibrary.z],
+  [-5.95, DR.receptionToLibrary.z],
   [0, 0.9],
   [0, -0.8],
   [0, -6.0],
@@ -318,6 +397,8 @@ export const NAV_WAYPOINTS: [number, number][] = [
   [11.4, DR.atriumToWorkshop.z],
   [20.3, DR.atriumToWorkshop.z],
   [20.3, 8.6],
+  [15.6, 8.6], // in front of the studio table / Visitors' Wall
+  [25.0, 14.3], // east end of the aisle ("Meet the maker" screens)
   [20.3, 5.4],
   [21.0, 2.0],
   [DR.workshopToCourtyard.x, MUSEUM.wings.workshop.minZ + 1.2],

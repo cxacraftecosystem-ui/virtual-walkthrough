@@ -28,6 +28,7 @@ import { COURT_CENTER, BAY } from './layout'
 import type { FrameConfig, FrameStyleId } from './frames'
 import type { SurfaceId } from './layout'
 import { MUSEUM } from './museum'
+import type { ContentI18n } from '../i18n/core'
 
 export interface ArtworkConfig {
   id: string
@@ -35,6 +36,8 @@ export interface ArtworkConfig {
   /** Traditional craft style the piece belongs to. */
   tradition: string
   artisan?: string
+  /** "Meet the maker" profile id (src/museum/content/artisans.ts / admin → Makers). */
+  artisanId?: string
   region?: string
   material?: string
   technique?: string
@@ -43,6 +46,16 @@ export interface ArtworkConfig {
   context?: string
   /** Public path under /public. Any aspect ratio. */
   image: string
+  /**
+   * Optional very-high-resolution source for the full-screen "Examine closely" viewer
+   * (used when there is no `deepZoom` pyramid; loaded whole, so keep it ≤ ~8k px).
+   */
+  highRes?: string
+  /**
+   * Optional Deep Zoom Image pyramid (URL of a .dzi descriptor) for the "Examine closely"
+   * viewer — see docs/CONTENT_CAPTURE.md and admin → Capture tools → Deep zoom.
+   */
+  deepZoom?: string
   /** Hero pieces: exactly 5 per tradition (PDF §4). */
   hero?: boolean
   placement: {
@@ -67,6 +80,10 @@ export interface ArtworkConfig {
   label?: boolean
   placeholder?: boolean
   metadata?: Record<string, string>
+  /** Alternative text describing the image (guide, screen readers). Falls back to the title. */
+  alt?: string
+  /** Optional Hindi / Bengali overrides of the text fields (UI falls back to English). */
+  i18n?: ContentI18n<'title' | 'tradition' | 'artisan' | 'region' | 'material' | 'technique' | 'description' | 'context' | 'alt'>
 }
 
 export const TRADITION = 'Hand Block Printing'
@@ -95,6 +112,8 @@ function work(id: string, title: string, image: string, placement: Place, o: Opt
     placement,
     description: o.hero ? PLACEHOLDER_NOTE : WORK_NOTE,
     placeholder: true,
+    // hero placeholders ship with generated deep-zoom pyramids (scripts/generate-deepzoom.mjs)
+    ...(o.hero ? { deepZoom: `/deepzoom/${image}/image.dzi` } : {}),
     ...o,
   }
 }

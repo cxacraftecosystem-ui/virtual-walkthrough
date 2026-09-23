@@ -160,6 +160,9 @@ export const MUSEUM = {
     /** Doorways between spaces (clear width × height; x or z locates the opening centre). */
     doors: {
       receptionToAtrium: { width: 3.2, height: 3.2 },
+      /** v3.1: side rooms either side of reception (formerly closed voids). */
+      receptionToShop: { z: 4.4, width: 2.0, height: 3.0 },
+      receptionToLibrary: { z: 4.4, width: 2.0, height: 3.0 },
       atriumToTheatre: { z: 17.4, width: 2.4, height: 3.2 },
       atriumToWorkshop: { z: 14.3, width: 3.4, height: 3.8 },
       workshopToCourtyard: { x: 20.6, width: 3.6, height: 3.6 },

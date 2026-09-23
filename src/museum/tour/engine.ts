@@ -14,6 +14,8 @@ import { teleport, visitor, yawToRad, type WalkTarget } from '../state/visitor'
 import { travel } from '../ui/Minimap'
 import { track } from '../analytics/tracker'
 import { pathLength, planPath, type P2 } from './pathing'
+import { bcp47, getLang, useLangStore, type Lang } from '../i18n'
+import { hasTourTranslation, tourField } from '../i18n/tourText'
 
 const DEG = Math.PI / 180
 /** Switch to the next waypoint this close to the current one (keeps the walk fluid). */
@@ -91,18 +93,70 @@ const manualInput = () => performance.now() - run.manualAt < 400 || Math.abs(vis
 /* Narration                                                           */
 /* ------------------------------------------------------------------ */
 
+let narrationEl: HTMLAudioElement | null = null
+
+/** Best installed voice for a BCP-47 tag (exact region first, then language; local voices preferred). */
+function pickVoice(tag: string): SpeechSynthesisVoice | null {
+  try {
+    const voices = window.speechSynthesis.getVoices()
+    const lower = tag.toLowerCase()
+    const base = lower.split('-')[0]
+    const exact = voices.filter((v) => v.lang.toLowerCase().replace('_', '-') === lower)
+    const lang = voices.filter((v) => v.lang.toLowerCase().startsWith(base))
+    const pool = exact.length ? exact : lang
+    return pool.find((v) => v.localService) ?? pool[0] ?? null
+  } catch {
+    return null
+  }
+}
+
+function speakSynth(stop: TourStop, lang: Lang) {
+  // Speak the caption in the visitor's language when a translation exists, else English.
+  const useLang: Lang = hasTourTranslation(stop, lang) ? lang : 'en'
+  const title = tourField(stop, 'title', useLang)
+  const text = tourField(stop, 'text', useLang)
+  const tag = bcp47(useLang)
+  const u = new SpeechSynthesisUtterance(`${title}. ${text}`)
+  u.rate = TOUR.narrationRate
+  u.lang = tag
+  const voice = pickVoice(tag)
+  if (voice) u.voice = voice
+  u.onend = u.onerror = () => {
+    run.speaking = false
+  }
+  run.speaking = true
+  window.speechSynthesis.speak(u)
+}
+
 function speak(stop: TourStop) {
   stopSpeaking()
-  if (!get().narration || !narrationSupported()) return
-  try {
-    const u = new SpeechSynthesisUtterance(`${stop.title}. ${stop.text}`)
-    u.rate = TOUR.narrationRate
-    u.lang = document.documentElement.lang || 'en'
-    u.onend = u.onerror = () => {
-      run.speaking = false
+  if (!get().narration) return
+  const lang = getLang()
+  // Recorded audio-guide narration (per language) wins over speech synthesis.
+  const url = stop.narrationAudio?.[lang]
+  if (url) {
+    try {
+      const el = new Audio(url)
+      narrationEl = el
+      el.onended = () => {
+        run.speaking = false
+      }
+      el.onerror = () => {
+        if (narrationEl !== el) return
+        narrationEl = null
+        run.speaking = false
+        if (narrationSupported()) speakSynth(stop, lang)
+      }
+      run.speaking = true
+      void el.play().catch(() => el.onerror?.(new Event('error')))
+      return
+    } catch {
+      /* fall through to synthesis */
     }
-    run.speaking = true
-    window.speechSynthesis.speak(u)
+  }
+  if (!narrationSupported()) return
+  try {
+    speakSynth(stop, lang)
   } catch {
     run.speaking = false
   }
@@ -110,6 +164,15 @@ function speak(stop: TourStop) {
 
 function stopSpeaking() {
   run.speaking = false
+  if (narrationEl) {
+    try {
+      narrationEl.onerror = null
+      narrationEl.pause()
+    } catch {
+      /* ignore */
+    }
+    narrationEl = null
+  }
   try {
     if (narrationSupported()) window.speechSynthesis.cancel()
   } catch {
@@ -187,7 +250,8 @@ function goStop(i: number) {
 
   const from = { x: visitor.x, z: visitor.z }
   const path = planPath(from, stop.view)
-  if (!path || pathLength(from, path) > TOUR.teleportBeyond) {
+  // Reduced motion: never glide the camera between stops — soft fade-cut instead.
+  if (!path || pathLength(from, path) > TOUR.teleportBeyond || useMuseum.getState().reducedMotion) {
     jumpTo(stop.view)
     return
   }
@@ -364,4 +428,13 @@ export const tour = {
 // Automation / console handle (like window.__museum in App.tsx).
 if (typeof window !== 'undefined') {
   ;(window as unknown as { __tour?: unknown }).__tour = { tour, useTour, stops: TOUR_STOPS }
+}
+
+// Changing language mid-stop re-reads the caption in the new language.
+if (typeof window !== 'undefined') {
+  useLangStore.subscribe((st, prev) => {
+    if (st.lang === prev.lang) return
+    const s = get()
+    if (s.active && s.narration && s.phase === 'viewing' && !s.paused) speak(TOUR_STOPS[s.index])
+  })
 }

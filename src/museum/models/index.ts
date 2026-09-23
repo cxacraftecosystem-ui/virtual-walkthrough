@@ -11,6 +11,11 @@ import type { ModelProps } from './types'
 import { Centrepiece } from './centrepiece'
 import { Pedestal, Vitrine } from './display'
 import { MapWall } from './mapWall'
+import { ArtisanCapture } from './artisan'
+import { PrintStudioTable, VisitorsWall } from './printStudio'
+import { ShopCounter, ShopShelf, ShopTable, StoleRail } from './shop'
+import { Bookcase, DrawingWall, LoungeSet, PatternLectern, ReadingTable, ResourceBoard } from './library'
+import { CreditsPanel } from './credits'
 import { BlockShelf, CarvingBench, DyeVat, FabricRolls, PigmentStation, PrintingTable, WashTank } from './workshop'
 
 export type { ModelProps } from './types'
@@ -41,4 +46,18 @@ export const PROCEDURAL_MODELS: Record<ProceduralModelId, ComponentType<ModelPro
   'map-wall': MapWall,
   vitrine: Vitrine,
   pedestal: Pedestal,
+  'print-studio': PrintStudioTable,
+  'visitors-wall': VisitorsWall,
+  splat: ArtisanCapture,
+  'shop-shelf': ShopShelf,
+  'shop-table': ShopTable,
+  'shop-counter': ShopCounter,
+  'stole-rail': StoleRail,
+  bookcase: Bookcase,
+  'reading-table': ReadingTable,
+  'lounge-set': LoungeSet,
+  'pattern-lectern': PatternLectern,
+  'drawing-wall': DrawingWall,
+  'resource-board': ResourceBoard,
+  'credits-panel': CreditsPanel,
 }

@@ -7,6 +7,7 @@ import 'server-only'
 import { purgeExpiredSessions, seedAdmin, syncMasterEntries, syncStaffRoles } from './auth'
 import { config } from './config'
 import { isSeeded, readSeed, seedContent } from './contentStore'
+import { ensureArtisanSeed } from './artisanSeed'
 import { type Db, getDb, migratePostgres } from './db'
 import { LocalDiskStorage, S3Storage, type StorageDriver } from './storage'
 
@@ -41,6 +42,7 @@ async function bootstrap(db: Db) {
       const v = await seedContent(db, readSeed(), true)
       if (v !== null) log(`seeded content from bundled config (version ${v})`)
     }
+    await ensureArtisanSeed(db) // placeholder maker profiles + links (once)
     await seedAdmin(db, log)
     await syncMasterEntries(db)
     await syncStaffRoles(db)

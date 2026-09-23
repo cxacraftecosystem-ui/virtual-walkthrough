@@ -16,7 +16,7 @@
 #   1. creates the bucket (ACLs disabled / BucketOwnerEnforced, SSE-S3 encryption)
 #   2. allows a PUBLIC-READ bucket policy for GET on objects (museum media is public content)
 #      — alternative: keep the bucket private and front it with CloudFront + Origin Access Control
-#        (see the note at the end), then set S3_PUBLIC_BASE_URL to the CloudFront domain
+#        (infra/setup-cloudfront.sh), then set S3_PUBLIC_BASE_URL to the CloudFront domain
 #   3. applies CORS (GET/HEAD from anywhere for WebGL/crossOrigin textures & video; PUT from the
 #      app origins for presigned admin uploads)
 #   4. creates a least-privilege IAM user for the app (Get/Head/Put/Delete objects + List, this
@@ -128,7 +128,7 @@ Done. Set these on Vercel (Project → Settings → Environment Variables) and i
   secret: $KEY_SECRET
 
 Note (CloudFront, recommended for production traffic):
-  create a distribution with this bucket as origin + Origin Access Control, cache policy
-  "CachingOptimized", response-headers policy "CORS-With-Preflight" (or SimpleCORS), then set
-  S3_PUBLIC_BASE_URL to the distribution URL. Range requests (video seeking) work through CloudFront.
+  run  BUCKET=$BUCKET REGION=$REGION ./infra/setup-cloudfront.sh  (OAC + CachingOptimized + CORS
+  response-headers policy + bucket-policy statement), then set S3_PUBLIC_BASE_URL to the
+  distribution URL. See infra/cloudfront.md. Range requests (video seeking) work through CloudFront.
 EOF

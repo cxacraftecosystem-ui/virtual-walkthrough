@@ -3,9 +3,22 @@
  * breaks rendering: it resolves to an intentional "image unavailable" card.
  */
 import * as THREE from 'three'
+import { useMuseum } from '../state/store'
 
 const loader = new THREE.TextureLoader()
 const cache = new Map<string, Promise<THREE.Texture>>()
+
+/**
+ * Bundled artworks (/artworks/<name>.jpg|png) have responsive WebP variants written by
+ * scripts/optimize-assets.mjs: <name>.1024.webp on Low/Medium, <name>.2048.webp on High/Ultra
+ * (long edge, never upscaled). Any other URL (uploads, CDN) is loaded as is.
+ */
+function variantUrl(url: string): string | null {
+  const m = /^(\/artworks\/[\w-]+)\.(jpe?g|png)$/i.exec(url)
+  if (!m) return null
+  const tier = useMuseum.getState().tier
+  return `${m[1]}.${tier === 'low' || tier === 'medium' ? 1024 : 2048}.webp`
+}
 
 export interface LoadedArtworkTexture {
   texture: THREE.Texture
@@ -40,7 +53,9 @@ function unavailableTexture(aspect: number): THREE.Texture {
 export function loadArtworkTexture(url: string, fallbackAspect: number, anisotropy: number): Promise<LoadedArtworkTexture> {
   let p = cache.get(url)
   if (!p) {
-    p = loader.loadAsync(url).then((t) => {
+    const variant = variantUrl(url)
+    // variant missing/undecodable → the original file
+    p = (variant ? loader.loadAsync(variant).catch(() => loader.loadAsync(url)) : loader.loadAsync(url)).then((t) => {
       t.colorSpace = THREE.SRGBColorSpace
       t.generateMipmaps = true
       t.minFilter = THREE.LinearMipmapLinearFilter

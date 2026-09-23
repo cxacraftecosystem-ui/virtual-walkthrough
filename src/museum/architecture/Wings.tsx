@@ -12,7 +12,7 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { EXHIBITION_TITLE } from '../config/infographics'
-import { surfacePoint } from '../config/layout'
+import { SIDE_ROOMS, surfacePoint } from '../config/layout'
 import { kelvinToHex, LIGHTING } from '../config/lighting'
 import { MUSEUM, type Vec3 } from '../config/museum'
 import { withDevOverrides, QUALITY_PRESETS } from '../config/quality'
@@ -409,6 +409,23 @@ function GalleryD() {
   )
 }
 
+/** Shop + library flanking the reception: oak floors, plaster ceilings at reception height, roof. */
+function SideRooms() {
+  const m = useMaterials()
+  const RH = MUSEUM.reception.ceilingHeight
+  return (
+    <group>
+      {Object.values(SIDE_ROOMS).map((r, i) => (
+        <group key={i}>
+          <Box min={[r.minX, -0.1, r.minZ]} max={[r.maxX, 0, r.maxZ]} material={m.oakFloor} cast={false} />
+          <Box min={[r.minX, RH, r.minZ]} max={[r.maxX, RH + 0.04, r.maxZ]} material={m.plasterCeiling} />
+          <Box min={[r.minX, RH + 0.04, r.minZ]} max={[r.maxX, RH + 0.34, r.maxZ]} material={m.plaster} />
+        </group>
+      ))}
+    </group>
+  )
+}
+
 /** Continuous stone coping on the 10 m perimeter: the compound reads as one pure cuboid. */
 function ShellCoping() {
   const m = useMaterials()
@@ -493,6 +510,11 @@ export function Wings() {
       </ZoneGroup>
       <ZoneGroup zones={['atrium', 'courtyard']}>
         <Landscape />
+      </ZoneGroup>
+      <ZoneGroup zones={['shop', 'library', 'reception']}>
+        <StaticMerge name="side-rooms">
+          <SideRooms />
+        </StaticMerge>
       </ZoneGroup>
       <StaticMerge name="coping">
         <ShellCoping />

@@ -7,12 +7,16 @@ import { MUSEUM } from './museum/config/museum'
 import { autoCeiling, QUALITY_ORDER, QUALITY_PRESETS, withDevOverrides } from './museum/config/quality'
 import { DebugOverlay } from './museum/debug/DebugOverlay'
 import { MuseumScene } from './museum/MuseumScene'
+import { useArrival } from './museum/navigation/ArrivalFlight'
 import { useMuseum } from './museum/state/store'
 import { teleport, visitor } from './museum/state/visitor'
 import { InspectModal } from './museum/ui/InspectModal'
 import { UIOverlay } from './museum/ui/UIOverlay'
 import { hasWebGL, WebGLUnsupported } from './museum/ui/WebGLUnsupported'
 import { ErrorBoundary } from './museum/utils/ErrorBoundary'
+import { tr } from './museum/i18n'
+import { reportError } from './museum/utils/errorReporter'
+import { webgpuGL, webgpuRequested } from './museum/utils/renderer'
 
 // Small automation/debug handle (used by scripts/screenshots.mjs and handy in the console).
 declare global {
@@ -37,12 +41,14 @@ function AdaptiveQuality() {
   const phase = useMuseum((s) => s.phase)
   const tier = useMuseum((s) => s.tier)
   const setDpr = useThree((s) => s.setDpr)
+  const flying = useArrival((s) => s.active)
   const [armed, setArmed] = useState(false)
   useEffect(() => {
-    if (phase !== 'entered') return
+    // The arrival flight is the heaviest view of the visit (no culling): judge the device after it.
+    if (phase !== 'entered' || flying) return
     const t = setTimeout(() => setArmed(true), 5000)
     return () => clearTimeout(t)
-  }, [phase, tier])
+  }, [phase, tier, flying])
   if (quality !== 'auto' || !armed) return null
   const [lo, hi] = QUALITY_PRESETS[tier].dpr
   const deviceMax = Math.min(hi, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
@@ -94,6 +100,7 @@ function SceneError() {
 export default function App() {
   const tier = useMuseum((s) => s.tier)
   const compiled = useMuseum((s) => s.sceneCompiled)
+  const entered = useMuseum((s) => s.phase === 'entered')
   const preset = withDevOverrides(QUALITY_PRESETS[tier])
   const [supported] = useState(hasWebGL)
   const [lost, setLost] = useState(false)
@@ -111,7 +118,8 @@ export default function App() {
             dpr={preset.dpr}
             // PCF ('percentage'): three r186 removed PCFSoftShadowMap (its PCF path is already filtered).
             shadows={preset.shadows ? 'percentage' : false}
-            gl={{
+            // `?renderer=webgpu` (experimental, navigator.gpu only) → WebGPURenderer with WebGL fallback.
+            gl={webgpuRequested() ? (webgpuGL({ antialias: preset.antialias, toneMappingExposure: LIGHTING.exposure }) as never) : {
               antialias: preset.antialias,
               powerPreference: 'high-performance',
               stencil: false,
@@ -133,7 +141,10 @@ export default function App() {
                 // remounts — e.g. on a quality change. Only a loss on the LIVE canvas that the
                 // browser doesn't restore within a few seconds is a genuine GPU failure.
                 window.setTimeout(() => {
-                  if (canvas.isConnected && !restored) setLost(true)
+                  if (canvas.isConnected && !restored) {
+                    reportError(new Error('WebGL context lost (not restored within 3 s)'), { kind: 'webgl' })
+                    setLost(true)
+                  }
                 }, 3000)
               })
             }}
@@ -143,7 +154,7 @@ export default function App() {
           </Canvas>
         </ErrorBoundary>
       </div>
-      {!compiled && useMuseum.getState().phase === 'entered' && (
+      {!compiled && entered && (
         <div
           role="status"
           style={{
@@ -162,11 +173,13 @@ export default function App() {
             pointerEvents: 'none',
           }}
         >
-          Applying graphics settings…
+          {tr('hud.applyingGraphics')}
         </div>
       )}
       <UIOverlay />
-      <InspectModal />
+      <ErrorBoundary fallback={null}>
+        <InspectModal />
+      </ErrorBoundary>
       <DebugOverlay />
     </>
   )

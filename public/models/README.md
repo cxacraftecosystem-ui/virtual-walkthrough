@@ -58,3 +58,20 @@ Attribution (id, name, authors, licence, source URL, real-world dimensions) is r
 viewer). CC0 requires no attribution; it is kept as good practice. To add another model,
 append its Poly Haven id to `CURATED` in the script, run it, then add a `SCENE_OBJECTS` entry
 pointing at `/models/cc0/<id>/<id>_1k.gltf`.
+
+## 4. Optimised copies (`opt/`) — what the museum actually loads
+
+`npm run optimize:assets` (= `node scripts/optimize-assets.mjs && node scripts/verify-optimized-models.mjs`)
+writes a single-file GLB for every model under `public/models/` to `opt/` (e.g.
+`cc0/brass_pot_01/brass_pot_01_1k.gltf` → `opt/cc0/brass_pot_01.glb`). Each file goes through
+dedup → prune → weld → textures ≤ 1024 px re-encoded to WebP (`EXT_texture_webp`, in headless Chrome since
+sharp isn't installed) → meshopt (`KHR_mesh_quantization` + `EXT_meshopt_compression`).
+The verifier renders each original/optimised pair, plus the optimised file through the app's
+bake/merge path, and fails if more than 1 % of the pixels differ. Sizes are recorded in `opt/manifest.json`.
+
+`SCENE_OBJECTS` points at `opt/cc0/<id>.glb`. `GLTFModel` also maps legacy `cc0/<id>/<id>_1k.gltf` paths
+(content already stored in the database) to the optimised GLB. drei's `useGLTF` decodes meshopt, and
+`GLTFModel` converts quantised attributes to float before baking transforms. After adding or changing a
+model, re-run `npm run optimize:assets`. It skips outputs that are up to date; use `--force` to rebuild all.
+The same script writes `public/artworks/<name>.1024.webp` / `.2048.webp`. Low/Medium tiers use the 1024
+variant, High/Ultra the 2048 one, and the original file is the fallback (`exhibits/artworkTexture.ts`).

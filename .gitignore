@@ -25,3 +25,6 @@ client_secret_*.json
 
 # Supabase CLI local state
 supabase/.temp/
+
+# visual regression output (baselines ARE committed)
+tests/visual/diff/

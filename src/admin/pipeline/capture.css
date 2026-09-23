@@ -1,0 +1,19 @@
+/* Admin → Capture tools (CapturePage.tsx). Uses the admin tokens from admin.css. */
+.cap-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.cap-grid > .card { margin-top: 0; }
+.cap-head { margin-bottom: 14px; }
+.cap-head h2 { font-family: var(--display); font-size: 26px; line-height: 1.1; margin-bottom: 4px; }
+.cap-head p { margin: 0; }
+.cap-file { display: flex; gap: 12px; align-items: center; margin-top: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.cap-file img { width: 64px; height: 64px; object-fit: cover; border-radius: 4px; flex: none; background: var(--paper-2); }
+.cap-progress { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.cap-progress .upload-row { grid-template-columns: minmax(0, 1fr) 160px 48px; }
+.cap-dzi { margin-top: 14px; }
+.cap-dzi-stage { height: 320px; border-radius: 6px; background: #1f1b17; overflow: hidden; }
+.cap-log { margin: 12px 0 0; padding: 10px 12px; max-height: 160px; overflow: auto; border-radius: 6px; background: var(--paper-2); font: 12px/1.5 var(--mono); white-space: pre-wrap; }
+.cap-warn { margin: 10px 0 0; padding: 8px 12px 8px 28px; border-radius: 6px; background: rgba(183, 134, 47, 0.12); color: #6b4c12; font-size: 12.5px; }
+.cap-preview { margin-top: 14px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #efe9df; }
+.cap-preview > div:first-child { height: 340px; }
+.cap-preview-dims { padding: 6px 10px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); background: var(--card); }
+.cap-preview-error { height: 340px; display: grid; place-items: center; color: var(--danger); font-size: 13px; padding: 20px; text-align: center; }
+@media (max-width: 1100px) { .cap-grid { grid-template-columns: 1fr; } }

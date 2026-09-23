@@ -11,6 +11,7 @@
 import type { SurfaceId } from './layout'
 import { BAY, COURT_CENTER } from './layout'
 import { TRADITION } from './artworks'
+import type { ContentI18n } from '../i18n/core'
 
 export type MotifId = 'rosette' | 'teardrop' | 'star-lattice' | 'leaf-trail' | 'diamond'
 
@@ -38,9 +39,15 @@ export interface ExhibitConfig {
   material?: string
   technique?: string
   artisan?: string
+  /** "Meet the maker" profile id (src/museum/content/artisans.ts / admin → Makers). */
+  artisanId?: string
   region?: string
   description?: string
   placeholder?: boolean
+  /** Alternative text describing the block (guide, screen readers). */
+  alt?: string
+  /** Optional Hindi / Bengali overrides of the text fields. */
+  i18n?: ContentI18n<'title' | 'tradition' | 'artisan' | 'region' | 'material' | 'technique' | 'description' | 'alt'>
 }
 
 const NOTE =

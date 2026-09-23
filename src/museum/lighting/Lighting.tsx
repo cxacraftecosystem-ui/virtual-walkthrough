@@ -19,6 +19,13 @@ import { useMuseum } from '../state/store'
 import { ShadowUpdater, SkyAndSun } from './SkyAndSun'
 import { SpotPool } from './SpotPool'
 import { GalleryEnvironment } from './GalleryEnvironment'
+import { ambience } from './timeOfDayState'
+import { TimeOfDayController } from './NightLights'
+import { probeState, ZoneProbes } from './ZoneProbes'
+import { isWebGPU } from '../utils/renderer'
+
+/** Experimental per-zone probes are opt-in (`?probes`) until verified on target hardware. */
+const probesRequested = () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('probes')
 
 RectAreaLightUniformsLib.init()
 
@@ -41,11 +48,17 @@ interface AreaProps {
   height: number
   intensity: number
   color: string
+  /** Daylight source: dimmed with the time of day (ambience.daylight). */
+  daylit?: boolean
 }
 
-function AreaLight({ position, dir, lengthAxis, width, height, intensity, color }: AreaProps) {
+function AreaLight({ position, dir, lengthAxis, width, height, intensity, color, daylit }: AreaProps) {
   const q = useMemo(() => rectOrientation(new THREE.Vector3(...dir), new THREE.Vector3(...lengthAxis)), [dir, lengthAxis])
-  return <rectAreaLight position={position} quaternion={q} width={width} height={height} intensity={intensity} color={color} />
+  const ref = useRef<THREE.RectAreaLight>(null)
+  useFrame(() => {
+    if (daylit && ref.current) ref.current.intensity = intensity * ambience.daylight
+  })
+  return <rectAreaLight ref={ref} position={position} quaternion={q} width={width} height={height} intensity={intensity} color={color} />
 }
 
 const COVE = kelvinToHex(LIGHTING.cove.colorK, 0.2)
@@ -59,17 +72,26 @@ const ALONG_X: [number, number, number] = [1, 0, 0]
  * and eased as the visitor walks between rooms (no shader changes, just intensities).
  */
 const ZONE_AMBIENT: Record<string, number> = { theatre: 0.12, courtyard: 1.25, atrium: 1.1 }
+/** Fraction of the hemisphere/env fill kept at full night (the rest is daylight bounce). */
+const NIGHT_FILL_FLOOR: Record<string, number> = { courtyard: 0.04, atrium: 0.22 }
 
 function ZoneAmbience({ base }: { base: number }) {
   const ref = useRef<THREE.HemisphereLight>(null)
   const scene = useThree((s) => s.scene)
   const k = useRef(1)
+  const floor = useRef(0.3)
   useFrame((_, dt) => {
     const id = zoneAt(visitor.x, visitor.z)?.id
     const target = id ? (ZONE_AMBIENT[id] ?? 1) : k.current
     k.current += (target - k.current) * (1 - Math.exp(-2.5 * dt))
-    if (ref.current) ref.current.intensity = base * k.current
-    scene.environmentIntensity = LIGHTING.ambient.environmentIntensity * k.current
+    // How much fill survives at night: open-air zones go dark, interiors keep lamp bounce.
+    const floorTarget = id ? (NIGHT_FILL_FLOOR[id] ?? 0.3) : floor.current
+    floor.current += (floorTarget - floor.current) * (1 - Math.exp(-2.5 * dt))
+    // Hemisphere = bounce fill; mostly daylight, so it fades at dusk/night (lamps keep some).
+    const tod = floor.current + (1 - floor.current) * ambience.daylight
+    if (ref.current) ref.current.intensity = base * k.current * tod
+    // Per-zone probes (ZoneProbes) already carry each room's real brightness and time of day.
+    scene.environmentIntensity = LIGHTING.ambient.environmentIntensity * (probeState.active ? probeState.zoneGain : k.current * tod)
   })
   return <hemisphereLight ref={ref} args={[LIGHTING.ambient.hemisphereSky, LIGHTING.ambient.hemisphereGround, base]} />
 }
@@ -94,11 +116,13 @@ export function Lighting() {
 
       {/* Reflection/irradiance environment built only from light-formers (no network HDRIs). */}
       <GalleryEnvironment />
+      <TimeOfDayController />
+      {preset.zoneProbes && probesRequested() && !isWebGPU() && <ZoneProbes />}
 
       {preset.areaLights && (
         <>
           {/* Diffuse daylight through the skylight */}
-          <AreaLight position={[0, H - 0.02, skyMidZ]} dir={SKY_DOWN} lengthAxis={ALONG_Z} width={sk.width} height={skyLen} intensity={LIGHTING.skylightFill.intensity} color={DAY} />
+          <AreaLight position={[0, H - 0.02, skyMidZ]} dir={SKY_DOWN} lengthAxis={ALONG_Z} width={sk.width} height={skyLen} intensity={LIGHTING.skylightFill.intensity} color={DAY} daylit />
           {/* Perimeter cove washes */}
           <AreaLight position={[-KEY.gx + covInset, H - 0.06, galleryMidZ]} dir={[-0.8, -1, 0]} lengthAxis={ALONG_Z} width={0.16} height={-KEY.gzNorth - 0.4} intensity={LIGHTING.cove.intensity * 6} color={COVE} />
           <AreaLight position={[KEY.gx - covInset, H - 0.06, galleryMidZ]} dir={[0.8, -1, 0]} lengthAxis={ALONG_Z} width={0.16} height={-KEY.gzNorth - 0.4} intensity={LIGHTING.cove.intensity * 6} color={COVE} />

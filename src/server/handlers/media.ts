@@ -11,6 +11,7 @@ import { route } from '../http'
 import { getStorage } from '../services'
 import { LocalDiskStorage, type StorageDriver } from '../storage'
 import { fail, HttpError, isRecord } from '../util'
+import { DEEPZOOM_FOLDER, DZI_MIME, isDeepZoomKey, removeDeepZoomSet } from './deepzoom'
 
 export const MEDIA_FOLDERS = ['artworks', 'models', 'videos', 'audio', 'textures'] as const
 type Folder = (typeof MEDIA_FOLDERS)[number]
@@ -102,6 +103,8 @@ export const mediaConfig = route(async (c) => {
     maxBytes: config.maxUploadBytes,
     folders: MEDIA_FOLDERS,
     extensions: Object.keys(TYPES),
+    /** Deep Zoom pyramids have their own flow: POST /api/admin/media/deepzoom (see handlers/deepzoom.ts). */
+    deepZoom: true,
   }
 })
 
@@ -224,7 +227,8 @@ export const deleteMedia = route<{ id: string }>(async (c) => {
   await c.requireCurator()
   const row = await c.db.one<MediaRow>('SELECT * FROM media WHERE id = $1', [c.params.id])
   if (!row) return fail(404, 'Media not found')
-  await c.storage.remove(`${row.folder}/${row.stored_name}`)
+  if (row.folder === DEEPZOOM_FOLDER) await removeDeepZoomSet(c.storage, row.stored_name) // whole tile pyramid
+  else await c.storage.remove(`${row.folder}/${row.stored_name}`)
   await c.db.run('DELETE FROM media WHERE id = $1', [row.id])
   return { ok: true }
 })
@@ -243,7 +247,7 @@ export async function serveMediaFile(req: Request, segments: string[]): Promise<
   // (kind check, not instanceof: the singleton may predate a dev hot reload of the class)
   if (storage.kind !== 'local') {
     // S3 mode: old relative /media/ URLs keep working by redirecting to the bucket/CDN.
-    return KEY_RE.test(key) ? Response.redirect(storage.urlFor(key), 308) : notFound()
+    return KEY_RE.test(key) || isDeepZoomKey(key) ? Response.redirect(storage.urlFor(key), 308) : notFound()
   }
   let file: string
   try {
@@ -261,7 +265,7 @@ export async function serveMediaFile(req: Request, segments: string[]): Promise<
   const size = st.size
   const etag = `W/"${size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}"`
   const headers = new Headers({
-    'content-type': MIME_BY_EXT[path.extname(file).toLowerCase()] ?? 'application/octet-stream',
+    'content-type': (path.extname(file).toLowerCase() === '.dzi' ? DZI_MIME : MIME_BY_EXT[path.extname(file).toLowerCase()]) ?? 'application/octet-stream',
     'accept-ranges': 'bytes',
     'cache-control': 'public, max-age=31536000, immutable',
     'last-modified': st.mtime.toUTCString(),

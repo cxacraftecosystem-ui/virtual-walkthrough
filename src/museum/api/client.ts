@@ -9,6 +9,7 @@
  * social feature hides itself. `?static` in the URL forces static mode.
  */
 import type { ContentCollection, ExhibitionText, MuseumContent } from '../content/types'
+import { CURRENT_EXHIBITION } from '../content/exhibition'
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -58,6 +59,10 @@ export type AnalyticsEventType =
   | 'video_play'
   | 'tour_start'
   | 'tour_complete'
+  /** Tour stop reached: itemId = stop id, meta.index = stop index (curator funnel). */
+  | 'tour_step'
+  /** Visitor position sample every 2 s (x, z, zone) → server heatmap rollup; never stored raw. */
+  | 'pos'
 
 export interface AnalyticsEvent {
   /** epoch ms */
@@ -69,6 +74,9 @@ export interface AnalyticsEvent {
   seconds?: number
   tier?: string
   meta?: Record<string, string | number | boolean>
+  /** 'pos' only: world position (m). */
+  x?: number
+  z?: number
 }
 
 export interface AnalyticsSummary {
@@ -214,11 +222,11 @@ export const api = {
 
   analytics: {
     send: (sessionId: string, events: AnalyticsEvent[]) =>
-      request<unknown>('POST', '/analytics/events', { sessionId, events }),
+      request<unknown>('POST', '/analytics/events', { sessionId, exhibition: CURRENT_EXHIBITION.slug, events }),
     /** Fire-and-forget for page unload (text/plain JSON, accepted by the server). */
     beacon: (sessionId: string, events: AnalyticsEvent[]) => {
       try {
-        const blob = new Blob([JSON.stringify({ sessionId, events })], { type: 'text/plain;charset=UTF-8' })
+        const blob = new Blob([JSON.stringify({ sessionId, exhibition: CURRENT_EXHIBITION.slug, events })], { type: 'text/plain;charset=UTF-8' })
         return navigator.sendBeacon?.(`${BASE}/analytics/events`, blob) ?? false
       } catch {
         return false

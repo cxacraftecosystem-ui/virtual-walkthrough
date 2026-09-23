@@ -4,6 +4,8 @@ import { teleport, visitor } from '../state/visitor'
 import { BENCHES, BENCH_SIZE, WALLS, ZONES, zoneAt, type Zone, type ZoneId } from '../config/layout'
 import { SCENE_OBJECTS } from '../config/objects'
 import { IconMap, IconMinus } from './icons'
+import { translate, useLang, useT, type Lang } from '../i18n'
+import { zoneName } from '../i18n/content'
 
 /* ------------------------------------------------------------------ */
 /* Travel fade (shared by minimap "go to" and HUD reset)               */
@@ -82,14 +84,15 @@ interface ZoneLabel {
 }
 
 /** Label shown in the plan, sized to the room; galleries use a big letter. */
-function zoneLabel(z: Zone): ZoneLabel {
+function zoneLabel(z: Zone, lang: Lang = 'en'): ZoneLabel {
   const r = z.rect
+  const short = zoneName(z.id, lang, true)
   const cx = (r.minX + r.maxX) / 2
-  if (z.id.startsWith('gallery-')) return { small: 'Gallery', big: z.id.slice(-1).toUpperCase(), size: 0.72, at: [cx, r.minZ + 2.6] }
-  if (z.id === 'passage') return { small: z.short, vertical: true, size: 0.85 }
-  if (z.id === 'reception') return { small: z.short, vertical: true, size: 0.7 }
-  if (z.id === 'reveal') return { small: z.short, size: 0.8, at: [cx, r.minZ + 1.05] }
-  return { small: z.short, size: 1.3 }
+  if (z.id.startsWith('gallery-')) return { small: translate(lang, 'map.gallery'), big: z.id.slice(-1).toUpperCase(), size: 0.72, at: [cx, r.minZ + 2.6] }
+  if (z.id === 'passage') return { small: short, vertical: true, size: 0.85 }
+  if (z.id === 'reception') return { small: short, vertical: true, size: 0.7 }
+  if (z.id === 'reveal') return { small: short, size: 0.8, at: [cx, r.minZ + 1.05] }
+  return { small: short, size: 1.3 }
 }
 
 /** Furniture & installations drawn faintly for orientation (skip foliage/props). */
@@ -108,6 +111,8 @@ export function Minimap() {
   const selection = useMuseum((s) => s.selection)
   const inspecting = useMuseum((s) => s.inspecting)
   const markerRef = useRef<SVGGElement>(null)
+  const t = useT()
+  const lang = useLang()
   const [current, setCurrent] = useState<ZoneId | undefined>(undefined)
   const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 720)
 
@@ -191,12 +196,12 @@ export function Minimap() {
       {mapOpen ? (
         <div className="ui-map__card ui-panel ui-interactive">
           <div className="ui-map__head">
-            <span className="ui-kicker">Floor plan</span>
-            <button type="button" className="ui-icon-btn" aria-label="Hide map (M)" onClick={() => setMapOpen(false)}>
+            <span className="ui-kicker">{t('map.title')}</span>
+            <button type="button" className="ui-icon-btn" aria-label={t('map.hide')} onClick={() => setMapOpen(false)}>
               <IconMinus />
             </button>
           </div>
-          <svg className="ui-map__svg" viewBox={VIEWBOX} style={{ aspectRatio: String(MAP_ASPECT) }} role="group" aria-label="Floor plan — select a room to go there">
+          <svg className="ui-map__svg" viewBox={VIEWBOX} style={{ aspectRatio: String(MAP_ASPECT) }} role="group" aria-label={t('map.group')}>
             <defs>
               <radialGradient id="ui-map-cone" cx="0" cy="0" r={CONE_LEN} gradientUnits="userSpaceOnUse">
                 <stop offset="0" stopColor="#8a5a3b" stopOpacity="0.42" />
@@ -219,7 +224,7 @@ export function Minimap() {
             {walls}
 
             {ZONES.map((z) => {
-              const l = zoneLabel(z)
+              const l = zoneLabel(z, lang)
               const [cx, cy] = l.at ?? [(z.rect.minX + z.rect.maxX) / 2, (z.rect.minZ + z.rect.maxZ) / 2]
               const isCur = current === z.id
               return (
@@ -232,7 +237,8 @@ export function Minimap() {
                     height={z.rect.maxZ - z.rect.minZ}
                     role="button"
                     tabIndex={0}
-                    aria-label={`Go to ${z.name}`}
+                    aria-label={t('map.goTo', { room: zoneName(z.id, lang) })}
+                    aria-current={isCur ? 'location' : undefined}
                     onClick={() => go(z)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -241,7 +247,7 @@ export function Minimap() {
                       }
                     }}
                   >
-                    <title>{`Go to ${z.name}`}</title>
+                    <title>{t('map.goTo', { room: zoneName(z.id, lang) })}</title>
                   </rect>
                   {l.big ? (
                     <>
@@ -282,9 +288,9 @@ export function Minimap() {
           </svg>
         </div>
       ) : (
-        <button type="button" className="ui-map__toggle ui-panel" aria-label="Show map (M)" onClick={() => setMapOpen(true)}>
+        <button type="button" className="ui-map__toggle ui-panel" aria-label={t('map.show')} onClick={() => setMapOpen(true)}>
           <IconMap />
-          <span>Map</span>
+          <span>{t('map.button')}</span>
         </button>
       )}
     </div>

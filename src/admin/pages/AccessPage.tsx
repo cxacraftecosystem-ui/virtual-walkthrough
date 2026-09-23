@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { api, ROLE_LABEL, type AccessEntry, type AccessRole, type AdminUser, type ManualRole, type User } from '../api'
-import { errMsg, formatDate, useToast } from '../ui'
+import { Skeleton, errMsg, formatDate, useToast } from '../ui'
 
 /**
  * Users (admin) + Access list (master admin).
@@ -137,7 +137,7 @@ function AccessList() {
             ))}
             {!data ? (
               <tr>
-                <td colSpan={6} className="empty">Loading…</td>
+                <td colSpan={6} style={{ padding: 16 }}><Skeleton rows={4} /></td>
               </tr>
             ) : data.entries.length === 0 ? (
               <tr>
@@ -242,7 +242,7 @@ function UsersTable({ me }: { me: User }) {
           <tbody>
             {!users ? (
               <tr>
-                <td colSpan={7} className="empty">Loading…</td>
+                <td colSpan={7} style={{ padding: 16 }}><Skeleton rows={4} /></td>
               </tr>
             ) : shown.length === 0 ? (
               <tr>

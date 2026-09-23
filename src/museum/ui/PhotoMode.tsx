@@ -3,11 +3,14 @@
  * the 3D canvas at its current resolution with a small caption strip, Esc exits.
  */
 import { useEffect, useRef, useState } from 'react'
+import { rich, useT } from '../i18n'
 import { create } from 'zustand'
 import { useMuseum } from '../state/store'
 import { tour, useTour } from '../tour/engine'
 import { IconCamera, IconClose } from './icons'
 import { isCoarsePointer } from './HelpOverlay'
+import { awaitRayTraceForCapture, useRayTrace } from '../effects/rayTraceStore'
+import { QUALITY_PRESETS } from '../config/quality'
 
 export const CAPTION = 'Hand Block Printing — Virtual Exhibition'
 
@@ -127,6 +130,8 @@ export async function capturePhoto(): Promise<boolean> {
     } catch {
       /* fall back to the serif stack */
     }
+    // Ray-traced view running: let it converge so the PNG is the path-traced image.
+    await awaitRayTraceForCapture()
     const frame = await grabFrame()
     if (!frame) return false
     drawCaption(frame)
@@ -196,6 +201,7 @@ export function PhotoMode() {
     }
   }, [on])
 
+  const t = useT()
   if (!on) return null
 
   return (
@@ -203,25 +209,71 @@ export function PhotoMode() {
       <div className={`ui-photo__hint ui-panel${hint ? ' is-visible' : ''}`} role="status">
         <IconCamera />
         {coarse ? (
-          <span>
-            Photo mode · <strong>Capture</strong> to save · <strong>✕</strong> to exit
-          </span>
+          <span>{rich(t('photo.hintTouch'), { capture: <strong>{t('photo.captureWord')}</strong>, close: <strong>✕</strong> })}</span>
         ) : (
-          <span>
-            Photo mode · <kbd className="ui-kbd">Esc</kbd> to exit · <kbd className="ui-kbd">Enter</kbd> to capture
-          </span>
+          <span>{rich(t('photo.hintDesktop'), { esc: <kbd className="ui-kbd">Esc</kbd>, enter: <kbd className="ui-kbd">Enter</kbd> })}</span>
         )}
       </div>
       <div className={`ui-photo__bar ui-panel ui-interactive${awake || coarse ? ' is-awake' : ''}`}>
-        <button type="button" className="ui-photo__shutter" aria-label="Capture photo (Enter)" onClick={() => void capturePhoto()}>
+        <button type="button" className="ui-photo__shutter" aria-label={t('photo.capture')} onClick={() => void capturePhoto()}>
           <span aria-hidden="true" />
-          Capture
+          {t('photo.captureWord')}
         </button>
-        <button type="button" className="ui-icon-btn" aria-label="Exit photo mode (Esc)" onClick={exitPhotoMode}>
+        <RayTraceToggle />
+        <button type="button" className="ui-icon-btn" aria-label={t('photo.exit')} onClick={exitPhotoMode}>
           <IconClose />
         </button>
       </div>
       {flash > 0 && <div key={flash} className="ui-photo__flash" aria-hidden="true" />}
     </div>
+  )
+}
+
+/** Ray-traced view toggle + live sample counter (effects/PathTracer.tsx does the work). */
+function RayTraceToggle() {
+  const t = useT()
+  const tier = useMuseum((s) => s.tier)
+  const choice = useRayTrace((s) => s.enabled)
+  const status = useRayTrace((s) => s.status)
+  const samples = useRayTrace((s) => s.samples)
+  const total = useRayTrace((s) => s.target)
+  const setEnabled = useRayTrace((s) => s.setEnabled)
+  if (status === 'unsupported') return null
+  const on = choice ?? QUALITY_PRESETS[tier].pathTracing
+  const label =
+    !on || status === 'off'
+      ? null
+      : status === 'waiting'
+        ? t('photo.rt.waiting')
+        : status === 'building'
+          ? t('photo.rt.building')
+          : status === 'compiling'
+            ? t('photo.rt.compiling')
+            : status === 'converged'
+              ? t('photo.rt.converged', { n: String(samples) })
+              : t('photo.rt.tracing', { n: String(samples), total: String(total) })
+  return (
+    <>
+      {label && (
+        <span
+          role="status"
+          aria-live="polite"
+          style={{ font: '500 11px/1.2 Inter, system-ui, sans-serif', letterSpacing: '0.04em', color: 'var(--ink-soft, #6b6157)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', padding: '0 4px' }}
+        >
+          {label}
+        </span>
+      )}
+      <button
+        type="button"
+        className="ui-icon-btn"
+        aria-pressed={on}
+        aria-label={t('photo.raytraceHint')}
+        title={t('photo.raytraceHint')}
+        onClick={() => setEnabled(!on)}
+        style={{ width: 'auto', padding: '0 10px', font: '600 11px/1 Inter, system-ui, sans-serif', letterSpacing: '0.08em', textTransform: 'uppercase' }}
+      >
+        {t('photo.raytrace')}
+      </button>
+    </>
   )
 }

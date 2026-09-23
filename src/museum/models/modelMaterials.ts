@@ -13,12 +13,16 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import { useMaterials, type MuseumMaterials } from '../materials/materials'
 import { woodTexture } from './textures'
+import { useMuseum } from '../state/store'
+import { VR_MODE } from '../utils/vr'
 
 export const MODEL_TIME = { value: 0 }
 
 /** Advances the shared animation clock. Mount once per <Canvas>. */
 export function ModelClock() {
   useFrame((_, dt) => {
+    // Reduced motion: banners, foliage and ripples hold still.
+    if (useMuseum.getState().reducedMotion || VR_MODE) return
     MODEL_TIME.value += Math.min(dt, 0.1)
   })
   return null

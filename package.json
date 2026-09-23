@@ -10,7 +10,10 @@
     "lint": "eslint .",
     "shots": "node scripts/screenshots.mjs",
     "db:migrate": "tsx --conditions=react-server scripts/db-migrate.ts",
-    "start": "next start"
+    "start": "next start",
+    "optimize:assets": "node scripts/optimize-assets.mjs && node scripts/verify-optimized-models.mjs",
+    "test:visual": "node scripts/visual-regression.mjs",
+    "test:visual:update": "node scripts/visual-regression.mjs --update"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

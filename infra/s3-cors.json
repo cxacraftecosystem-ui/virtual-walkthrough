@@ -11,7 +11,7 @@
     {
       "ID": "admin-direct-upload",
       "AllowedMethods": ["PUT"],
-      "AllowedOrigins": ["https://YOUR-APP.vercel.app", "http://localhost:3000"],
+      "AllowedOrigins": ["https://hand-block-museum.vercel.app", "https://hand-block-museum-*.vercel.app", "http://localhost:3000"],
       "AllowedHeaders": ["Content-Type", "Cache-Control"],
       "ExposeHeaders": ["ETag"],
       "MaxAgeSeconds": 3600

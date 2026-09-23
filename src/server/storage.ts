@@ -53,7 +53,7 @@ export class LocalDiskStorage implements StorageDriver {
   constructor(root: string, publicPrefix = '/media') {
     this.root = path.resolve(root)
     this.publicPrefix = publicPrefix
-    fs.mkdirSync(this.root, { recursive: true })
+    // Directories are created lazily in save(): read-only serverless file systems must not break every route.
   }
 
   /** Absolute path for a key (throws on traversal). */

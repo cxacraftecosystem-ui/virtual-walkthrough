@@ -24,6 +24,7 @@ import { useMaterials, type MaterialKey } from '../materials/materials'
 import { createLabelTexture } from '../materials/wallGraphics'
 import { focusOn } from '../navigation/focus'
 import { useMuseum } from '../state/store'
+import { openExamine } from '../ui/deepzoom/deepZoomStore'
 import { ErrorBoundary } from '../utils/ErrorBoundary'
 import { useAsyncTexture } from '../utils/useAsyncTexture'
 import { loadArtworkTexture, type LoadedArtworkTexture } from './artworkTexture'
@@ -207,6 +208,12 @@ function ArtworkBody({ config, res }: { config: ArtworkConfig; res: LoadedArtwor
     select({ kind: 'artwork', id: config.id })
     focusOn('artwork', config.id)
   }
+  // Double-click: full-screen "Examine closely" deep-zoom viewer.
+  const onDoubleClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation()
+    if (e.delta > 6 || useMuseum.getState().phase !== 'entered' || useMuseum.getState().inspecting) return
+    openExamine(config.id)
+  }
   const onOver = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation()
     setHover(true)
@@ -226,7 +233,7 @@ function ArtworkBody({ config, res }: { config: ArtworkConfig; res: LoadedArtwor
   return (
     <group>
       <group position={place.position} rotation={[0, place.rotationY, 0]}>
-        <group onClick={onClick} onPointerOver={onOver} onPointerOut={onOut}>
+        <group onClick={onClick} onDoubleClick={onDoubleClick} onPointerOver={onOver} onPointerOut={onOut}>
           <ArtworkFrame layout={layout} frame={frame} texture={res.texture} hovered={hovered} />
         </group>
         {config.label !== false && <WallLabel config={config} position={labelPos} />}

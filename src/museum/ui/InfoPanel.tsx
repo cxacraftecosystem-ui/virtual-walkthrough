@@ -8,6 +8,11 @@ import { VIDEOS } from '../config/videos'
 import { toggleFavorite } from '../api/social'
 import { CommentThread } from './Comments'
 import { IconClose, IconCube, IconHeart, IconPause, IconPlay } from './icons'
+import { loc, useLang, useT, type Lang, type T } from '../i18n'
+import { openExamine } from './deepzoom/deepZoomStore'
+import { MakerCard } from './MakerCard'
+import { ItemLinks } from './ItemLinks'
+import { ShareButton } from '../share/ShareButton'
 
 /**
  * CUSTOM WINDOW EVENTS (video screens):
@@ -52,11 +57,15 @@ interface ViewModel {
   steps?: string[]
   metadata?: [string, string][]
   image?: string
+  /** Alternative text for the image (falls back to the title). */
+  alt?: string
   placeholder: boolean
   /** Argument for store.inspect(): an exhibit id, or 'object:<id>'. */
   inspectId?: string
   inspectLabel?: string
   videoId?: string
+  /** Artwork id for the full-screen "Examine closely" deep-zoom viewer. */
+  examineId?: string
   credit?: { author: string; source: string; license: string }
   related?: { label: string; selection: Selection }
 }
@@ -65,32 +74,35 @@ function fact(label: string, value: string | undefined): [string, string][] {
   return value && value.trim() ? [[label, value]] : []
 }
 
-function resolve(sel: Selection): ViewModel | null {
+function resolve(sel: Selection, t: T = (k) => k, lang: Lang = 'en'): ViewModel | null {
+  const L = <O extends object, K extends keyof O & string>(o: O, f: K) => loc(o, f, lang)
   if (sel.kind === 'artwork') {
     const a = ARTWORKS.find((x) => x.id === sel.id)
     if (!a) return null
     const block = a.exhibitId ? EXHIBITS.find((e) => e.id === a.exhibitId) : undefined
     return {
-      kicker: a.hero ? 'Hero work · Textile' : 'Textile',
-      title: a.title,
+      kicker: a.hero ? t('info.heroTextile') : t('info.textile'),
+      title: L(a, 'title') ?? a.title,
+      alt: L(a, 'alt'),
       facts: [
-        ...fact('Tradition', a.tradition),
-        ...fact('Artisan', a.artisan),
-        ...fact('Region', a.region),
-        ...fact('Material', a.material),
-        ...fact('Technique', a.technique),
-        ...fact('Year', a.year),
+        ...fact(t('info.tradition'), L(a, 'tradition')),
+        ...fact(t('info.artisan'), L(a, 'artisan')),
+        ...fact(t('info.region'), L(a, 'region')),
+        ...fact(t('info.material'), L(a, 'material')),
+        ...fact(t('info.technique'), L(a, 'technique')),
+        ...fact(t('info.year'), a.year),
       ],
       paragraphs: [
-        ...(a.description ? [{ text: a.description }] : []),
-        ...(a.context ? [{ heading: 'Context', text: a.context }] : []),
+        ...(L(a, 'description') ? [{ text: L(a, 'description')! }] : []),
+        ...(L(a, 'context') ? [{ heading: t('info.context'), text: L(a, 'context')! }] : []),
       ],
       metadata: a.metadata ? Object.entries(a.metadata) : undefined,
       image: a.image,
       placeholder: !!a.placeholder,
       inspectId: block?.id,
-      inspectLabel: 'Inspect hand block in 3D',
-      related: block ? { label: `Printed with ${block.title}`, selection: { kind: 'exhibit', id: block.id } } : undefined,
+      inspectLabel: t('info.inspectBlock'),
+      examineId: a.image || a.deepZoom || a.highRes ? a.id : undefined,
+      related: block ? { label: t('info.printedWith', { title: L(block, 'title') ?? block.title }), selection: { kind: 'exhibit', id: block.id } } : undefined,
     }
   }
   if (sel.kind === 'exhibit') {
@@ -98,33 +110,35 @@ function resolve(sel: Selection): ViewModel | null {
     if (!e) return null
     const art = ARTWORKS.find((a) => a.id === e.artworkId)
     return {
-      kicker: 'Hand block · Craft tool',
-      title: e.title,
+      kicker: t('info.handBlock'),
+      title: L(e, 'title') ?? e.title,
+      alt: L(e, 'alt'),
       facts: [
-        ...fact('Tradition', e.tradition),
-        ...fact('Artisan', e.artisan),
-        ...fact('Region', e.region),
-        ...fact('Material', e.material),
-        ...fact('Technique', e.technique),
+        ...fact(t('info.tradition'), L(e, 'tradition')),
+        ...fact(t('info.artisan'), L(e, 'artisan')),
+        ...fact(t('info.region'), L(e, 'region')),
+        ...fact(t('info.material'), L(e, 'material')),
+        ...fact(t('info.technique'), L(e, 'technique')),
       ],
-      paragraphs: e.description ? [{ text: e.description }] : [],
+      paragraphs: L(e, 'description') ? [{ text: L(e, 'description')! }] : [],
       placeholder: !!e.placeholder,
       inspectId: e.id,
-      inspectLabel: 'Inspect hand block in 3D',
-      related: art ? { label: `Prints the textile ${art.title}`, selection: { kind: 'artwork', id: art.id } } : undefined,
+      inspectLabel: t('info.inspectBlock'),
+      related: art ? { label: t('info.printsTextile', { title: L(art, 'title') ?? art.title }), selection: { kind: 'artwork', id: art.id } } : undefined,
     }
   }
   if (sel.kind === 'object') {
     const o = SCENE_OBJECTS.find((x) => x.id === sel.id)
     if (!o) return null
     return {
-      kicker: 'Installation',
-      title: o.title,
+      kicker: t('info.installation'),
+      title: L(o, 'title') ?? o.title,
+      alt: L(o, 'alt'),
       facts: [],
-      paragraphs: o.description ? [{ text: o.description }] : [],
+      paragraphs: L(o, 'description') ? [{ text: L(o, 'description')! }] : [],
       placeholder: !!o.placeholder,
       inspectId: o.inspectable ? `object:${o.id}` : undefined,
-      inspectLabel: 'Inspect in 3D',
+      inspectLabel: t('info.inspect'),
       credit: o.credit,
     }
   }
@@ -132,10 +146,11 @@ function resolve(sel: Selection): ViewModel | null {
     const v = VIDEOS.find((x) => x.id === sel.id)
     if (!v) return null
     return {
-      kicker: 'Film',
-      title: v.title,
+      kicker: t('info.film'),
+      title: L(v, 'title') ?? v.title,
+      alt: L(v, 'alt'),
       facts: [],
-      paragraphs: v.description ? [{ text: v.description }] : [],
+      paragraphs: L(v, 'description') ? [{ text: L(v, 'description')! }] : [],
       image: v.poster,
       placeholder: !!v.placeholder,
       videoId: v.id,
@@ -144,11 +159,11 @@ function resolve(sel: Selection): ViewModel | null {
   const g = INFOGRAPHICS.find((x) => x.id === sel.id)
   if (!g) return null
   return {
-    kicker: `Craft panel ${g.kicker}`,
-    title: g.title,
+    kicker: t('info.craftPanel', { n: L(g, 'kicker') ?? g.kicker }),
+    title: L(g, 'title') ?? g.title,
     facts: [],
-    paragraphs: g.body ? [{ text: g.body }] : [],
-    steps: g.steps,
+    paragraphs: L(g, 'body') ? [{ text: L(g, 'body')! }] : [],
+    steps: (lang !== 'en' && g.i18n?.[lang]?.steps?.length ? g.i18n[lang]!.steps : undefined) ?? g.steps,
     placeholder: !!g.placeholder,
   }
 }
@@ -169,7 +184,9 @@ export function InfoPanel() {
   const closeRef = useRef<HTMLButtonElement>(null)
   const rootRef = useRef<HTMLElement>(null)
 
-  const vm = shown ? resolve(shown) : null
+  const t = useT()
+  const lang = useLang()
+  const vm = shown ? resolve(shown, t, lang) : null
   const open = entered && !!selection && !!vm
 
   // A selection that resolves to nothing (item removed from the content, stale tour stop…)
@@ -196,7 +213,8 @@ export function InfoPanel() {
       ref={rootRef}
       className={`ui-info${open ? ' is-open' : ''}`}
       aria-hidden={!open || undefined}
-      aria-labelledby="ui-info-title"
+      inert={!open || undefined}
+      aria-labelledby={vm ? 'ui-info-title' : undefined}
       role="dialog"
     >
       {vm && (
@@ -208,8 +226,8 @@ export function InfoPanel() {
               {vm.title}
             </h2>
             {vm.placeholder && (
-              <span className="ui-info__badge" title="This item is a stand-in until the final content is supplied">
-                Placeholder content
+              <span className="ui-info__badge" title={t('info.placeholderTip')}>
+                {t('info.placeholder')}
               </span>
             )}
             {online && shown && (
@@ -217,19 +235,20 @@ export function InfoPanel() {
                 type="button"
                 className={`ui-icon-btn ui-info__fav${fav ? ' is-on' : ''}`}
                 aria-pressed={fav}
-                aria-label={fav ? 'Remove from favourites' : 'Add to favourites'}
-                data-tip={fav ? 'Saved' : 'Add to favourites'}
+                aria-label={fav ? t('info.favRemove') : t('info.favAdd')}
+                data-tip={fav ? t('info.favSaved') : t('info.favAdd')}
                 tabIndex={open ? 0 : -1}
                 onClick={() => void toggleFavorite(shown.kind, shown.id)}
               >
                 <IconHeart filled={fav} />
               </button>
             )}
+            {shown && <ShareButton selection={shown} title={vm.title} tabIndex={open ? 0 : -1} />}
             <button
               ref={closeRef}
               type="button"
               className="ui-icon-btn ui-info__close"
-              aria-label="Close (Esc)"
+              aria-label={t('info.close')}
               onClick={() => select(null)}
               tabIndex={open ? 0 : -1}
             >
@@ -240,7 +259,7 @@ export function InfoPanel() {
           <div className="ui-info__body" ref={bodyRef}>
             {vm.image && imgFailed !== vm.image && (
               <figure className="ui-info__thumb">
-                <img src={vm.image} alt={vm.title} loading="lazy" decoding="async" onError={() => setImgFailed(vm.image ?? null)} />
+                <img src={vm.image} alt={vm.alt ?? vm.title} loading="lazy" decoding="async" onError={() => setImgFailed(vm.image ?? null)} />
               </figure>
             )}
 
@@ -261,7 +280,7 @@ export function InfoPanel() {
 
             {vm.steps && vm.steps.length > 0 && (
               <>
-                <div className="ui-kicker ui-info__section">Stages</div>
+                <div className="ui-kicker ui-info__section">{t('info.stages')}</div>
                 <ol className="ui-info__steps">
                   {vm.steps.map((s) => (
                     <li key={s}>{s}</li>
@@ -272,7 +291,7 @@ export function InfoPanel() {
 
             {vm.metadata && vm.metadata.length > 0 && (
               <>
-                <div className="ui-kicker ui-info__section">Details</div>
+                <div className="ui-kicker ui-info__section">{t('info.details')}</div>
                 <dl className="ui-info__facts">
                   {vm.metadata.map(([k, v]) => (
                     <FactRow key={k} k={k} v={v} />
@@ -289,7 +308,7 @@ export function InfoPanel() {
 
             {vm.credit && (
               <p className="ui-info__credit">
-                Model: {vm.credit.author} ·{' '}
+                {t('info.model')}: {vm.credit.author} ·{' '}
                 {/^https?:\/\//.test(vm.credit.source) ? (
                   <a href={vm.credit.source} target="_blank" rel="noopener noreferrer" tabIndex={open ? 0 : -1}>
                     {sourceLabel(vm.credit.source)}
@@ -301,15 +320,30 @@ export function InfoPanel() {
               </p>
             )}
 
+            <ItemLinks selection={shown} tabIndex={open ? 0 : -1} />
+            <MakerCard selection={shown} tabIndex={open ? 0 : -1} />
+
             {online && shown && open && <CommentThread key={`${shown.kind}:${shown.id}`} item={shown} tabIndex={open ? 0 : -1} compact />}
           </div>
 
-          {(vm.inspectId || vm.videoId) && (
+          {(vm.inspectId || vm.videoId || vm.examineId) && (
             <footer className="ui-info__foot">
+              {vm.examineId && (
+                <button
+                  type="button"
+                  className="ui-btn"
+                  tabIndex={open ? 0 : -1}
+                  onClick={() => openExamine(vm.examineId!)}
+                  title={t('info.examineTip')}
+                >
+                  <IconMagnifier />
+                  {t('info.examine')}
+                </button>
+              )}
               {vm.inspectId && (
                 <button type="button" className="ui-btn" tabIndex={open ? 0 : -1} onClick={() => inspect(vm.inspectId!)}>
                   <IconCube />
-                  {vm.inspectLabel ?? 'Inspect in 3D'}
+                  {vm.inspectLabel ?? t('info.inspect')}
                 </button>
               )}
               {vm.videoId && (
@@ -324,7 +358,7 @@ export function InfoPanel() {
                   }}
                 >
                   {playing ? <IconPause /> : <IconPlay />}
-                  {playing === null ? 'Play / pause film' : playing ? 'Pause film' : 'Play film'}
+                  {playing === null ? t('info.playPause') : playing ? t('info.pause') : t('info.play')}
                 </button>
               )}
             </footer>
@@ -332,6 +366,16 @@ export function InfoPanel() {
         </div>
       )}
     </aside>
+  )
+}
+
+/** Magnifier for "Examine closely" (same hairline style as ./icons). */
+function IconMagnifier() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true" focusable="false">
+      <circle cx="10.5" cy="10.5" r="6" />
+      <path d="M15 15l5 5M8 10.5h5M10.5 8v5" />
+    </svg>
   )
 }
 

@@ -88,7 +88,8 @@ function build(tier: QualityTier): DecorMaterials {
     }),
     jaliStone: new THREE.MeshStandardMaterial({
       name: 'jaliStone',
-      map: tex('jali').map,
+      // no albedo map (memory): flat carved-stone colour, bevels come from the normal map
+      color: new THREE.Color('#e3d2b6'),
       alphaMap: tex('jali').alphaMap ?? null,
       normalMap: tex('jali').normalMap ?? null,
       normalScale: new THREE.Vector2(1, 1),

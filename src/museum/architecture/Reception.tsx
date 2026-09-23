@@ -6,7 +6,7 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
 import { KEY, MUSEUM } from '../config/museum'
-import { RECEPTION_DESK, surfacePoint } from '../config/layout'
+import { RECEPTION_DESK } from '../config/layout'
 import { createMeterBoxGeometry } from '../materials/geometry'
 import { useMaterials } from '../materials/materials'
 import { createWelcomeTexture } from '../materials/wallGraphics'
@@ -44,13 +44,21 @@ function WelcomeWall() {
   const w = 2.3
   const h = 1.55
   const tex = useAsyncTexture(() => createWelcomeTexture(w, h), [])
-  const p = surfacePoint('reception-west', KEY.rzNorth + MUSEUM.reception.length * 0.55, 1.55, 0.003)
-  if (!tex) return null
+  const m = useMaterials()
+  // v3.1: on a plaster board on the north wall (west of the passage mouth), seen on arrival —
+  // the west wall now has the library door where the welcome used to hang.
+  const x = -(MUSEUM.passage.clearWidth / 2 + KEY.rx) / 2 - 0.05
+  const z = KEY.rzNorth + 0.02
   return (
-    <mesh position={p.position} rotation={[0, p.rotationY, 0]} raycast={() => null}>
-      <planeGeometry args={[w, h]} />
-      <meshStandardMaterial map={tex} transparent roughness={0.9} polygonOffset polygonOffsetFactor={-2} depthWrite={false} />
-    </mesh>
+    <group>
+      <Box size={[w + 0.2, h + 0.2, 0.024]} position={[x, 1.6, z + 0.012]} material={m.plaster} />
+      {tex && (
+        <mesh position={[x, 1.6, z + 0.027]} raycast={() => null}>
+          <planeGeometry args={[w, h]} />
+          <meshStandardMaterial map={tex} transparent roughness={0.9} polygonOffset polygonOffsetFactor={-2} depthWrite={false} />
+        </mesh>
+      )}
+    </group>
   )
 }
 

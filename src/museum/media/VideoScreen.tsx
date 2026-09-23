@@ -26,6 +26,7 @@ import { registerItem } from '../interaction/registry'
 import { useMuseum } from '../state/store'
 import { visitor } from '../state/visitor'
 import { ErrorBoundary } from '../utils/ErrorBoundary'
+import { VR_MODE } from '../utils/vr'
 import { inverseDistanceGain, isAudioUnsupported, onAudioUnlock, onUserGesture, setVideoAudibility } from './audioEngine'
 import { curveRadius, DEFAULT_ASPECT, MASK, screenDepth, screenPlacement } from './screenMath'
 import { routeVideoAudio, type VideoAudioRoute } from './videoAudio'
@@ -81,6 +82,7 @@ function getMedia(cfg: VideoConfig): Media {
     el.disablePictureInPicture = true
     el.addEventListener('loadedmetadata', () => {
       if (el.videoWidth > 0 && el.videoHeight > 0) m.aspect = el.videoWidth / el.videoHeight
+      if (cfg.kind === 'portrait' && m.aspect && m.texture) m.aspect = applyPortraitCrop(m.texture, m.aspect, cfg.cropAspect)
       m.status = 'ready'
       notify(m)
     })
@@ -221,6 +223,52 @@ function loadPoster(url: string | undefined): Promise<Poster | null> {
 }
 
 const cards = new Map<string, THREE.Texture>()
+/** Centre-crops a landscape video texture to a portrait aspect; returns the displayed aspect. */
+function applyPortraitCrop(tex: THREE.Texture, srcAspect: number, crop = 9 / 16) {
+  if (srcAspect <= crop) return srcAspect
+  const k = crop / srcAspect
+  tex.repeat.set(k, 1)
+  tex.offset.set((1 - k) / 2, 0)
+  return crop
+}
+
+/** "Meet the maker" card shown on portrait screens until the film has a frame. */
+function portraitCard(title: string): THREE.Texture {
+  const key = `portrait|${title}`
+  let t = cards.get(key)
+  if (t) return t
+  const c = document.createElement('canvas')
+  c.width = 540
+  c.height = 960
+  const g = c.getContext('2d')
+  if (g) {
+    const grad = g.createLinearGradient(0, 0, 0, 960)
+    grad.addColorStop(0, '#2a241f')
+    grad.addColorStop(1, '#14110f')
+    g.fillStyle = grad
+    g.fillRect(0, 0, 540, 960)
+    g.strokeStyle = 'rgba(214, 196, 164, 0.3)'
+    g.lineWidth = 1.5
+    g.strokeRect(40, 40, 460, 880)
+    g.textAlign = 'center'
+    g.fillStyle = 'rgba(233, 223, 204, 0.62)'
+    g.font = '500 20px Inter, system-ui, sans-serif'
+    g.fillText('M E E T   T H E   M A K E R', 270, 430)
+    g.fillStyle = '#e9dfcc'
+    g.font = "500 44px 'Cormorant Garamond', Georgia, serif"
+    g.fillText(shortTitle(title), 270, 500, 420)
+    g.fillStyle = 'rgba(233, 223, 204, 0.5)'
+    g.font = '400 18px Inter, system-ui, sans-serif'
+    g.fillText('Portrait film · placeholder', 270, 560)
+  }
+  t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  cards.set(key, t)
+  return t
+}
+
+const shortTitle = (title: string) => title.replace(/^Meet the Maker\s*[—-]\s*/i, '')
+
 function unavailableCard(title: string): THREE.Texture {
   let t = cards.get(title)
   if (t) return t
@@ -370,7 +418,7 @@ const BRIGHTNESS: Record<VideoConfig['screen'], number> = { flat: 0.92, 'led-wal
 
 function wantsToPlay(cfg: VideoConfig, m: Media, center: Vec3): boolean {
   const st = useMuseum.getState()
-  if (st.phase !== 'entered' || m.status === 'failed' || (typeof document !== 'undefined' && document.hidden)) return false
+  if (VR_MODE || st.phase !== 'entered' || m.status === 'failed' || (typeof document !== 'undefined' && document.hidden)) return false
   const d = Math.hypot(visitor.x - center[0], visitor.z - center[2])
   const inZone = cfg.zone ? zoneAt(visitor.x, visitor.z)?.id === cfg.zone : false
   const near = d <= (cfg.activationDistance ?? (cfg.zone ? 0 : 10))
@@ -410,7 +458,7 @@ function VideoScreenBody({ config: cfg }: { config: VideoConfig }) {
     }
   }, [cfg.poster])
 
-  const aspect = m.aspect ?? poster?.aspect ?? DEFAULT_ASPECT
+  const aspect = m.aspect ?? (cfg.kind === 'portrait' ? (cfg.cropAspect ?? 9 / 16) : (poster?.aspect ?? DEFAULT_ASPECT))
   const W = cfg.width
   const H = W / aspect
   const place = useMemo(() => screenPlacement(cfg), [cfg])
@@ -460,8 +508,11 @@ function VideoScreenBody({ config: cfg }: { config: VideoConfig }) {
 
   /* ---------------- material / texture selection ---------------- */
   const showVideo = m.hasFrame && m.status !== 'failed' && !!m.texture
-  const fallback = poster?.texture ?? (posterDone && (m.status === 'failed' || !cfg.poster) ? unavailableCard(cfg.title) : null)
-  const failedNoPoster = m.status === 'failed' && !poster
+  const portrait = cfg.kind === 'portrait'
+  const fallback = portrait
+    ? portraitCard(cfg.title)
+    : (poster?.texture ?? (posterDone && (m.status === 'failed' || !cfg.poster) ? unavailableCard(cfg.title) : null))
+  const failedNoPoster = m.status === 'failed' && !poster && !portrait
   const map = failedNoPoster ? unavailableCard(cfg.title) : showVideo ? m.texture : fallback
 
   const screenMat = useMemo(() => new THREE.MeshBasicMaterial({ toneMapped: false, side: THREE.DoubleSide }), [])
@@ -604,6 +655,7 @@ function VideoScreenBody({ config: cfg }: { config: VideoConfig }) {
         </group>
       )}
       {cfg.screen === 'led-wall' && <LedSeams w={W} h={H} z={depth + 0.0022} />}
+      {portrait && <PortraitStand w={W} h={H} centerHeight={cfg.placement.centerHeight} title={cfg.title} />}
       {glyph && (
         <mesh position={[0, -H / 2 + glyphSize * 0.95, depth + 0.012]} renderOrder={2}>
           <planeGeometry args={[glyphSize, glyphSize]} />
@@ -611,6 +663,54 @@ function VideoScreenBody({ config: cfg }: { config: VideoConfig }) {
         </mesh>
       )}
       {spill && <ScreenSpill m={m} w={W} h={H} z={depth + 0.35} active={showVideo} />}
+    </group>
+  )
+}
+
+const standMat = new THREE.MeshStandardMaterial({ color: '#1b1a19', roughness: 0.5, metalness: 0.6 })
+
+/** Free-standing stand for a portrait screen: slim post, weighted base and a caption plate. */
+function PortraitStand({ w, h, centerHeight, title }: { w: number; h: number; centerHeight: number; title: string }) {
+  const caption = useMemo(() => {
+    const c = document.createElement('canvas')
+    c.width = 512
+    c.height = 128
+    const g = c.getContext('2d')
+    if (g) {
+      g.fillStyle = '#f3ede1'
+      g.fillRect(0, 0, 512, 128)
+      g.fillStyle = '#8a5a3b'
+      g.font = '600 18px Inter, system-ui, sans-serif'
+      g.fillText('M E E T   T H E   M A K E R', 24, 42)
+      g.fillStyle = '#2b2621'
+      g.font = "500 40px 'Cormorant Garamond', Georgia, serif"
+      g.fillText(shortTitle(title), 24, 94, 470)
+    }
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    t.anisotropy = 4
+    return t
+  }, [title])
+  useEffect(() => () => caption.dispose(), [caption])
+  const postH = centerHeight - h / 2 + 0.05
+  const capY = -h / 2 - 0.11
+  return (
+    <group>
+      <mesh material={standMat} position={[0, -centerHeight + postH / 2, -0.012]} castShadow>
+        <cylinderGeometry args={[0.022, 0.026, postH, 12]} />
+      </mesh>
+      <mesh material={standMat} position={[0, -centerHeight + 0.008, -0.012]} castShadow receiveShadow>
+        <boxGeometry args={[Math.max(0.4, w * 0.8), 0.016, 0.3]} />
+      </mesh>
+      <group position={[0, capY, 0.03]} rotation={[-0.5, 0, 0]}>
+        <mesh material={standMat}>
+          <boxGeometry args={[w, w / 4 + 0.02, 0.012]} />
+        </mesh>
+        <mesh position={[0, 0, 0.0065]}>
+          <planeGeometry args={[w - 0.02, w / 4]} />
+          <meshStandardMaterial map={caption} roughness={0.85} />
+        </mesh>
+      </group>
     </group>
   )
 }

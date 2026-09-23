@@ -14,6 +14,8 @@
 import { COURT_CENTER, type ZoneId } from './layout'
 import type { Vec3 } from './museum'
 import { MUSEUM } from './museum'
+import type { ContentI18n } from '../i18n/core'
+import { AMENITY_OBJECTS } from './amenities'
 
 export type ProceduralModelId =
   | 'printing-table'
@@ -45,6 +47,25 @@ export type ProceduralModelId =
   /** v3: glazed table vitrine with hand blocks, plaster pedestal (models/display.tsx). */
   | 'vitrine'
   | 'pedestal'
+  /** "Print it yourself" studio table, Visitors' Wall (models/printStudio.tsx). */
+  | 'print-studio'
+  | 'visitors-wall'
+  /** Volumetric artisan capture: Gaussian splat `model` (.splat) or a labelled placeholder (models/artisan.tsx). */
+  | 'splat'
+  /** Museum shop (models/shop.tsx). */
+  | 'shop-shelf'
+  | 'shop-table'
+  | 'shop-counter'
+  | 'stole-rail'
+  /** Reading room & library (models/library.tsx). */
+  | 'bookcase'
+  | 'reading-table'
+  | 'lounge-set'
+  | 'pattern-lectern'
+  | 'drawing-wall'
+  | 'resource-board'
+  /** Credits / partners wall panel (models/credits.tsx). */
+  | 'credits-panel'
 
 export interface SceneObjectConfig {
   id: string
@@ -73,11 +94,22 @@ export interface SceneObjectConfig {
   /** Attribution for downloaded CC0 assets. */
   credit?: { author: string; source: string; license: 'CC0' }
   placeholder?: boolean
+  /** Alternative text describing the object (guide, screen readers). */
+  alt?: string
+  /** Optional Hindi / Bengali overrides of the text fields. */
+  i18n?: ContentI18n<'title' | 'description' | 'alt'>
+  /** "Meet the maker" profile (src/museum/content/artisans.ts), e.g. for shop products. */
+  artisanId?: string
+  /** Links listed in the info panel (shop "Visit the maker / Buy", library Resources). No href = placeholder. */
+  links?: { label: string; href?: string; note?: string }[]
 }
 
 const PENDING = 'Interpretive text to be supplied by the workshop.'
-/** Poly Haven CC0 model path (downloaded by scripts/download-cc0-models.mjs). */
-const cc0 = (id: string) => `/models/cc0/${id}/${id}_1k.gltf`
+/**
+ * Poly Haven CC0 model: the optimised single-file GLB (meshopt + WebP, scripts/optimize-assets.mjs,
+ * verified by scripts/verify-optimized-models.mjs); sources in /models/cc0/<id>/ (download-cc0-models.mjs).
+ */
+const cc0 = (id: string) => `/models/opt/cc0/${id}.glb`
 const PH = (author: string, id: string) => ({ author, source: `https://polyhaven.com/a/${id}`, license: 'CC0' as const })
 const A = MUSEUM.wings.atrium
 const WS = MUSEUM.wings.workshop
@@ -357,6 +389,53 @@ export const SCENE_OBJECTS: SceneObjectConfig[] = [
   { id: 'workshop-crate', title: 'Timber crate', kind: 'crate', model: cc0('wooden_crate_01'), modelScale: 1, position: [14.4, 0, 19.6], rotationDeg: 180, footprint: [0.85, 0.44], height: 0.35, zone: 'workshop', credit: PH('James Ray Cock', 'wooden_crate_01') },
   { id: 'workshop-crate-basket', title: 'Wicker basket', kind: 'vessel', model: cc0('wicker_basket_01'), modelScale: 1, position: [14.25, 0.35, 19.6], rotationDeg: 8, height: 0.12, zone: 'workshop', credit: PH('Kuutti Siitonen', 'wicker_basket_01') },
   { id: 'workshop-brass-pot', title: 'Brass pot', kind: 'vessel', model: cc0('brass_pot_01'), modelScale: 1, position: [30.1, 0, 1.6], footprint: [0.34, 0.34], height: 0.29, zone: 'workshop', credit: PH('Rico Cilliers', 'brass_pot_01') },
+  // "Print it yourself": the studio table (opens the studio overlay) in front of the Visitors' Wall (west wall)
+  {
+    id: 'print-studio',
+    title: 'Print It Yourself — Studio Table',
+    kind: 'print-studio',
+    position: [13.0, 0, 8.5],
+    rotationDeg: 90,
+    footprint: [2.2, 1.0],
+    height: 0.86,
+    interactive: true,
+    description: 'A printing table for visitors. Choose a block and a dye, press it onto the cloth and hang your print on the Visitors’ Wall. The blocks are placeholder designs made for this museum.',
+    zone: 'workshop',
+  },
+  {
+    id: 'visitors-wall',
+    title: 'The Visitors’ Wall',
+    kind: 'visitors-wall',
+    position: [WS.minX + 0.02, 0, 8.6],
+    rotationDeg: 90,
+    footprint: [6.4, 0.08],
+    height: 3.6,
+    props: { cols: 8, rows: 3, width: 6.2, bottom: 1.0 },
+    interactive: true,
+    description: 'Prints made by visitors at the studio table, hung after review by the museum team. Make your own at the table in front of the wall.',
+    zone: 'workshop',
+  },
+  // volumetric artisan captures (Gaussian splats) — placeholders until the captures are made
+  ...(
+    [
+      ['artisan-capture-1', 17.2, 18.25 + 0.42, 180],
+      ['artisan-capture-2', 23.4, 10.35 - 0.42, 0],
+    ] as const
+  ).map<SceneObjectConfig>(([id, x, z, r]) => ({
+    id,
+    title: 'Artisan Capture — coming soon',
+    kind: 'splat',
+    // model: '/models/splats/<capture>.splat',  ← set when a capture exists
+    position: [x, 0, z],
+    rotationDeg: r,
+    footprint: [1.5, 0.7],
+    height: 1.45,
+    props: { seat: 0.6, tableHeight: 0.86, reach: 0.42 },
+    interactive: true,
+    description: 'PLACEHOLDER — a volumetric (Gaussian splat) recording of a printer at work will be shown here once it has been captured with the workshop. The glowing seated figure only marks the place.',
+    zone: 'workshop',
+    placeholder: true,
+  })),
 
   // ══ Dye Garden Courtyard ═════════════════════════════════════════
   // four drying lines in two pairs either side of the N–S axis from the workshop door (x ≈ 20.6),
@@ -451,6 +530,9 @@ export const SCENE_OBJECTS: SceneObjectConfig[] = [
   })),
   { id: 'garden-vase', title: 'Antique ceramic vase', kind: 'vessel', model: cc0('antique_ceramic_vase_01'), modelScale: 1, position: [28.95, 0, -30.65], rotationDeg: 20, footprint: [0.28, 0.28], height: 0.44, zone: 'courtyard', credit: PH('James Ray Cock', 'antique_ceramic_vase_01') },
   { id: 'garden-bucket', title: 'Wooden bucket', kind: 'vessel', model: cc0('wooden_bucket_01'), modelScale: 1, position: [13.4, 0, -31.6], rotationDeg: -35, footprint: [0.4, 0.4], height: 0.55, zone: 'courtyard', credit: PH('James Ray Cock', 'wooden_bucket_01') },
+
+  // ══ Museum Shop, Reading Room & Library, credits wall (config/amenities.ts) ══
+  ...AMENITY_OBJECTS,
 ]
 
 export function getSceneObject(id: string) {

@@ -1,5 +1,6 @@
 /** Admin API client (same-origin; session cookie). Contract: docs/API.md. */
 import type { ContentCollection, ExhibitionText, MuseumContent } from '../museum/content/types'
+import { exQuery } from './exhibitionsApi'
 
 /** visitor < curator (content + media) < admin (+ comments, analytics, users) < master (+ access list) */
 export type Role = 'visitor' | 'curator' | 'admin' | 'master'
@@ -79,6 +80,33 @@ export interface AnalyticsSummary {
   daily: { date: string; sessions: number }[]
 }
 
+export interface ErrorGroup {
+  fingerprint: string
+  kind: string
+  message: string
+  count: number
+  firstSeen: string
+  lastSeen: string
+  resolvedAt: string | null
+  lastStack: string | null
+  lastUrl: string | null
+  lastUa: string | null
+  lastTier: string | null
+  lastGpu: string | null
+  lastRelease: string | null
+  last24h?: number
+}
+export interface ErrorOccurrence {
+  id: number
+  url: string | null
+  ua: string | null
+  tier: string | null
+  gpu: string | null
+  release: string | null
+  stack: string | null
+  createdAt: string
+}
+
 export class ApiError extends Error {
   status: number
   constructor(status: number, message: string) {
@@ -109,13 +137,13 @@ export const api = {
   google: (credential: string) => req<User>('POST', '/api/auth/google', { credential }),
   logout: () => req<{ ok: true }>('POST', '/api/auth/logout'),
 
-  content: () => req<MuseumContent>('GET', '/api/content'),
-  list: (c: ContentCollection) => req<Item[]>('GET', `/api/admin/content/${c}`),
-  put: (c: ContentCollection, item: Item) => req<Item>('PUT', `/api/admin/content/${c}/${encodeURIComponent(item.id)}`, item),
-  remove: (c: ContentCollection, id: string) => req<{ ok: true }>('DELETE', `/api/admin/content/${c}/${encodeURIComponent(id)}`),
-  putExhibition: (e: ExhibitionText) => req<ExhibitionText>('PUT', '/api/admin/content/exhibition', e),
-  putWelcome: (w: { title: string; body: string }) => req<{ title: string; body: string }>('PUT', '/api/admin/content/welcome', w),
-  reset: () => req<{ ok: true }>('POST', '/api/admin/content/reset'),
+  content: () => req<MuseumContent>('GET', `/api/content${exQuery()}`),
+  list: (c: ContentCollection) => req<Item[]>('GET', `/api/admin/content/${c}${exQuery()}`),
+  put: (c: ContentCollection, item: Item) => req<Item>('PUT', `/api/admin/content/${c}/${encodeURIComponent(item.id)}${exQuery()}`, item),
+  remove: (c: ContentCollection, id: string) => req<{ ok: true }>('DELETE', `/api/admin/content/${c}/${encodeURIComponent(id)}${exQuery()}`),
+  putExhibition: (e: ExhibitionText) => req<ExhibitionText>('PUT', `/api/admin/content/exhibition${exQuery()}`, e),
+  putWelcome: (w: MuseumContent['welcome']) => req<MuseumContent['welcome']>('PUT', `/api/admin/content/welcome${exQuery()}`, w),
+  reset: () => req<{ ok: true }>('POST', `/api/admin/content/reset${exQuery()}`),
 
   mediaConfig: () => req<MediaConfig>('GET', '/api/admin/media/config'),
   media: () => req<MediaRecord[]>('GET', '/api/admin/media'),
@@ -126,6 +154,11 @@ export const api = {
   deleteComment: (id: string) => req<{ ok: true }>('DELETE', `/api/admin/comments/${id}`),
 
   summary: (days: number) => req<AnalyticsSummary>('GET', `/api/admin/analytics/summary?days=${days}`),
+
+  errors: (status: 'open' | 'resolved' | 'all') => req<{ groups: ErrorGroup[]; open: number; resolved: number }>('GET', `/api/admin/errors?status=${status}`),
+  errorDetail: (fp: string) => req<{ group: ErrorGroup; occurrences: ErrorOccurrence[] }>('GET', `/api/admin/errors/${fp}`),
+  resolveError: (fp: string, resolved: boolean) => req<{ ok: true }>('PATCH', `/api/admin/errors/${fp}`, { resolved }),
+  deleteError: (fp: string) => req<{ ok: true }>('DELETE', `/api/admin/errors/${fp}`),
 
   users: () => req<AdminUser[]>('GET', '/api/admin/users'),
   setUserRole: (id: string, role: ManualRole) => req<AdminUser>('PATCH', `/api/admin/users/${encodeURIComponent(id)}`, { role }),

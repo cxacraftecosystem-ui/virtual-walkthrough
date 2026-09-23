@@ -31,6 +31,36 @@ export const LIGHTING = {
     morning: { elevationDeg: 22, azimuthDeg: 96, intensity: 3.3, colorK: 4400, turbidity: 4.2, rayleigh: 1.6, skyExposure: 0.5 },
     midday: { elevationDeg: 58, azimuthDeg: 118, intensity: 4.4, colorK: 5600, turbidity: 3.2, rayleigh: 1.05, skyExposure: 0.55 },
     golden: { elevationDeg: 11, azimuthDeg: 252, intensity: 3.1, colorK: 3200, turbidity: 6.5, rayleigh: 2.6, skyExposure: 0.46 },
+    /**
+     * Blue hour: the sun is just below the horizon (the atmosphere keeps a warm band in the west);
+     * the directional light becomes a faint cool sky light from `lightElevationDeg/AzimuthDeg`.
+     */
+    dusk: { elevationDeg: -3.2, azimuthDeg: 262, intensity: 0.32, colorK: 11000, turbidity: 3.4, rayleigh: 2.2, skyExposure: 1, lightElevationDeg: 24, lightAzimuthDeg: 250 },
+    /** Night: sun off, moonlight (the directional light) from the south-east; interior lamps take over. */
+    night: { elevationDeg: -26, azimuthDeg: 300, intensity: 0.16, colorK: 9000, turbidity: 2, rayleigh: 1, skyExposure: 1, lightElevationDeg: 46, lightAzimuthDeg: 148 },
+  },
+
+  /**
+   * Artificial-light takeover per time of day (see lighting/timeOfDayState.ts):
+   *   night     0 = daylight scene … 1 = full night (sky formers dimmed, lanterns on, stars/moon)
+   *   twilight  blue-hour sky gradient amount
+   *   exposure  renderer exposure multiplier (eye adapts to the darker scene)
+   *   daylight  multiplier on the skylight/area daylight fill and the hemisphere "bounce" fill
+   */
+  ambience: {
+    morning: { night: 0, twilight: 0, exposure: 1, daylight: 1 },
+    midday: { night: 0, twilight: 0, exposure: 1, daylight: 1 },
+    golden: { night: 0, twilight: 0, exposure: 1.02, daylight: 0.9 },
+    dusk: { night: 0.55, twilight: 1, exposure: 1.2, daylight: 0.28 },
+    night: { night: 1, twilight: 0, exposure: 1.35, daylight: 0.04 },
+  },
+
+  /** Courtyard wall lanterns (lit at dusk/night; they borrow slots from the SpotPool). */
+  lanterns: {
+    colorK: 2300,
+    /** Downlight candela at full night. */
+    intensity: 26,
+    emissive: 3.2,
   },
 
   sky: {
