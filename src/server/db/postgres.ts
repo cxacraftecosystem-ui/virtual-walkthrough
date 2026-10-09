@@ -7,6 +7,7 @@ import 'server-only'
 // The subpath, not the package root, which also loads Vercel's cache, purge and WebSocket helpers.
 import { attachDatabasePool } from '@vercel/functions/db-connections'
 import pg from 'pg'
+import { databaseTls } from './tls'
 import type { Db, Param, Queryable, Row } from './types'
 
 // bigint / numeric → number (all our values are well inside 2^53).
@@ -23,8 +24,10 @@ for (const oid of [1184, 1114]) {
 
 export interface PgOptions {
   connectionString: string
-  /** 'disable' | 'require' (default: require unless the host is localhost). */
+  /** DATABASE_SSL: 'disable' | 'require' | 'verify-full'. Unset: decided by the URL and host (./tls). */
   ssl?: string
+  /** DATABASE_CA_CERT: PEM root(s) trusted next to the bundled Supabase root (./tls). */
+  caCert?: string
   max?: number
 }
 
@@ -84,24 +87,11 @@ export class PostgresDb implements Db {
   private readonly q: Queryable
 
   constructor(opts: PgOptions) {
-    const local = /@(localhost|127\.0\.0\.1)[:/]/.test(opts.connectionString)
-    // pg-connection-string maps `sslmode=require` to full certificate verification (which fails on
-    // Supabase's chain), so the URL's sslmode is taken out and applied by us instead.
-    let connectionString = opts.connectionString
-    let urlSslMode: string | undefined
-    try {
-      const u = new URL(connectionString)
-      urlSslMode = u.searchParams.get('sslmode') ?? undefined
-      for (const k of ['sslmode', 'uselibpqcompat']) u.searchParams.delete(k)
-      connectionString = u.toString()
-    } catch {
-      /* not a URL (key=value DSN) → leave as is */
-    }
-    const sslMode = opts.ssl || (urlSslMode && ['disable', 'verify-full'].includes(urlSslMode) ? urlSslMode : undefined) || (local && !urlSslMode ? 'disable' : 'require')
+    // Off, encrypted, or verified (Supabase: against the bundled root) — the rules are in ./tls.
+    const tls = databaseTls(opts.connectionString, { ssl: opts.ssl, caCert: opts.caCert })
     this.pool = new pg.Pool({
-      connectionString,
-      // Supabase presents a certificate chain not in Node's default store; encryption is still enforced.
-      ssl: sslMode === 'disable' ? false : { rejectUnauthorized: sslMode === 'verify-full' },
+      connectionString: tls.connectionString,
+      ssl: tls.ssl,
       max: opts.max ?? 5,
       // Short, because Fluid compute suspends an idle instance with whatever sockets it holds, and the
       // pooler or a NAT drops them meanwhile. 5 s is Vercel's figure for Fluid.

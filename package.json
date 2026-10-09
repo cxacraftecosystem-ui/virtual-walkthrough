@@ -11,6 +11,7 @@
     "test": "tsx --conditions=react-server --test \"tests/unit/*.test.ts\"",
     "shots": "node scripts/screenshots.mjs",
     "db:migrate": "tsx --conditions=react-server scripts/db-migrate.ts",
+    "db:tls-check": "tsx --conditions=react-server scripts/db-tls-check.ts",
     "start": "next start",
     "optimize:assets": "node scripts/optimize-assets.mjs && node scripts/verify-optimized-models.mjs",
     "test:visual": "node scripts/visual-regression.mjs",

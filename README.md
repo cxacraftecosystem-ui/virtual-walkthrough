@@ -379,6 +379,7 @@ npm run db:migrate     # apply supabase/migrations/*.sql to DATABASE_URL (or cre
                        # then seed content + admin if empty and re-sync staff roles
 USE_REMOTE=1 npm run db:migrate          # same, against the REMOTE_* (production) settings
 npm run db:migrate -- --schema-only      # migrations only (CI)
+USE_REMOTE=1 npm run db:tls-check        # read-only: the connection's certificate is verified (infra/setup-supabase.md §3)
 ```
 
 Setup guides (review before running — they create cloud resources):

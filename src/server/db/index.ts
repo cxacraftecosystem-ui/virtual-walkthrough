@@ -26,7 +26,7 @@ export function getDb(): Db {
     throw new Error('DATABASE_URL is not set — refusing to use the SQLite fallback on Vercel')
   }
   g.__museumDb ??= config.databaseUrl
-    ? new PostgresDb({ connectionString: config.databaseUrl, ssl: config.databaseSsl, max: config.databasePoolMax })
+    ? new PostgresDb({ connectionString: config.databaseUrl, ssl: config.databaseSsl, caCert: config.databaseCaCert, max: config.databasePoolMax })
     : new SqliteDb(config.dbPath) // migrates itself on open
   return g.__museumDb
 }

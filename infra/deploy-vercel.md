@@ -35,6 +35,7 @@ contrast, are set per route with `export const maxDuration`.
 | `S3_ENDPOINT` | no | S3-compatible storage (Supabase Storage, R2) |
 | `S3_PREFIX` | no | key prefix, e.g. `museum/` |
 | `DATABASE_POOL_MAX` | no | default 2 on Vercel. Never 1: under Fluid compute one instance serves several requests at once, and a transaction holds its client until it commits |
+| `DATABASE_SSL` / `DATABASE_CA_CERT` | no | leave unset: the Supabase server's certificate is verified against the root the app carries. `infra/setup-supabase.md` §3 |
 | `ALLOWED_ORIGINS` | no | extra origins allowed to POST/PUT (custom domains are same-origin already) |
 
 `NODE_ENV=production` is set by Vercel, which turns on the `Secure` cookie flag.

@@ -57,12 +57,38 @@ the database is empty, and the admin account from `ADMIN_EMAIL`/`ADMIN_PASSWORD`
 
 Supabase dashboard → **Connect** → **Transaction pooler** (port **6543**) — use this for Vercel
 (serverless functions open many short-lived connections). Put it in `DATABASE_URL`.
-SSL is on by default (`DATABASE_SSL=require`): the connection is encrypted, but the server certificate
-is not verified, because Supabase signs it with its own CA, which is not in Node's trust store.
-`DATABASE_SSL=verify-full` turns verification on without supplying a CA — the app has no setting for
-one — so against Supabase it fails every connection unless Node already trusts that CA (the
-`NODE_EXTRA_CA_CERTS` file, read once at process start). Leave it at `require` until the pool can be
-given the CA (Dashboard → Database Settings → SSL Configuration) directly.
+
+The connection is encrypted **and the server is verified**. Supabase signs its server certificates with
+its own root, *Supabase Root 2021 CA*, which is not in Node's trust store, so the app carries it
+(`src/server/db/supabaseCa.ts`). Against a Supabase host (`*.supabase.com`, `*.supabase.co`) the
+certificate must chain to that root and carry the host's name; the poolers present
+`*.pooler.supabase.com`. This holds although the dashboard's connection strings say `sslmode=require`:
+libpq also verifies a `require` connection once it has a root certificate. Migrations
+(`npm run db:migrate`, CI's included) connect the same way. The rules, in `src/server/db/tls.ts`:
+
+| Setting | Effect |
+|---|---|
+| `DATABASE_SSL` unset | Supabase host: verified. localhost: no TLS. Any other host: verified when `DATABASE_CA_CERT` is set, otherwise encrypted only |
+| `DATABASE_SSL=require` | encrypted, certificate **not** verified: the way out if verification ever fails |
+| `DATABASE_SSL=verify-full` | verified on any host; elsewhere than Supabase, without `DATABASE_CA_CERT`, against Node's public roots |
+| `DATABASE_SSL=disable` | no TLS |
+| `sslmode` in the URL | `disable`: no TLS; `verify-full` or `verify-ca`: verified, host name included; any other value turns TLS on for localhost and changes nothing elsewhere. `DATABASE_SSL` wins over it |
+
+`DATABASE_CA_CERT` (PEM text; one or more certificates; on one line with `\n` for line breaks is fine)
+is trusted next to the bundled root. When Supabase announces a new root, put it there and the switch
+needs no release; then replace the bundled one as the comment in `supabaseCa.ts` describes. A unit test
+fails six months before the current root expires on 26 April 2031, as a reminder.
+
+To see it against the real database (read-only: each connection runs `SELECT 1`, nothing else):
+
+```bash
+USE_REMOTE=1 npm run db:tls-check    # the REMOTE_* URLs from .env.local; without USE_REMOTE, DATABASE_URL
+```
+
+It connects to both poolers with the app's settings (certificate verified) and with
+`DATABASE_SSL=require` (encrypted, not verified), and shows that verification refuses a root that did
+not sign the chain and the right root under a name the certificate does not carry: the pooler's load
+balancer name and its IP address, both of which `DATABASE_SSL=require` still reaches.
 
 ## Optional: Supabase Storage instead of S3
 

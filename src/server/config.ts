@@ -23,8 +23,10 @@ export const config = {
 
   /* ---- database: Postgres when DATABASE_URL is set, else local SQLite ---- */
   databaseUrl: pick('DATABASE_URL') ?? '',
-  /** 'require' (default for remote hosts) | 'verify-full' | 'disable' */
+  /** 'disable' | 'require' | 'verify-full'; unset → by host, Supabase verified (src/server/db/tls.ts) */
   databaseSsl: env.DATABASE_SSL,
+  /** PEM root certificate(s) trusted next to the bundled Supabase root, e.g. a rotated root. */
+  databaseCaCert: env.DATABASE_CA_CERT,
   databasePoolMax: Number(env.DATABASE_POOL_MAX ?? (env.VERCEL ? 2 : 5)),
   dbPath: path.resolve(/* turbopackIgnore: true */ ROOT, env.DB_PATH ?? '.data/museum.sqlite'),
 
