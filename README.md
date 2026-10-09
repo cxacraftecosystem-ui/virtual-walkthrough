@@ -440,10 +440,13 @@ least-privilege IAM user `hand-block-museum-app`, Vercel project `hand-block-mus
 - **Curator analytics** (admin → *Analytics*): the tracker samples the visitor position every 2 s (`pos`) and tour
   arrivals (`tour_step`). Positions are aggregated on arrival into `analytics_heat` (0.5 m cells per exhibition /
   day / zone) and never stored raw. Floor-plan heatmap (walls from `config/layout.ts`), zone filter, date range,
-  tour funnel, attention ranking, CSV export.
+  tour funnel, attention ranking, CSV export. Each batch the tracker sends carries an id made in the browser, and
+  a batch that fails is sent again unchanged under that id; the server stores an id once per session
+  (`analytics_batches`), so a batch whose reply was lost is not counted twice.
 - **Retention**: analytics older than the retention setting (default **180 days**, admin → Analytics → *Privacy &
-  retention*) are deleted automatically at most once a day, and by `POST /api/admin/analytics/cleanup` (admin) or
-  `GET|POST` with `Authorization: Bearer $CRON_SECRET` for a scheduled job, e.g. a Vercel Cron Job
+  retention*) are deleted automatically at most once a day (batch ids after 31 days), and by
+  `POST /api/admin/analytics/cleanup` (admin) or `GET|POST` with `Authorization: Bearer $CRON_SECRET` for a
+  scheduled job, e.g. a Vercel Cron Job
   (`"crons": [{ "path": "/api/admin/analytics/cleanup", "schedule": "0 3 * * *" }]` + `CRON_SECRET` env var).
 
 ### Print it yourself, Visitors' Wall & artisan presence

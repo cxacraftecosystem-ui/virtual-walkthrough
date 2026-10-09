@@ -153,6 +153,15 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (exhibition_id, day, zone, cx, cz)
   );
   `,
+  // analytics batch markers: a batch sent again is stored once
+  // (supabase/migrations/20261009120000_analytics_batches.sql)
+  `
+  CREATE TABLE IF NOT EXISTS analytics_batches (
+    session_id TEXT NOT NULL, batch_id TEXT NOT NULL, received_at INTEGER NOT NULL,
+    PRIMARY KEY (session_id, batch_id)
+  );
+  CREATE INDEX IF NOT EXISTS analytics_batches_received ON analytics_batches(received_at);
+  `,
 ]
 
 /** Schema version of this code (a dev-server singleton opened by older code is reopened). */

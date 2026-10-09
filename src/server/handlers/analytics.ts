@@ -1,6 +1,7 @@
 import 'server-only'
-import type { Param } from '../db'
-import { HeatBatch, resolveEventExhibition, summaryExhibition } from './curatorAnalytics'
+import { after } from 'next/server'
+import type { Db, Param } from '../db'
+import { EVENT_MAX_AGE_MS, EVENT_MAX_AHEAD_MS, HeatBatch, maybeAutoCleanup, resolveEventExhibition, summaryExhibition } from './curatorAnalytics'
 import { route } from '../http'
 import { createRateLimiter, fail, isRecord } from '../util'
 
@@ -22,52 +23,90 @@ const MAX_BATCH = 200
 /** Per-instance abuse guards; pair with a Vercel Firewall rule on /api/analytics/* for fleet-wide limits. */
 const ipLimit = createRateLimiter(120, 60_000)
 const sessionLimit = createRateLimiter(20, 60_000)
-const SESSION_RE = /^[A-Za-z0-9_-]{8,64}$/
+/** Session ids and batch ids alike: random, made by the tracker in the browser. */
+const ID_RE = /^[A-Za-z0-9_-]{8,64}$/
 // NUL bytes are rejected by Postgres text columns.
 const str = (v: unknown, max = 100): string | null => (typeof v === 'string' && v.length > 0 ? v.split(String.fromCharCode(0)).join('').slice(0, max) || null : null)
+
+export interface EventBatch {
+  sessionId: string
+  /** null: sent by a tracker from before batch ids (a page still cached), stored without the check. */
+  batchId: string | null
+  exhibitionId: string
+  events: unknown[]
+}
+
+/**
+ * Stores one batch, once. The tracker sends a failed batch again, unchanged and under the same id,
+ * and a failure may be a lost reply to a batch that was in fact stored. So the batch's marker
+ * (analytics_batches: session_id, batch_id) is inserted first, in the same transaction as its events
+ * and heatmap cells. A marker already there means an earlier attempt stored the batch: nothing is
+ * stored again. A failure anywhere rolls the marker back with the rest, so the next attempt can succeed.
+ */
+export async function storeBatch(db: Db, batch: EventBatch, now = Date.now()): Promise<{ accepted: number; duplicate: boolean }> {
+  const rows: Param[][] = []
+  const heat = new HeatBatch(batch.exhibitionId)
+  for (const e of batch.events) {
+    if (!isRecord(e) || typeof e.type !== 'string' || !EVENT_TYPES.has(e.type)) continue
+    const t = typeof e.t === 'number' && Number.isFinite(e.t) ? Math.round(e.t) : now
+    if (t > now + EVENT_MAX_AHEAD_MS || t < now - EVENT_MAX_AGE_MS) continue // clock garbage
+    if (e.type === 'pos') {
+      heat.add(t, e.x, e.z, str(e.zone))
+      continue
+    }
+    const seconds = typeof e.seconds === 'number' && Number.isFinite(e.seconds) ? Math.min(Math.max(e.seconds, 0), 3600) : null
+    let meta: string | null = null
+    if (e.meta !== undefined && e.meta !== null) {
+      const s = JSON.stringify(e.meta).split('\\u0000').join('') // JSON escape of NUL, rejected by Postgres
+      if (s.length <= 500) meta = s
+    }
+    rows.push([batch.sessionId, t, e.type, str(e.zone), str(e.itemKind, 30), str(e.itemId), seconds, str(e.tier, 20), meta, now, batch.exhibitionId])
+  }
+  // Nothing to store, so nothing that could be stored twice: no transaction, no marker.
+  if (!rows.length && heat.empty) return { accepted: 0, duplicate: false }
+
+  return db.tx(async (q) => {
+    if (batch.batchId) {
+      const first = await q.run(
+        'INSERT INTO analytics_batches (session_id, batch_id, received_at) VALUES ($1, $2, $3) ON CONFLICT (session_id, batch_id) DO NOTHING',
+        [batch.sessionId, batch.batchId, now],
+      )
+      if (!first) return { accepted: 0, duplicate: true }
+    }
+    if (rows.length) {
+      const values = rows.map((_, i) => `(${Array.from({ length: 11 }, (_, j) => `$${i * 11 + j + 1}`).join(', ')})`).join(', ')
+      await q.run(
+        `INSERT INTO analytics_events (session_id, t, type, zone, item_kind, item_id, seconds, tier, meta, received_at, exhibition_id) VALUES ${values}`,
+        rows.flat(),
+      )
+    }
+    return { accepted: rows.length + (await heat.flush(q)), duplicate: false }
+  })
+}
 
 /** POST /api/analytics/events — public, batched; accepts application/json and text/plain (navigator.sendBeacon). */
 export const postEvents = route(
   async (c) => {
     const db = c.db
     const b = await c.json({ allowText: true })
-    if (!isRecord(b)) return fail(400, 'Body must be { sessionId, events }')
+    if (!isRecord(b)) return fail(400, 'Body must be { sessionId, batchId, events }')
     const sessionId = str(b.sessionId)
-    if (!sessionId || !SESSION_RE.test(sessionId)) return fail(400, '"sessionId" is required')
+    if (!sessionId || !ID_RE.test(sessionId)) return fail(400, '"sessionId" is required')
     if (!ipLimit(c.ip) || !sessionLimit(sessionId)) return fail(429, 'Too many analytics batches')
     if (!Array.isArray(b.events)) return fail(400, '"events" must be an array')
     if (b.events.length > MAX_BATCH) return fail(413, `Max ${MAX_BATCH} events per batch`)
+    // Absent only from a tracker older than batch ids: still stored, without the duplicate check.
+    let batchId: string | null = null
+    if (b.batchId !== undefined && b.batchId !== null) {
+      if (typeof b.batchId !== 'string' || !ID_RE.test(b.batchId)) return fail(400, '"batchId" must be 8–64 letters, digits, "-" or "_"')
+      batchId = b.batchId
+    }
 
-    const now = Date.now()
-    const exhibitionId = await resolveEventExhibition(db, b.exhibition)
-    const rows: Param[][] = []
-    const heat = new HeatBatch(exhibitionId)
-    for (const e of b.events) {
-      if (!isRecord(e) || typeof e.type !== 'string' || !EVENT_TYPES.has(e.type)) continue
-      const t = typeof e.t === 'number' && Number.isFinite(e.t) ? Math.round(e.t) : now
-      if (t > now + 86_400_000 || t < now - 30 * 86_400_000) continue // clock garbage
-      if (e.type === 'pos') {
-        heat.add(t, e.x, e.z, str(e.zone))
-        continue
-      }
-      const seconds = typeof e.seconds === 'number' && Number.isFinite(e.seconds) ? Math.min(Math.max(e.seconds, 0), 3600) : null
-      let meta: string | null = null
-      if (e.meta !== undefined && e.meta !== null) {
-        const s = JSON.stringify(e.meta).split('\\u0000').join('') // JSON escape of NUL, rejected by Postgres
-        if (s.length <= 500) meta = s
-      }
-      rows.push([sessionId, t, e.type, str(e.zone), str(e.itemKind, 30), str(e.itemId), seconds, str(e.tier, 20), meta, now, exhibitionId])
-    }
-    if (rows.length) {
-      const values = rows.map((_, i) => `(${Array.from({ length: 11 }, (_, j) => `$${i * 11 + j + 1}`).join(', ')})`).join(', ')
-      await db.run(
-        `INSERT INTO analytics_events (session_id, t, type, zone, item_kind, item_id, seconds, tier, meta, received_at, exhibition_id) VALUES ${values}`,
-        rows.flat(),
-      )
-    }
-    const cells = await heat.flush(db)
+    const out = await storeBatch(db, { sessionId, batchId, exhibitionId: await resolveEventExhibition(db, b.exhibition), events: b.events })
+    if (out.accepted) after(() => maybeAutoCleanup(db))
     c.status = 202
-    return { ok: true, accepted: rows.length + cells }
+    // duplicate: true — this batch id was stored by an earlier attempt, so nothing was stored now.
+    return { ok: true, ...out }
   },
   { crossOrigin: true },
 )

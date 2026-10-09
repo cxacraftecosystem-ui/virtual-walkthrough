@@ -7,13 +7,13 @@
  *  - 'tour_step' events: `itemId` = tour stop id, `meta.index` = stop index.
  *  - Retention: meta 'analytics_retention_days' (default 180). Rows older than that are deleted by
  *    POST /api/admin/analytics/cleanup (admin, or `Authorization: Bearer $CRON_SECRET` for a
- *    scheduled job) and automatically at most once a day from the ingestion endpoint.
+ *    scheduled job) and automatically at most once a day from the ingestion endpoint. The same job
+ *    deletes batch markers (analytics_batches) after BATCH_MARKER_MS, whatever the retention.
  */
 import 'server-only'
 import { DEFAULT_EXHIBITION_ID, defaultExhibitionRow, findExhibition, getMeta, setMeta } from '../contentStore'
-import { type Db, nowIso, type Param } from '../db'
+import { type Db, nowIso, type Param, type Queryable } from '../db'
 import { type Call, route } from '../http'
-import { after } from 'next/server'
 import { fail, isRecord } from '../util'
 
 export const HEAT_CELL_M = 0.5
@@ -22,6 +22,19 @@ export const DEFAULT_RETENTION_DAYS = 180
 const COORD_LIMIT = 100 // metres; the building spans roughly ±35 m
 const DAY_MS = 86_400_000
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/** Ingestion keeps an event only when it is dated at most this long before its batch arrives… */
+export const EVENT_MAX_AGE_MS = 30 * DAY_MS
+/** …or this long after it (clocks run fast). */
+export const EVENT_MAX_AHEAD_MS = DAY_MS
+/**
+ * How long a batch marker (analytics_batches) is kept. The tracker never gives up on a failed batch
+ * while its page lives: it sends it again every 10 s, and a page that slept with a request in flight
+ * sends it again on waking, however much later. The client sets no limit, so the server's applies:
+ * 31 days after a batch first arrived, every event in it is too old to be stored, and its marker has
+ * nothing left to stop.
+ */
+export const BATCH_MARKER_MS = EVENT_MAX_AGE_MS + EVENT_MAX_AHEAD_MS
 
 /* ------------------------------------------------------------------ */
 /* Ingestion helpers (used by analytics.ts → postEvents)               */
@@ -41,7 +54,10 @@ export async function resolveEventExhibition(db: Db, v: unknown): Promise<string
   return id
 }
 
-/** Collects 'pos' samples of one batch and upserts them into analytics_heat in one statement. */
+/**
+ * Collects 'pos' samples of one batch and upserts them into analytics_heat in one statement, through
+ * the batch's transaction: a batch stored twice would count its samples twice.
+ */
 export class HeatBatch {
   private readonly cells = new Map<string, { day: string; zone: string; cx: number; cz: number; n: number }>()
   constructor(private readonly exhibitionId: string) {}
@@ -59,8 +75,12 @@ export class HeatBatch {
     else this.cells.set(k, { day, zone: zn, cx, cz, n: 1 })
   }
 
+  get empty() {
+    return this.cells.size === 0
+  }
+
   /** Returns the number of samples written. */
-  async flush(db: Db): Promise<number> {
+  async flush(q: Queryable): Promise<number> {
     if (!this.cells.size) return 0
     const list = [...this.cells.values()]
     const params: Param[] = []
@@ -70,13 +90,11 @@ export class HeatBatch {
       return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, $${b + 6})`
     })
     // keys are unique within the statement (aggregated above), as Postgres requires
-    await db.run(
+    await q.run(
       `INSERT INTO analytics_heat (exhibition_id, day, zone, cx, cz, samples) VALUES ${values.join(', ')}
        ON CONFLICT (exhibition_id, day, zone, cx, cz) DO UPDATE SET samples = analytics_heat.samples + excluded.samples`,
       params,
     )
-    // after(): keeps the function alive until cleanup finishes (a bare promise can be frozen mid-query)
-    after(() => maybeAutoCleanup(db))
     return list.reduce((s, c) => s + c.n, 0)
   }
 }
@@ -296,14 +314,25 @@ export async function cleanupAnalytics(db: Db) {
   const cutoffDay = new Date(cutoffMs).toISOString().slice(0, 10)
   const events = await db.run('DELETE FROM analytics_events WHERE t < $1', [cutoffMs])
   const heat = await db.run('DELETE FROM analytics_heat WHERE day < $1', [cutoffDay])
-  const result = { retentionDays: days, cutoff: new Date(cutoffMs).toISOString(), deletedEvents: events, deletedHeatRows: heat, ranAt: nowIso() }
+  const markers = await db.run('DELETE FROM analytics_batches WHERE received_at < $1', [Date.now() - BATCH_MARKER_MS])
+  const result = {
+    retentionDays: days,
+    cutoff: new Date(cutoffMs).toISOString(),
+    deletedEvents: events,
+    deletedHeatRows: heat,
+    deletedBatchMarkers: markers,
+    ranAt: nowIso(),
+  }
   await setMeta(db, 'analytics_last_cleanup', JSON.stringify(result))
   return result
 }
 
 const g = globalThis as { __museumAnalyticsCleanupAt?: number }
-/** At most once per day per process (and per DB via meta), fire-and-forget from ingestion. */
-async function maybeAutoCleanup(db: Db) {
+/**
+ * At most once per day per process (and per DB via meta), from ingestion. Call it in after(), which
+ * keeps the function alive until it finishes (a bare promise can be frozen mid-query).
+ */
+export async function maybeAutoCleanup(db: Db) {
   try {
     const now = Date.now()
     if (g.__museumAnalyticsCleanupAt && now - g.__museumAnalyticsCleanupAt < DAY_MS) return

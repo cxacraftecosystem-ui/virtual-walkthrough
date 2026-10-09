@@ -2,7 +2,9 @@
  * Anonymous visit analytics → POST /api/analytics/events (docs/API.md).
  *
  * - Random session id in sessionStorage (no personal data).
- * - Events are queued and flushed every 10 s, and via navigator.sendBeacon on pagehide.
+ * - Events are sent in batches, one request every 10 s, and the rest via navigator.sendBeacon on
+ *   pagehide. Each batch has an id made here; a batch that fails is sent again unchanged, under that
+ *   id, and the server stores an id once, so a lost reply does not store a batch twice (./outbox.ts).
  * - Automatic events: session_start (tier), zone_enter / zone_dwell (visitor position polled
  *   2×/s), item_view / item_dwell (store.nearby & selection), panel_open, inspect_open,
  *   video_play (window event, see below).
@@ -20,19 +22,21 @@ import { zoneAt } from '../config/layout'
 import { useMuseum } from '../state/store'
 import { visitor } from '../state/visitor'
 import { startCuratorTracking } from './curatorTracking'
+import { createOutbox } from './outbox'
 
 const FLUSH_MS = 10000
 const POLL_MS = 500
-const MAX_BATCH = 200
-const MAX_QUEUE = 2000
 const SESSION_KEY = 'museum.sessionId'
 
 let enabled = false
 let started = false
 /** Health probe answered (nothing is sent before). */
 let ready = false
-let queue: AnalyticsEvent[] = []
 let sessionId = ''
+const outbox = createOutbox({
+  send: (batch) => api.analytics.send(getSessionId(), batch.id, batch.events),
+  beacon: (batch) => api.analytics.beacon(getSessionId(), batch.id, batch.events),
+})
 
 function makeId() {
   try {
@@ -63,10 +67,9 @@ type Extra = Omit<AnalyticsEvent, 't' | 'type'>
 export function track(type: AnalyticsEventType, extra: Extra = {}) {
   try {
     if (started && !enabled) return
-    if (queue.length >= MAX_QUEUE) queue.shift()
     const ev: AnalyticsEvent = { t: Date.now(), type }
     for (const [k, v] of Object.entries(extra)) if (v !== undefined) (ev as unknown as Record<string, unknown>)[k] = v
-    queue.push(ev)
+    outbox.push(ev)
   } catch {
     /* never throw */
   }
@@ -74,23 +77,9 @@ export function track(type: AnalyticsEventType, extra: Extra = {}) {
 
 function flush(useBeacon = false) {
   try {
-    if (!ready || !enabled || queue.length === 0) return
-    const id = getSessionId()
-    while (queue.length) {
-      const batch = queue.splice(0, MAX_BATCH)
-      if (useBeacon) {
-        if (!api.analytics.beacon(id, batch)) void api.analytics.send(id, batch).catch(() => {})
-      } else {
-        void api.analytics.send(id, batch).catch((err: unknown) => {
-          // client errors (4xx: malformed / rate-limited) would fail forever — drop that batch
-          const status = (err as { status?: number })?.status ?? 0
-          if (status >= 400 && status < 500 && status !== 429) return
-          // put back (bounded) and retry next tick
-          queue = [...batch, ...queue].slice(-MAX_QUEUE)
-        })
-        break // one batch per tick keeps things gentle
-      }
-    }
+    if (!ready || !enabled) return
+    if (useBeacon) outbox.flushAll()
+    else outbox.flush() // one batch per tick keeps things gentle
   } catch {
     /* never throw */
   }
@@ -218,7 +207,7 @@ export function startAnalytics() {
     void checkBackend().then((ok) => {
       enabled = ok
       ready = true
-      if (!ok) queue = []
+      if (!ok) outbox.clear()
     })
 
     window.setInterval(() => flush(false), FLUSH_MS)

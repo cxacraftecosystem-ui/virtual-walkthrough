@@ -138,7 +138,7 @@ Keys: `deepzoom/<set>/image.dzi` + `deepzoom/<set>/image_files/<level>/<col>_<ro
 ## Analytics
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/api/analytics/events` | public, batched: `{ sessionId, events: AnalyticsEvent[] }` (max 200/batch). `navigator.sendBeacon` compatible (text/plain JSON accepted). → **202** `{ ok: true, accepted }` (unknown event types are skipped). |
+| POST | `/api/analytics/events` | public, batched: `{ sessionId, batchId, events: AnalyticsEvent[] }` (max 200/batch). `navigator.sendBeacon` compatible (text/plain JSON accepted). → **202** `{ ok: true, accepted, duplicate: false }` (unknown event types are skipped). `batchId` (8–64 of `A–Z a–z 0–9 _ -`, made by the client) stays the same on every attempt to send a batch: each `(sessionId, batchId)` is stored once, so a batch sent again after a lost reply stores nothing and answers **202** `{ ok: true, accepted: 0, duplicate: true }`. A batch without `batchId` (older clients) is stored without that check; a malformed one is a 400. |
 | GET | `/api/admin/analytics/summary?days=7` | admin → `{ days, sessions, avgSessionSec, zoneDwell: {zone, seconds}[], topItems: {itemKind, itemId, views, dwellSec}[], quality: {tier, count}[], daily: {date, sessions}[] }` (`days` 1–365; `daily` has one entry per UTC day, zero-filled) |
 
 `AnalyticsEvent = { t: number (epoch ms), type: 'session_start' | 'zone_enter' | 'zone_dwell' | 'item_view' | 'item_dwell' | 'panel_open' | 'inspect_open' | 'video_play' | 'tour_start' | 'tour_complete' | 'tour_step' | 'pos', zone?, itemKind?, itemId?, seconds?, tier?, meta?, x?, z? }`. The batch body may carry `exhibition` (slug; default when absent/unknown).
@@ -154,7 +154,7 @@ Curator analytics (role ≥ admin; all take `exhibition` (id|slug, default when 
 | GET | `/api/admin/analytics/curator?kind=` | `{ funnel: { starts, completes, steps: { stopId, index, sessions }[] }, attention: { itemKind, itemId, views, viewers, dwellSec, avgDwellSec }[] }` |
 | GET | `/api/admin/analytics/export?dataset=heatmap\|zones\|attention\|funnel` | `text/csv` download (UTF-8 BOM; formula-injection safe) |
 | GET / PUT | `/api/admin/analytics/retention` | `{ days, defaultDays: 180, lastCleanup }` / PUT `{ days: 7–1825 }` |
-| POST | `/api/admin/analytics/cleanup` | deletes events / heatmap rows older than the retention → `{ retentionDays, cutoff, deletedEvents, deletedHeatRows, ranAt }`. Admin session, **or** `Authorization: Bearer $CRON_SECRET` (GET accepted too, for a Vercel Cron Job). Also runs automatically at most once a day from event ingestion. |
+| POST | `/api/admin/analytics/cleanup` | deletes events / heatmap rows older than the retention, and batch markers (`analytics_batches`) older than 31 days → `{ retentionDays, cutoff, deletedEvents, deletedHeatRows, deletedBatchMarkers, ranAt }`. Admin session, **or** `Authorization: Bearer $CRON_SECRET` (GET accepted too, for a Vercel Cron Job). Also runs automatically at most once a day from event ingestion. |
 
 ## Errors / monitoring
 Built-in client error reporting (no SDK). The browser side (`src/museum/utils/errorReporter.ts`, installed by `app/MuseumClient.tsx`)

@@ -221,12 +221,13 @@ export const api = {
   },
 
   analytics: {
-    send: (sessionId: string, events: AnalyticsEvent[]) =>
-      request<unknown>('POST', '/analytics/events', { sessionId, exhibition: CURRENT_EXHIBITION.slug, events }),
+    /** One batch. `batchId` is the same on every attempt, so the server stores the batch once. */
+    send: (sessionId: string, batchId: string, events: AnalyticsEvent[]) =>
+      request<unknown>('POST', '/analytics/events', { sessionId, batchId, exhibition: CURRENT_EXHIBITION.slug, events }),
     /** Fire-and-forget for page unload (text/plain JSON, accepted by the server). */
-    beacon: (sessionId: string, events: AnalyticsEvent[]) => {
+    beacon: (sessionId: string, batchId: string, events: AnalyticsEvent[]) => {
       try {
-        const blob = new Blob([JSON.stringify({ sessionId, exhibition: CURRENT_EXHIBITION.slug, events })], { type: 'text/plain;charset=UTF-8' })
+        const blob = new Blob([JSON.stringify({ sessionId, batchId, exhibition: CURRENT_EXHIBITION.slug, events })], { type: 'text/plain;charset=UTF-8' })
         return navigator.sendBeacon?.(`${BASE}/analytics/events`, blob) ?? false
       } catch {
         return false

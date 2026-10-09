@@ -65,7 +65,8 @@ sockets and all, when it goes idle. `src/server/db/postgres.ts` is set up for th
   (and, outside a transaction, committed it). So a plain query that meets a dead pooled socket is sent
   once more, on another connection, only if it reads: one `SELECT`, `SHOW` or `WITH … SELECT`. A
   write fails instead: the request answers 500 and logs `[museum] <METHOD> <path> failed:` with the
-  error (the analytics tracker re-sends its batch on the next tick). A transaction whose `BEGIN` fails
+  error (the analytics tracker sends the same batch again on the next tick, and the server stores a
+  batch id once, so a batch whose reply was lost is not stored twice). A transaction whose `BEGIN` fails
   that way is retried once, because none of its work has run; once its work has started it is never
   retried. A client whose connection broke is destroyed rather than handed to the next request. The
   comment and session inserts are also written to be harmless if repeated (`ON CONFLICT … DO NOTHING`).
