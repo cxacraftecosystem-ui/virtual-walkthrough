@@ -42,10 +42,17 @@ walk there, click artworks/objects for details, **E** for the nearby item, **M**
 ```bash
 npm run build        # next build (type-checks)
 npm run start        # production server on http://localhost:3000
-npm run typecheck
+npm run typecheck    # TypeScript 7, the native compiler
 npm run lint
 npm test             # unit tests (tests/unit), no database needed
 ```
+
+Node.js 24 (the current LTS; `engines` in `package.json`, CI and Vercel agree). Two TypeScripts are installed side
+by side, as the TypeScript 7 release recommends: `@typescript/native` is TypeScript 7, which `npm run typecheck`
+runs, and `typescript` is TypeScript 6 (`@typescript/typescript6`), because typescript-eslint needs the JavaScript
+API that TypeScript 7 does not have yet. `next build` type-checks with the package named `typescript`, so with
+TypeScript 6. The typecheck script calls TypeScript 7 by its path, since both bring a `tsc` command and npm links
+only one of them.
 
 ## How to deploy
 
