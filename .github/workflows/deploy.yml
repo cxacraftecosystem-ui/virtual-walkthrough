@@ -37,6 +37,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+      # Unit tests (tests/unit): no database, about two seconds.
+      - run: npm test
 
   migrate:
     name: database migrations (production)

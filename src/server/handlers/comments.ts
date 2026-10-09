@@ -61,15 +61,14 @@ export const postComment = route(async (c) => {
   const v = await c.db.one<{ email_verified: number }>('SELECT email_verified FROM users WHERE id = $1', [user.id])
   const hidden = user.role === 'visitor' && !Number(v?.email_verified) ? 1 : 0
   const row: Row = { id: randomUUID(), item_kind: kind, item_id: id, body, hidden, created_at: nowIso(), display_name: user.displayName }
-  await c.db.run('INSERT INTO comments (id, user_id, item_kind, item_id, body, hidden, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
-    row.id,
-    user.id,
-    kind,
-    id,
-    body,
-    hidden,
-    row.created_at,
-  ])
+  // The id is minted just above, so only a second run of this same statement can conflict with it, and
+  // that must store nothing rather than report a saved comment as failed (23505). Nothing sends a write
+  // twice today (db/postgres.ts retries reads only); this keeps a repeat harmless if anything ever does.
+  await c.db.run(
+    `INSERT INTO comments (id, user_id, item_kind, item_id, body, hidden, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (id) DO NOTHING`,
+    [row.id, user.id, kind, id, body, hidden, row.created_at],
+  )
   c.status = 201
   return { ...toComment(row), pending: hidden === 1 }
 })

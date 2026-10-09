@@ -44,6 +44,7 @@ npm run build        # next build (type-checks)
 npm run start        # production server on http://localhost:3000
 npm run typecheck
 npm run lint
+npm test             # unit tests (tests/unit), no database needed
 ```
 
 ## How to deploy

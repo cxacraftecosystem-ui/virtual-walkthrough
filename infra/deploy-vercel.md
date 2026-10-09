@@ -2,7 +2,10 @@
 
 The app is a standard Next.js (App Router) project: the museum and `/admin` are pages, every
 `/api/*` endpoint and `/media/*` are Route Handlers running as Vercel Node.js functions.
-No `vercel.json` is required (function limits are set per route with `export const maxDuration`).
+**`vercel.json` is required.** Its `"regions": ["bom1"]` runs the functions in Mumbai, next to the
+Supabase database (ap-south-1), and a Vercel project's own default region is `iad1` (Washington):
+delete the file and every database round trip silently crosses the world. Function limits, by
+contrast, are set per route with `export const maxDuration`.
 
 > `vercel link`, `vercel env add` and `vercel deploy` change cloud state — confirm first. The project
 > `hand-block-museum` has been created and linked, and its env vars are set; CI deploys via
@@ -31,10 +34,41 @@ No `vercel.json` is required (function limits are set per route with `export con
 | `S3_PUBLIC_BASE_URL` | recommended | `https://d3rtt6mxyznwx8.cloudfront.net`, the CloudFront CDN in front of the bucket (set for production, preview and development). Created by `infra/setup-cloudfront.sh`; see `infra/cloudfront.md` |
 | `S3_ENDPOINT` | no | S3-compatible storage (Supabase Storage, R2) |
 | `S3_PREFIX` | no | key prefix, e.g. `museum/` |
-| `DATABASE_POOL_MAX` | no | default 2 on Vercel |
+| `DATABASE_POOL_MAX` | no | default 2 on Vercel. Never 1: under Fluid compute one instance serves several requests at once, and a transaction holds its client until it commits |
 | `ALLOWED_ORIGINS` | no | extra origins allowed to POST/PUT (custom domains are same-origin already) |
 
 `NODE_ENV=production` is set by Vercel, which turns on the `Secure` cookie flag.
+
+**Secret variables are not real at build time in CI.** The workflow builds prebuilt
+(`vercel pull` → `vercel build`), and `vercel pull` writes `[SENSITIVE]` in place of every variable
+stored as Sensitive. Only the plain ones are real during the build — which is why every `NEXT_PUBLIC_*`
+variable must stay plain (it is inlined into the bundle, and is public anyway), and why nothing may
+read a secret (`DATABASE_URL`, `ADMIN_PASSWORD`, AWS keys…) while building. Functions read the real
+values at runtime.
+
+## Database connections under Fluid compute
+
+The project runs on Fluid compute: one function instance serves several requests and is suspended,
+sockets and all, when it goes idle. `src/server/db/postgres.ts` is set up for that:
+
+- **A small pool.** `DATABASE_POOL_MAX` clients per instance (2 on Vercel), against the transaction
+  pooler, so many instances share few real connections.
+- **`attachDatabasePool`** (`@vercel/functions`), called right after the pool is created on Vercel.
+  After every release it keeps the invocation alive for the pool's idle timeout, so idle clients are
+  closed by the pool before the instance is suspended, instead of surviving the freeze as sockets the
+  pooler has already dropped.
+- **A 5-second idle timeout**, Vercel's figure for Fluid; it is also how long each request may be kept
+  alive after its last query.
+- **A stale socket is retried once, and only where running twice is harmless.** pg cannot tell a
+  socket that died before the server read a statement from one that died after the server ran it
+  (and, outside a transaction, committed it). So a plain query that meets a dead pooled socket is sent
+  once more, on another connection, only if it reads: one `SELECT`, `SHOW` or `WITH … SELECT`. A
+  write fails instead: the request answers 500 and logs `[museum] <METHOD> <path> failed:` with the
+  error (the analytics tracker re-sends its batch on the next tick). A transaction whose `BEGIN` fails
+  that way is retried once, because none of its work has run; once its work has started it is never
+  retried. A client whose connection broke is destroyed rather than handed to the next request. The
+  comment and session inserts are also written to be harmless if repeated (`ON CONFLICT … DO NOTHING`).
+  `tests/unit/` pins the retry rules (`npm test`).
 
 ## Commands
 
@@ -46,8 +80,9 @@ vercel deploy                                 # preview deployment
 vercel deploy --prod                          # production
 ```
 
-Build settings are auto-detected (framework **Next.js**, `npm run build`). Pick the function region
-next to the database (Project → Settings → Functions → Region, e.g. `bom1` Mumbai for ap-south-1).
+Build settings come from `vercel.json` (framework **Next.js**, functions in `bom1`) and `npm run build`.
+Set Project → Settings → Functions → Region to `bom1` (Mumbai) as well, so the project's default
+matches the file and a deployment that ignores it cannot fall back to `iad1`.
 
 ## After the first deploy
 

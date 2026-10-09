@@ -277,12 +277,14 @@ const hashToken = (t: string) => createHash('sha256').update(t).digest('hex')
 export async function startSession(db: Db, headers: Headers, userId: string) {
   const token = randomBytes(32).toString('base64url')
   const maxAge = config.sessionDays * 86400
-  await db.run('INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES ($1, $2, $3, $4)', [
-    hashToken(token),
-    userId,
-    nowIso(),
-    Date.now() + maxAge * 1000,
-  ])
+  // A 32-byte random token's hash can only conflict with a second run of this same statement, which
+  // must not turn a stored session into a failed sign-in. Nothing sends a write twice today
+  // (db/postgres.ts retries reads only); this keeps a repeat harmless if anything ever does.
+  await db.run(
+    `INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (token_hash) DO NOTHING`,
+    [hashToken(token), userId, nowIso(), Date.now() + maxAge * 1000],
+  )
   headers.append('set-cookie', sessionCookie(token, maxAge))
 }
 
