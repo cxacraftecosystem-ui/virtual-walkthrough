@@ -5,10 +5,13 @@
  *
  * Verified means the server's certificate must chain to a trusted root AND name the host that was
  * dialled: rejectUnauthorized, plus the host-name check that tls.connect runs (checkServerIdentity)
- * against the `servername` pg passes it, which is the host (pg/lib/connection.js, upgradeToSSL). For
- * an IP address pg passes none and Node checks the name "localhost" instead, which fails as well.
- * The trusted roots are the bundled Supabase root and DATABASE_CA_CERT, so a rotated root can be
- * added without a code change.
+ * against the `servername` pg passes it, which is the host (pg/lib/connection.js, upgradeToSSL). An IP
+ * address may not be a server name (RFC 6066), so for one pg passes `host` instead (since pg 8.23.1;
+ * before, it passed nothing and Node checked "localhost"), and the certificate must list that address,
+ * which Supabase's do not. The trusted roots are the bundled Supabase root and DATABASE_CA_CERT, so a
+ * rotated root can be added without a code change.
+ *
+ * The URL may not carry ssl, sslrootcert, sslcert, sslkey or sslnegotiation=direct (PG_TLS_PARAMS).
  *
  * First match wins:
  *  1. DATABASE_SSL: disable | require | verify-full. Anything else is a configuration error.
@@ -52,6 +55,15 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
 const PEM_RE = /-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g
 
 /**
+ * URL parameters from which pg-connection-string builds TLS settings of its own, and pg then uses them
+ * in place of the ones decided here, DATABASE_SSL's included: `ssl=0` turns TLS off, `ssl=no-verify`
+ * the verification; sslrootcert, sslcert and sslkey swap the trusted roots for files the function
+ * bundle does not carry; sslnegotiation=direct falls back to Node's public roots. A URL carrying one is
+ * refused rather than guessed at: DATABASE_SSL and DATABASE_CA_CERT say the same things.
+ */
+const PG_TLS_PARAMS = ['ssl', 'sslrootcert', 'sslcert', 'sslkey']
+
+/**
  * DATABASE_CA_CERT as a list of PEM certificates. Each is parsed here because Node silently skips a
  * `ca` entry it cannot read (a paste that lost its line breaks, say); verification would then fail
  * at the first connection, or, worse, only on the day the bundled root stops being the right one.
@@ -79,15 +91,17 @@ export function databaseTls(connectionString: string, settings: TlsSettings = {}
   let url = connectionString
   let sslmode = ''
   let host = ''
-  try {
-    const u = new URL(connectionString)
+  // Not a URL: pg gets it as is, and there is no host to go by.
+  const u = URL.canParse(connectionString) ? new URL(connectionString) : undefined
+  if (u) {
+    const own = PG_TLS_PARAMS.find((k) => u.searchParams.has(k)) ?? (u.searchParams.get('sslnegotiation') === 'direct' ? 'sslnegotiation=direct' : undefined)
+    // The parameter's name only: the URL holds the password.
+    if (own) throw new Error(`The database URL carries "${own}", which pg would use in place of the TLS settings decided in src/server/db/tls.ts: take it out, and set DATABASE_SSL or DATABASE_CA_CERT instead`)
     sslmode = (u.searchParams.get('sslmode') ?? '').toLowerCase()
     // pg dials a `host` query parameter in preference to the URL's host.
     host = (u.searchParams.get('host') || u.hostname).toLowerCase().replace(/\.$/, '')
     for (const k of ['sslmode', 'uselibpqcompat']) u.searchParams.delete(k)
     url = u.toString()
-  } catch {
-    /* not a URL: pg gets it as is, and there is no host to go by */
   }
   const extra = extraRoots(settings.caCert)
   const supabase = SUPABASE_HOST_RE.test(host)

@@ -73,6 +73,7 @@ libpq also verifies a `require` connection once it has a root certificate. Migra
 | `DATABASE_SSL=verify-full` | verified on any host; elsewhere than Supabase, without `DATABASE_CA_CERT`, against Node's public roots |
 | `DATABASE_SSL=disable` | no TLS |
 | `sslmode` in the URL | `disable`: no TLS; `verify-full` or `verify-ca`: verified, host name included; any other value turns TLS on for localhost and changes nothing elsewhere. `DATABASE_SSL` wins over it |
+| `ssl`, `sslrootcert`, `sslcert`, `sslkey` or `sslnegotiation=direct` in the URL | an error, before any connection: pg would use TLS settings of its own instead of all of the above (`ssl=0` would mean no TLS at all). Take it out and use `DATABASE_SSL` / `DATABASE_CA_CERT` |
 
 `DATABASE_CA_CERT` (PEM text; one or more certificates; on one line with `\n` for line breaks is fine)
 is trusted next to the bundled root. When Supabase announces a new root, put it there and the switch
@@ -88,7 +89,8 @@ USE_REMOTE=1 npm run db:tls-check    # the REMOTE_* URLs from .env.local; withou
 It connects to both poolers with the app's settings (certificate verified) and with
 `DATABASE_SSL=require` (encrypted, not verified), and shows that verification refuses a root that did
 not sign the chain and the right root under a name the certificate does not carry: the pooler's load
-balancer name and its IP address, both of which `DATABASE_SSL=require` still reaches.
+balancer name and its IP address (Node checks the address itself against the certificate), both of which
+`DATABASE_SSL=require` still reaches.
 
 ## Optional: Supabase Storage instead of S3
 

@@ -11,8 +11,9 @@
  *  - DATABASE_SSL=require connects as well: encrypted, certificate not verified;
  *  - the verification is real. It refuses a root that did not sign the server's chain, and it refuses
  *    the right root presented under a name the certificate does not carry: the load balancer's DNS
- *    name (pg sends it as the TLS server name) and the bare IP address (pg sends none). DATABASE_SSL=
- *    require reaches the server both ways, so what refuses them is the name check, not the route.
+ *    name (pg sends it as the TLS server name) and the bare IP address (no server name; pg 8.23.1 has
+ *    Node check the address itself). DATABASE_SSL=require reaches the server both ways, so what refuses
+ *    them is the name check, not the route.
  * Exits 1 when an expectation fails.
  */
 import dns from 'node:dns/promises'

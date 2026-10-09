@@ -11,6 +11,7 @@ import assert from 'node:assert/strict'
 import { X509Certificate } from 'node:crypto'
 import { rootCertificates } from 'node:tls'
 import { describe, it } from 'node:test'
+import pg from 'pg'
 import { PostgresDb } from '../../src/server/db/postgres'
 import { SUPABASE_ROOT_CA_2021 } from '../../src/server/db/supabaseCa'
 import { databaseTls } from '../../src/server/db/tls'
@@ -174,6 +175,32 @@ describe('databaseTls: the connection string pg gets', () => {
     assert.equal(u.searchParams.get('application_name'), 'museum')
     assert.equal(u.searchParams.get('pgbouncer'), 'true')
     assert.equal(`${u.username}:${u.password}@${u.host}${u.pathname}`, 'postgres.ref:secret@aws-0-ap-south-1.pooler.supabase.com:6543/postgres')
+  })
+})
+
+describe('databaseTls: what pg uses is what was decided', () => {
+  /** The TLS settings a pg client really takes from the pool's options, its connection string included. */
+  const used = (d: ReturnType<typeof databaseTls>) =>
+    (new pg.Client({ connectionString: d.connectionString, ssl: d.ssl }) as unknown as { connectionParameters: { ssl: unknown } }).connectionParameters.ssl
+
+  it('the URL puts no TLS settings of its own in place of the decision', () => {
+    const urls = [POOLER, `${POOLER}?sslmode=require`, `${POOLER}?sslmode=verify-ca&uselibpqcompat=true`, `${POOLER}?sslmode=no-verify`, `${POOLER}?sslnegotiation=postgres`, `${OTHER}?sslmode=disable`, `${LOCAL}?sslmode=require`]
+    for (const url of urls) {
+      for (const ssl of [undefined, 'disable', 'require', 'verify-full']) {
+        const decided = tls(url, { ssl })
+        assert.deepEqual(used(decided), decided.ssl, `${url} with DATABASE_SSL=${ssl}`)
+      }
+    }
+  })
+
+  it('refuses a URL whose ssl, sslrootcert, sslcert, sslkey or sslnegotiation=direct pg would use instead', () => {
+    // ?ssl=0 would have connected a "verified" Supabase pool in plain text, whatever DATABASE_SSL said.
+    for (const query of ['?ssl=0', '?ssl=no-verify', '?ssl=true', '?ssl=', '?sslmode=verify-full&sslrootcert=prod-ca-2021.crt', '?sslcert=client.crt&sslkey=client.key', '?sslnegotiation=direct']) {
+      for (const ssl of [undefined, 'require', 'disable']) {
+        assert.throws(() => tls(POOLER + query, { ssl }), /The database URL carries "(ssl|sslrootcert|sslcert|sslnegotiation=direct)", which pg would use in place/, `${query} with DATABASE_SSL=${ssl}`)
+      }
+    }
+    assert.throws(() => tls(`${POOLER}?ssl=0`), (err: Error) => !err.message.includes('secret'), 'the message names the parameter, never the URL')
   })
 })
 
