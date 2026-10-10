@@ -59,7 +59,6 @@ interface ViewModel {
   image?: string
   /** Alternative text for the image (falls back to the title). */
   alt?: string
-  placeholder: boolean
   /** Argument for store.inspect(): an exhibit id, or 'object:<id>'. */
   inspectId?: string
   inspectLabel?: string
@@ -98,7 +97,6 @@ function resolve(sel: Selection, t: T = (k) => k, lang: Lang = 'en'): ViewModel 
       ],
       metadata: a.metadata ? Object.entries(a.metadata) : undefined,
       image: a.image,
-      placeholder: !!a.placeholder,
       inspectId: block?.id,
       inspectLabel: t('info.inspectBlock'),
       examineId: a.image || a.deepZoom || a.highRes ? a.id : undefined,
@@ -121,7 +119,6 @@ function resolve(sel: Selection, t: T = (k) => k, lang: Lang = 'en'): ViewModel 
         ...fact(t('info.technique'), L(e, 'technique')),
       ],
       paragraphs: L(e, 'description') ? [{ text: L(e, 'description')! }] : [],
-      placeholder: !!e.placeholder,
       inspectId: e.id,
       inspectLabel: t('info.inspectBlock'),
       related: art ? { label: t('info.printsTextile', { title: L(art, 'title') ?? art.title }), selection: { kind: 'artwork', id: art.id } } : undefined,
@@ -136,7 +133,6 @@ function resolve(sel: Selection, t: T = (k) => k, lang: Lang = 'en'): ViewModel 
       alt: L(o, 'alt'),
       facts: [],
       paragraphs: L(o, 'description') ? [{ text: L(o, 'description')! }] : [],
-      placeholder: !!o.placeholder,
       inspectId: o.inspectable ? `object:${o.id}` : undefined,
       inspectLabel: t('info.inspect'),
       credit: o.credit,
@@ -152,7 +148,6 @@ function resolve(sel: Selection, t: T = (k) => k, lang: Lang = 'en'): ViewModel 
       facts: [],
       paragraphs: L(v, 'description') ? [{ text: L(v, 'description')! }] : [],
       image: v.poster,
-      placeholder: !!v.placeholder,
       videoId: v.id,
     }
   }
@@ -164,7 +159,6 @@ function resolve(sel: Selection, t: T = (k) => k, lang: Lang = 'en'): ViewModel 
     facts: [],
     paragraphs: L(g, 'body') ? [{ text: L(g, 'body')! }] : [],
     steps: (lang !== 'en' && g.i18n?.[lang]?.steps?.length ? g.i18n[lang]!.steps : undefined) ?? g.steps,
-    placeholder: !!g.placeholder,
   }
 }
 
@@ -225,11 +219,6 @@ export function InfoPanel() {
             <h2 id="ui-info-title" className="ui-info__title">
               {vm.title}
             </h2>
-            {vm.placeholder && (
-              <span className="ui-info__badge" title={t('info.placeholderTip')}>
-                {t('info.placeholder')}
-              </span>
-            )}
             {online && shown && (
               <button
                 type="button"

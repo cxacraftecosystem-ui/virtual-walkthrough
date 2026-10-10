@@ -23,7 +23,7 @@ export function WebGLUnsupported() {
         </div>
         <h1 className="ui-nogl__title">Hand Block Printing</h1>
         <p>
-          This exhibition is a 3D walkthrough and needs WebGL, which isn&rsquo;t available in this browser right now.
+          This exhibition is a 3D walkthrough and needs 3D graphics, which this browser can&rsquo;t show right now.
         </p>
         <ul>
           <li>Enable hardware acceleration in your browser settings, then restart it.</li>

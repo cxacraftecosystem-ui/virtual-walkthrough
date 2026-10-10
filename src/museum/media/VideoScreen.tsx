@@ -259,7 +259,7 @@ function portraitCard(title: string): THREE.Texture {
     g.fillText(shortTitle(title), 270, 500, 420)
     g.fillStyle = 'rgba(233, 223, 204, 0.5)'
     g.font = '400 18px Inter, system-ui, sans-serif'
-    g.fillText('Portrait film · placeholder', 270, 560)
+    g.fillText('Portrait film', 270, 560)
   }
   t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace

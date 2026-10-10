@@ -216,7 +216,7 @@ export async function drawCertificate(name: string, date: Date): Promise<HTMLCan
   g.fillStyle = 'rgba(46,42,38,0.7)'
   g.fillText(dateText, W / 2, 1010)
   g.font = `400 22px ${SANS}`
-  g.fillText('A keepsake from the virtual exhibition. The motifs shown are placeholder designs.', W / 2, 1080)
+  g.fillText('A keepsake from the virtual exhibition. The motifs are designs made for this museum.', W / 2, 1080)
   return cv
 }
 

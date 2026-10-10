@@ -9,7 +9,7 @@
  * frozen; the viewer owns the keyboard (capture phase): Esc close · + / − zoom · 0 reset ·
  * F fullscreen · arrows / WASD pan.
  *
- * Scale bar: exact when the artwork has `physicalWidth`; for placeholders without one it
+ * Scale bar: exact when the artwork has `physicalWidth`; for stand-in works without one it
  * shows the size AS HUNG in the virtual gallery (and says so); otherwise hidden.
  */
 import { _roots } from '@react-three/fiber'
@@ -168,7 +168,7 @@ function ExamineView({ art }: { art: ArtworkConfig }) {
           const item = v.world.getItemAt(0)
           const size = item?.getContentSize()
           if (size) {
-            setScaleNote(art.physicalWidth ? null : physicalWidthFor(art, size.x, size.y) ? 'Scale as hung in the gallery (placeholder)' : null)
+            setScaleNote(art.physicalWidth ? null : physicalWidthFor(art, size.x, size.y) ? 'Scale as hung in the gallery' : null)
           }
           update()
         })
@@ -305,11 +305,6 @@ function ExamineView({ art }: { art: ArtworkConfig }) {
           <h2 className="dz-title">{art.title}</h2>
           {facts.length > 0 && <div className="dz-facts">{facts.join(' · ')}</div>}
         </div>
-        {art.placeholder && (
-          <span className="dz-badge" title="Generated stand-in until the workshop's photograph is supplied">
-            Placeholder image
-          </span>
-        )}
         <button ref={closeRef} type="button" className="dz-icon-btn dz-close" aria-label="Close (Esc)" title="Close (Esc)" onClick={close}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6 6l12 12M18 6L6 18" />
@@ -379,12 +374,12 @@ function ExamineView({ art }: { art: ArtworkConfig }) {
         )}
       </div>
 
-      {usingFallback && status === 'ready' && <div className="dz-fallback">Deep-zoom tiles unavailable — showing the standard image.</div>}
+      {usingFallback && status === 'ready' && <div className="dz-fallback">The most detailed view isn’t available right now — showing the standard image.</div>}
     </div>
   )
 }
 
-/** Real width (m) for the scale bar: `physicalWidth`, else (placeholders only) the size as hung. */
+/** Real width (m) for the scale bar: `physicalWidth`, else (stand-in works only) the size as hung. */
 function physicalWidthFor(art: ArtworkConfig, pxW: number, pxH: number): number | null {
   if (art.physicalWidth && art.physicalWidth > 0) return art.physicalWidth
   if (!art.placeholder) return null

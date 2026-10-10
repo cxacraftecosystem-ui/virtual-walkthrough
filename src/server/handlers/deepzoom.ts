@@ -91,7 +91,7 @@ export const startDeepZoom = route(async (c) => {
   const b = await c.json()
   if (!isRecord(b)) return fail(400, 'Body must be { name, width, height, tileSize?, overlap?, format? }')
   const info = readInfo(b)
-  if (config.isVercel && c.storage.kind === 'local') return fail(501, 'Local disk storage is not available on Vercel; configure S3_BUCKET')
+  if (config.isVercel && c.storage.kind === 'local') return fail(501, 'Uploads aren’t set up on this site.')
   const set = `${slug(typeof b.name === 'string' ? b.name : 'image')}-${randomBytes(4).toString('hex')}`
   c.status = 201
   return {
@@ -140,7 +140,7 @@ export const uploadDeepZoomTile = route(async (c) => {
 /** POST /api/admin/media/deepzoom/presign — batch of presigned PUT URLs (S3). */
 export const presignDeepZoom = route(async (c) => {
   await c.requireCurator()
-  if (!c.storage.presignPut) return fail(501, 'Direct upload not supported by local storage; POST tiles to /api/admin/media/deepzoom/tile')
+  if (!c.storage.presignPut) return fail(501, 'This site stores uploads itself, so direct uploads aren’t available.')
   const b = await c.json({ maxBytes: 256 * 1024 })
   if (!isRecord(b) || !Array.isArray(b.paths)) return fail(400, 'Body must be { set, paths: string[] }')
   const set = readSet(b.set)
@@ -167,7 +167,7 @@ export const completeDeepZoom = route(async (c) => {
   const top = dziLevelTiles(info, max)
   const probes = [dziTilePath(info, 0, 0, 0), dziTilePath(info, max, 0, 0), dziTilePath(info, max, top[top.length - 1].col, top[top.length - 1].row)]
   for (const p of probes) {
-    if (!(await c.storage.stat(`${DEEPZOOM_FOLDER}/${set}/${p}`))) return fail(400, `Tile ${p} is missing; upload every tile before completing`)
+    if (!(await c.storage.stat(`${DEEPZOOM_FOLDER}/${set}/${p}`))) return fail(400, 'Part of the image didn’t upload. Please try again.')
   }
   const xml = dziXml(info)
   await c.storage.save(deepZoomDziKey(set), Readable.from([Buffer.from(xml, 'utf8')]), DZI_MIME)

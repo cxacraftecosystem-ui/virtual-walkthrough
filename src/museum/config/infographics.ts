@@ -2,9 +2,9 @@
  * CRAFT INFOGRAPHICS — Product Wall (PDF §4 "Craft Infographics at Product Wall").
  *
  * The panel layout, typography and illustration slots are final; the COPY is not.
- * No historical or regional claims are invented here: every `body` is a clearly
- * marked slot awaiting curatorial text from the workshop. Replace `body` (and set
- * `placeholder: false`) and the wall panel + information panel update automatically.
+ * No historical or regional claims are invented here: every `body` is empty until the
+ * workshop supplies curatorial text (the panel then shows its title and illustration only).
+ * Fill in `body` (and set `placeholder: false`) and the wall panel + information panel update.
  */
 
 import type { SurfaceId } from './layout'
@@ -28,7 +28,7 @@ export interface InfographicConfig {
   i18n?: Partial<Record<AltLang, Partial<Record<'kicker' | 'title' | 'body', string>> & { steps?: string[] }>>
 }
 
-const PENDING = 'Curatorial text to be supplied by the workshop. This panel will present verified content only.'
+const PENDING = ''
 
 export const INFOGRAPHICS: InfographicConfig[] = [
   { id: 'info-history', kicker: '01', title: 'Regional History', body: PENDING, icon: 'map', placement: { surface: 'product-wall', at: -3.6 }, width: 1.45, height: 1.95, placeholder: true },

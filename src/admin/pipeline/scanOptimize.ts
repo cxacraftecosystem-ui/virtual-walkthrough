@@ -185,7 +185,7 @@ function ensureNormals(doc: Document, warnings: string[]) {
       fixed++
     }
   }
-  if (fixed) warnings.push(`Generated smooth normals for ${fixed} primitive(s) that had none.`)
+  if (fixed) warnings.push(`Added smooth shading to ${fixed} part(s) of the model that had none.`)
 }
 
 async function recodeTextures(doc: Document, maxSide: number, quality: number, warnings: string[]) {
@@ -195,7 +195,7 @@ async function recodeTextures(doc: Document, maxSide: number, quality: number, w
     const img = t.getImage()
     const mime = t.getMimeType()
     if (!img || !/^image\/(png|jpeg|webp)$/.test(mime)) {
-      if (img) warnings.push(`Texture "${t.getName() || t.getURI() || '?'}" (${mime}) left as-is.`)
+      if (img) warnings.push(`Texture “${t.getName() || t.getURI() || '?'}” was kept in its original format.`)
       continue
     }
     const bmp = await createImageBitmap(new Blob([img as BlobPart], { type: mime }))
@@ -270,7 +270,7 @@ export async function optimizeScan(files: ScanFile[], opts: ScanOptions, log: (m
       // UV seams / thin parts resist simplification: allow a larger (still small) error
       await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio: Math.max(0.001, opts.targetTriangles / after1), error: 0.04 }))
       const after2 = stats(doc, 0).triangles
-      if (after2 > opts.targetTriangles * 1.25) warnings.push(`Could only simplify to ${after2.toLocaleString()} triangles without visible damage (UV seams).`)
+      if (after2 > opts.targetTriangles * 1.25) warnings.push(`Could only simplify to ${after2.toLocaleString()} triangles without visible damage.`)
     }
   }
   ensureNormals(doc, warnings)
@@ -282,7 +282,7 @@ export async function optimizeScan(files: ScanFile[], opts: ScanOptions, log: (m
   placeInMetres(doc, opts, warnings)
   await doc.transform(prune())
 
-  log('Compressing geometry (meshopt)…')
+  log('Compressing geometry…')
   await doc.transform(meshopt({ encoder: MeshoptEncoder, level: 'medium' }))
   const glb = await io.writeBinary(doc)
 

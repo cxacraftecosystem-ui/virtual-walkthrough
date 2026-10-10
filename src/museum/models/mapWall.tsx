@@ -7,9 +7,9 @@
  *   relief ..... the official-depiction outline of India (exhibits/indiaGeometry.ts, unchanged)
  *                extruded 12 mm off the panel: plaster-paper top faces with a fine madder dot
  *                print, ink-coloured sides that read as a crisp outline under the wash lights
- *   pins ....... PLACEHOLDER craft-cluster pins (props.pins = "lon,lat;lon,lat;…") — hollow
- *                numbered markers; the legend says "Cluster location — to be confirmed by the
- *                workshop". They are arbitrary layout positions and mark no real place.
+ *   pins ....... craft-cluster pins (props.pins = "lon,lat;lon,lat;…") — hollow numbered markers
+ *                with a "Craft cluster" legend. While the item is flagged `placeholder` the pins
+ *                are stand-in positions that mark no real place, so none are drawn.
  *   light ...... three wash spots from the ceiling (SpotPool)
  *
  * Local space: origin = floor point on the wall face, panel faces +z. Place it against a
@@ -235,33 +235,30 @@ async function faceTexture(L: MapLayout, pins: [number, number][], title: string
   y += s * 0.2
   ctx.fillStyle = INK
   ctx.font = `400 ${Math.round(s * 0.072)}px ${SANS}`
-  const body =
-    'This wall will show where the blocks, dyes and textiles in the exhibition are made. The workshop is confirming each craft cluster; until then the numbered pins are placeholders and do not mark real places.'
+  const body = 'Hand block printing is practised in many places across India, each with its own blocks, colours and patterns.'
   for (const line of wrap(ctx, body, tw)) {
     ctx.fillText(line, tl, y)
     y += s * 0.112
   }
-  // legend
+  // legend (only when there are pins to explain)
   y += s * 0.2
-  const lx = tl + s * 0.07
-  ctx.strokeStyle = MADDER
-  ctx.lineWidth = s * 0.004
-  ctx.setLineDash([s * 0.012, s * 0.009])
-  ctx.beginPath()
-  ctx.arc(lx, y - s * 0.02, s * 0.05, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.setLineDash([])
-  ctx.fillStyle = MADDER
-  ctx.beginPath()
-  ctx.arc(lx, y - s * 0.02, s * 0.022, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.fillStyle = INK
-  ctx.font = `500 ${Math.round(s * 0.064)}px ${SANS}`
-  ctx.fillText('Cluster location — to be confirmed by the workshop', tl + s * 0.19, y)
-  y += s * 0.08
-  ctx.fillStyle = 'rgba(43,38,33,0.6)'
-  ctx.font = `400 ${Math.round(s * 0.04)}px ${SANS}`
-  ctx.fillText('Placeholder pins 1–5 · positions for layout only', tl + s * 0.19, y)
+  if (pins.length) {
+    const lx = tl + s * 0.07
+    ctx.strokeStyle = MADDER
+    ctx.lineWidth = s * 0.004
+    ctx.setLineDash([s * 0.012, s * 0.009])
+    ctx.beginPath()
+    ctx.arc(lx, y - s * 0.02, s * 0.05, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.fillStyle = MADDER
+    ctx.beginPath()
+    ctx.arc(lx, y - s * 0.02, s * 0.022, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = INK
+    ctx.font = `500 ${Math.round(s * 0.064)}px ${SANS}`
+    ctx.fillText('Craft cluster', tl + s * 0.19, y)
+  }
   // credit, bottom-left
   ctx.fillStyle = 'rgba(43,38,33,0.55)'
   ctx.font = `400 ${Math.round(s * 0.036)}px ${SANS}`
@@ -343,7 +340,8 @@ export function MapWall({ config }: ModelProps) {
   const H = num(config, 'height', 4.6)
   const bottom = num(config, 'bottom', 0.65)
   const title = str(config, 'title', 'A Map of Making')
-  const pinStr = str(config, 'pins', '')
+  // stand-in pins mark no real place: draw none until the workshop's clusters are in
+  const pinStr = config.placeholder ? '' : str(config, 'pins', '')
   const L = useMemo(() => layoutFor(W, H), [W, H])
   const pins = useMemo(() => parsePins(pinStr), [pinStr])
   const cy = bottom + H / 2

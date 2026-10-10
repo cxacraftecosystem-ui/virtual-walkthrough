@@ -75,7 +75,7 @@ export const patchUser = route<{ id: string }>(async (c) => {
   const target = await getUserRow(c.db, c.params.id)
   if (!target) return fail(404, 'User not found')
   if (target.id === me.id) return fail(400, 'You cannot change your own role')
-  if (target.role === 'master' || isMasterEmail(target.email)) return fail(403, 'Master admins are configured by MASTER_ADMIN_EMAILS and cannot be changed here')
+  if (target.role === 'master' || isMasterEmail(target.email)) return fail(403, 'Master admins are set by whoever hosts the site and can’t be changed here.')
   await c.db.run('UPDATE users SET manual_role = $1 WHERE id = $2', [b.role === 'visitor' ? null : b.role, target.id])
   await syncRole(c.db, target.id)
   return toAdminUser(c.db, (await getUserRow(c.db, target.id))!)
@@ -115,7 +115,7 @@ function parsePattern(raw: unknown) {
   if (typeof raw !== 'string') return fail(400, '"pattern" must be an email (person@example.org) or a domain (@example.org)')
   const p = normalizeAccessPattern(raw)
   if (!p) return fail(400, `"${raw.slice(0, 100)}" is not a valid email or @domain`)
-  if (isMasterEmail(p)) return fail(400, 'Master admins are configured by MASTER_ADMIN_EMAILS and need no entry')
+  if (isMasterEmail(p)) return fail(400, 'Master admins already have full access and need no entry.')
   return p
 }
 

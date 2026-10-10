@@ -310,7 +310,7 @@ export async function purgeExpiredSessions(db: Db) {
 }
 
 export function requireUser(user: User | null): User {
-  if (!user) throw new HttpError(401, 'Not logged in')
+  if (!user) throw new HttpError(401, 'Please sign in first.')
   return user
 }
 

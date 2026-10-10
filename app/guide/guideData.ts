@@ -22,6 +22,7 @@ export const ROOM_ORDER: ZoneId[] = ['atrium', 'reception', 'passage', 'gallery-
 export interface GuideArtisan {
   id: string
   name: string
+  placeholder?: boolean
 }
 
 export interface GuideContent extends MuseumContent {

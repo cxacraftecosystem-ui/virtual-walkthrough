@@ -132,12 +132,12 @@ function WallLabel({ config, position }: { config: ArtworkConfig; position: Vec3
         [
           { text: config.title, style: 'title' },
           { text: config.tradition, style: 'meta' },
-          { text: config.placeholder ? 'Placeholder — awaiting workshop deliverable' : (config.artisan ?? config.region ?? ''), style: 'body' },
+          { text: config.artisan ?? config.region ?? '', style: 'body' },
         ],
         w,
         h,
       ),
-    [config.title, config.tradition, config.placeholder],
+    [config.title, config.tradition, config.artisan, config.region],
   )
   if (!tex) return null
   return (

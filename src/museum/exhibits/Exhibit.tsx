@@ -45,12 +45,12 @@ function TableLabel({ exhibit }: { exhibit: ExhibitConfig }) {
       createLabelTexture(
         [
           { text: exhibit.title, style: 'title' },
-          { text: exhibit.placeholder ? 'Placeholder block · click to inspect' : 'Click to inspect in 3D', style: 'meta' },
+          { text: 'Click to inspect in 3D', style: 'meta' },
         ],
         0.16,
         0.07,
       ),
-    [exhibit.title, exhibit.placeholder],
+    [exhibit.title],
   )
   if (!tex) return null
   return (

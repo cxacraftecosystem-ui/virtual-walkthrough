@@ -82,7 +82,7 @@ export function MediaPage() {
             Upload images, 3D models, video and audio, then paste the URL into a content item.
             {cfg && (
               <>
-                {' '}Storage: <strong>{cfg.driver === 's3' ? 'S3 (direct upload)' : 'local disk'}</strong> · max {formatBytes(cfg.maxBytes)}.
+                {' '}Storage: <strong>{cfg.driver === 's3' ? 'cloud storage (direct upload)' : 'built-in storage'}</strong> · max {formatBytes(cfg.maxBytes)}.
               </>
             )}
           </p>

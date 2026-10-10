@@ -140,7 +140,7 @@ No geometry needs editing. The info panel shows only the fields you provide.
 
 The five hero works are `hero-01 … hero-05` in `config/artworks.ts` (PDF §4: exactly 5 per tradition).
 Either overwrite `public/artworks/hero-0N.jpg` with the final photograph, **or** change `image:`.
-Then fill in the real metadata and set `placeholder: false` (this removes the "Placeholder" badges/labels).
+Then fill in the real metadata and set `placeholder: false` (admin: untick *Needs content from the workshop*). Visitors see no badge either way.
 
 > ⚠ `scripts/generate-placeholders.mjs` regenerates the placeholder JPGs and would overwrite files with the same names.
 
@@ -442,8 +442,9 @@ least-privilege IAM user `hand-block-museum-app`, Vercel project `hand-block-mus
   published. Demo: `textile-traditions` ("Textile Traditions — coming soon", draft) was made with *Duplicate*.
 - **Meet the maker**: profiles in table `artisans` (admin → *Makers*, curators); artworks / exhibits reference one
   with `artisanId`. The info panel shows a maker card with *Visit the maker* / *Commission* / *Buy (fair trade)*
-  when those URLs exist; `/makers/<id>` is the accessible profile page. Seed profiles are placeholders only
-  ("Artisan profile — to be supplied by the workshop") — enter only what the workshop supplies.
+  when those URLs exist; `/makers/<id>` is the accessible profile page. The seed profiles are empty stand-ins
+  (`placeholder`, "Hidden from visitors" in the admin): visitors get no card, link or page for them until the flag is
+  cleared — enter only what the workshop supplies.
 - **Curator analytics** (admin → *Analytics*): the tracker samples the visitor position every 2 s (`pos`) and tour
   arrivals (`tour_step`). Positions are aggregated on arrival into `analytics_heat` (0.5 m cells per exhibition /
   day / zone) and never stored raw. Floor-plan heatmap (walls from `config/layout.ts`), zone filter, date range,
@@ -471,11 +472,11 @@ least-privilege IAM user `hand-block-museum-app`, Vercel project `hand-block-mus
   (`supabase/migrations/20260923110000_visitor_prints.sql`).
 - **Meet the maker screens**: `VIDEOS` entries with `kind: 'portrait'`, `stand: { x, z, rotationDeg }` and
   `cropAspect` (default 9 / 16) render a small vertical screen on a free-standing stand with spatial audio. The two
-  placeholders beside printing tables II and IV centre-crop the placeholder process films — replace `src` with the
+  stand-ins beside printing tables II and IV centre-crop the generated process films — replace `src` with the
   portrait films.
 - **Artisan captures** (kind `splat`): set `model` to a Gaussian-splat `.splat` file (drei `<Splat>`; `.ksplat` /
   `.ply` must be converted first) with optional props `splatScale`, `splatY`, `splatRotDeg`. Without a capture a
-  clearly labelled placeholder (translucent seated figure + "Artisan capture — coming soon" card) is shown.
+  translucent seated figure with a "The printer's place" card is shown.
 
 ### Security notes
 

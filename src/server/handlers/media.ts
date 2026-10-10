@@ -118,7 +118,7 @@ export const uploadMedia = route(async (c) => {
   const ct = c.req.headers.get('content-type') ?? ''
   if (!ct.startsWith('multipart/form-data')) return fail(415, 'Expected multipart/form-data')
   if (!c.req.body) return fail(400, 'Empty body')
-  if (config.isVercel && c.storage.kind === 'local') return fail(501, 'Local disk storage is not available on Vercel; configure S3_BUCKET')
+  if (config.isVercel && c.storage.kind === 'local') return fail(501, 'Uploads aren’t set up on this site.')
 
   const { storage, db } = c
   const result = await new Promise<{ folder: string; storedName: string; filename: string; mime: string; size: number }>((resolve, reject) => {
@@ -126,7 +126,7 @@ export const uploadMedia = route(async (c) => {
     try {
       bb = Busboy({ headers: { 'content-type': ct }, limits: { fileSize: config.maxUploadBytes, files: 1, fields: 10, fieldSize: 1000 } })
     } catch {
-      return reject(new HttpError(400, 'Malformed multipart body'))
+      return reject(new HttpError(400, 'The upload was interrupted. Please try again.'))
     }
     const fields: Record<string, string> = {}
     let sawFile = false
@@ -169,7 +169,7 @@ export const uploadMedia = route(async (c) => {
           failure ??= truncated ? new HttpError(413, TOO_LARGE) : err
         })
     })
-    bb.on('error', (err) => reject(failure ?? new HttpError(400, `Malformed multipart body: ${(err as Error).message}`)))
+    bb.on('error', () => reject(failure ?? new HttpError(400, 'The upload was interrupted. Please try again.')))
     bb.on('close', async () => {
       if (pending) await pending
       if (failure) return reject(failure)
@@ -185,7 +185,7 @@ export const uploadMedia = route(async (c) => {
 /** POST /api/admin/media/presign — direct-to-S3 upload URL (serverless-safe, up to 500 MB). */
 export const presignMedia = route(async (c) => {
   await c.requireCurator()
-  if (!c.storage.presignPut) return fail(501, 'Direct upload not supported by local storage; use multipart POST /api/admin/media')
+  if (!c.storage.presignPut) return fail(501, 'This site stores uploads itself, so direct uploads aren’t available.')
   const b = await c.json()
   if (!isRecord(b) || typeof b.filename !== 'string' || !b.filename) return fail(400, 'Body must be { filename, size, folder? }')
   const size = Number(b.size)
@@ -206,7 +206,7 @@ export const completeMedia = route(async (c) => {
   const [, folder, storedName, ext] = m
   if (await c.db.one('SELECT id FROM media WHERE folder = $1 AND stored_name = $2', [folder, storedName])) return fail(409, 'Already recorded')
   const stat = await c.storage.stat(b.key)
-  if (!stat) return fail(400, 'Object not found in storage; upload it to uploadUrl first')
+  if (!stat) return fail(400, 'The upload didn’t reach storage. Please try again.')
   if (stat.size > config.maxUploadBytes) {
     await c.storage.remove(b.key)
     return fail(413, TOO_LARGE)

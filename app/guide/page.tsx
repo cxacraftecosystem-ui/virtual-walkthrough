@@ -68,16 +68,6 @@ function Alt({ lang, text }: { lang: Lang; text: string }) {
   )
 }
 
-function Placeholder({ lang, on }: { lang: Lang; on: boolean | undefined }) {
-  if (!on) return null
-  return (
-    <p className="guide-placeholder">
-      <span aria-hidden="true">◌ </span>
-      {translate(lang, 'guide.placeholder')}
-    </p>
-  )
-}
-
 const itemId = (kind: string, id: string) => `${kind}-${id}`.replace(/[^A-Za-z0-9_-]/g, '-')
 
 interface Ctx {
@@ -97,7 +87,6 @@ function ArtworkItem({ a, ctx }: { a: ArtworkConfig; ctx: Ctx }) {
     <article className="guide-item" id={itemId('artwork', a.id)} aria-labelledby={`${itemId('artwork', a.id)}-h`}>
       <div className="guide-item__body">
         <h4 id={`${itemId('artwork', a.id)}-h`}>{title}</h4>
-        <Placeholder lang={lang} on={a.placeholder} />
         <Facts
           facts={[
             [t('info.tradition'), str(loc(a, 'tradition', lang))],
@@ -134,7 +123,6 @@ function ExhibitItem({ e, ctx }: { e: ExhibitConfig; ctx: Ctx }) {
     <article className="guide-item" id={itemId('exhibit', e.id)} aria-labelledby={`${itemId('exhibit', e.id)}-h`}>
       <div className="guide-item__body">
         <h4 id={`${itemId('exhibit', e.id)}-h`}>{title}</h4>
-        <Placeholder lang={lang} on={e.placeholder} />
         <Facts
           facts={[
             [t('info.tradition'), str(loc(e, 'tradition', lang))],
@@ -169,7 +157,6 @@ function InfographicItem({ g, ctx }: { g: InfographicConfig; ctx: Ctx }) {
       <div className="guide-item__body">
         {kicker && <p className="guide-kicker">{kicker}</p>}
         <h4 id={hid}>{title}</h4>
-        <Placeholder lang={lang} on={g.placeholder} />
         <Paragraphs text={str(loc(g, 'body', lang))} />
         {steps.length > 0 && (
           <>
@@ -196,7 +183,6 @@ function VideoItem({ v, ctx }: { v: VideoConfig; ctx: Ctx }) {
     <article className="guide-item" id={itemId('film', v.id)} aria-labelledby={`${itemId('film', v.id)}-h`}>
       <div className="guide-item__body">
         <h4 id={`${itemId('film', v.id)}-h`}>{title}</h4>
-        <Placeholder lang={lang} on={v.placeholder} />
         <Paragraphs text={str(loc(v, 'description', lang))} />
         <Alt lang={lang} text={str(loc(v, 'alt', lang)) ?? title} />
       </div>
@@ -211,7 +197,6 @@ function ObjectItem({ o, ctx }: { o: SceneObjectConfig; ctx: Ctx }) {
     <article className="guide-item" id={itemId('object', o.id)} aria-labelledby={`${itemId('object', o.id)}-h`}>
       <div className="guide-item__body">
         <h4 id={`${itemId('object', o.id)}-h`}>{title}</h4>
-        <Placeholder lang={lang} on={o.placeholder} />
         <Paragraphs text={str(loc(o, 'description', lang))} />
         <Alt lang={lang} text={str(loc(o, 'alt', lang)) ?? title} />
       </div>
@@ -277,7 +262,11 @@ function makeCtx(lang: Lang, content: GuideContent): Ctx {
       const a = id ? artworks.get(id) : undefined
       return a ? { title: str(loc(a, 'title', lang)) ?? a.id, href: `#${itemId('artwork', a.id)}` } : undefined
     },
-    artisanName: (item, localised) => localised ?? (item.artisanId ? str(artisans.get(item.artisanId)?.name) : undefined),
+    // stand-in maker profiles are not public (see app/makers/[id])
+    artisanName: (item, localised) => {
+      const p = item.artisanId ? artisans.get(item.artisanId) : undefined
+      return localised ?? (p && !p.placeholder ? str(p.name) : undefined)
+    },
   }
 }
 

@@ -75,7 +75,7 @@ export const liveToken = route(async (c) => {
   const user = await c.requireCurator()
   if (!tokenLimit(user.id)) return fail(429, 'Too many token requests')
   const key = secret()
-  if (!key) return fail(503, 'Live tours are not configured (LIVE_TOKEN_SECRET)')
+  if (!key) return fail(503, 'Live tours aren’t available right now.')
   const b = await c.json({ maxBytes: 4096 })
   if (!isRecord(b)) return fail(400, 'Body must be { room, pub }')
   const room = typeof b.room === 'string' ? b.room : ''
@@ -101,7 +101,7 @@ export const liveToken = route(async (c) => {
 export const liveVerify = route(async (c) => {
   if (!verifyLimit(c.ip)) return fail(429, 'Too many requests')
   const key = secret()
-  if (!key) return fail(503, 'Live tours are not configured')
+  if (!key) return fail(503, 'Live tours aren’t available right now.')
   const token = c.url.searchParams.get('token') ?? ''
   const claims = token ? verifyLiveToken(token, key) : null
   return claims ? { ok: true, claims } : { ok: false }

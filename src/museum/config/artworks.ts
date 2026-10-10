@@ -20,8 +20,9 @@
  *                  wall (the west wall centre is the India map installation — objects.ts).
  *   Atrium / reception  a monumental textile on the atrium west wall; three small studies.
  *
- * PLACEHOLDER STATUS: every image below is a procedurally generated placeholder (see
- * scripts/generate-placeholders.mjs) flagged `placeholder: true` so the UI labels it honestly.
+ * STAND-IN STATUS: every image below is a procedurally generated design (see
+ * scripts/generate-placeholders.mjs) flagged `placeholder: true`; its description says it was made
+ * for this exhibition, so nothing is passed off as a documented textile.
  */
 
 import { COURT_CENTER, BAY } from './layout'
@@ -88,9 +89,7 @@ export interface ArtworkConfig {
 
 export const TRADITION = 'Hand Block Printing'
 
-const PLACEHOLDER_NOTE =
-  'Placeholder image generated for layout and lighting calibration. The final hero textile will be supplied by the workshop and dropped in here without any geometry changes.'
-const WORK_NOTE = 'Placeholder image generated for layout and lighting calibration. The final work and its details will be supplied by the workshop.'
+const DESIGN_NOTE = 'A design made for this exhibition, in the manner of a hand block print.'
 
 type Place = ArtworkConfig['placement']
 interface Opts {
@@ -110,7 +109,7 @@ function work(id: string, title: string, image: string, placement: Place, o: Opt
     tradition: TRADITION,
     image: `/artworks/${image}.jpg`,
     placement,
-    description: o.hero ? PLACEHOLDER_NOTE : WORK_NOTE,
+    description: DESIGN_NOTE,
     placeholder: true,
     // hero placeholders ship with generated deep-zoom pyramids (scripts/generate-deepzoom.mjs)
     ...(o.hero ? { deepZoom: `/deepzoom/${image}/image.dzi` } : {}),

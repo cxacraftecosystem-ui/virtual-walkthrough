@@ -1,11 +1,13 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { makerForPage } from '@/server/pages'
+import { hasRole } from '@/server/auth'
+import { makerForPage, pageUser } from '@/server/pages'
 import '../../../src/museum/ui/standalone.css'
 
 /**
  * /makers/<id> — accessible, server-rendered "Meet the maker" page (works without WebGL).
- * Shows only what the workshop supplied; placeholder profiles are labelled as such.
+ * Shows only what the workshop supplied. Stand-in profiles (`placeholder`) are not public: visitors
+ * get a 404, curators and above see a preview marked "Hidden from visitors".
  */
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +18,12 @@ const safeImg = (u: string) => (/^(https?:\/\/|\/)[^\s]*$/i.test(u.trim()) ? u.t
 
 async function load(id: string) {
   try {
-    return await makerForPage(decodeURIComponent(id))
+    const data = await makerForPage(decodeURIComponent(id))
+    if (data?.maker.placeholder) {
+      const u = await pageUser()
+      if (!u || !hasRole(u.role, 'curator')) return null
+    }
+    return data
   } catch {
     return null
   }
@@ -67,7 +74,7 @@ export default async function MakerPage({ params }: Props) {
             <div className="sp-kicker">Meet the maker</div>
             <h1 className="sp-title" id="maker-name">{m.name}</h1>
             {m.placeholder ? (
-              <span className="sp-badge">Placeholder profile — details to be supplied by the workshop</span>
+              <span className="sp-badge">Hidden from visitors</span>
             ) : m.verified ? (
               <span className="sp-badge sp-badge--ok">Verified by the workshop</span>
             ) : null}

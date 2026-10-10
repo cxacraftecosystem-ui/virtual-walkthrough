@@ -125,7 +125,7 @@ async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
   const isJson = (res.headers.get('content-type') ?? '').includes('json')
   const data = isJson ? await res.json() : null
   if (!res.ok) {
-    const msg = (data as { error?: string } | null)?.error ?? (res.status === 404 && !isJson ? 'API not reachable — is `npm run server` running?' : res.statusText)
+    const msg = (data as { error?: string } | null)?.error ?? (res.status === 404 && !isJson ? 'Can’t reach the museum service. Try again.' : 'Something went wrong. Try again.')
     throw new ApiError(res.status, msg)
   }
   return data as T
@@ -178,7 +178,7 @@ function xhr(method: string, url: string, body: XMLHttpRequestBodyInit, headers:
     for (const [k, v] of Object.entries(headers)) x.setRequestHeader(k, v)
     x.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total)
     x.onload = () => resolve({ status: x.status, text: x.responseText })
-    x.onerror = () => reject(new Error('Network error during upload'))
+    x.onerror = () => reject(new Error('The upload didn’t finish. Check your connection and try again.'))
     x.send(body)
   })
 }
@@ -196,7 +196,7 @@ export async function uploadMedia(file: File, folder: string, cfg: MediaConfig, 
       folder: folder || undefined,
     })
     const r = await xhr(p.method, p.uploadUrl, file, p.headers, onProgress)
-    if (r.status < 200 || r.status >= 300) throw new Error(`Storage rejected the upload (HTTP ${r.status}). Check the bucket CORS configuration.`)
+    if (r.status < 200 || r.status >= 300) throw new Error('The upload didn’t reach storage. Check your connection and try again.')
     return req<MediaRecord>('POST', '/api/admin/media/complete', { key: p.key, filename: file.name })
   }
   const fd = new FormData()
@@ -209,6 +209,6 @@ export async function uploadMedia(file: File, folder: string, cfg: MediaConfig, 
   } catch {
     /* non-JSON */
   }
-  if (r.status < 200 || r.status >= 300) throw new ApiError(r.status, (data as { error?: string } | null)?.error ?? `Upload failed (HTTP ${r.status})`)
+  if (r.status < 200 || r.status >= 300) throw new ApiError(r.status, (data as { error?: string } | null)?.error ?? 'The upload didn’t finish. Try again.')
   return data as MediaRecord
 }

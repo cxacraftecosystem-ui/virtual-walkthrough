@@ -1,10 +1,10 @@
 /**
  * "Meet the maker" — artisan profiles (bundled fallback + runtime store).
  *
- * The bundled profiles are PLACEHOLDERS ONLY: no real people are named or described here.
- * Real profiles are supplied by the workshop and entered by curators in the admin (Makers);
- * the server then replaces ARTISANS in place (see content.ts → applyContent).
- * Artworks / exhibits reference a profile with `artisanId`.
+ * The bundled profiles are empty stand-ins (`placeholder: true`): no real people are named or
+ * described here, and visitors never see them (findPublicArtisan). Real profiles are supplied by
+ * the workshop and entered by curators in the admin (Makers); the server then replaces ARTISANS
+ * in place (see content.ts → applyContent). Artworks / exhibits reference a profile with `artisanId`.
  */
 
 export interface Artisan {
@@ -28,14 +28,12 @@ export interface Artisan {
   sort?: number
 }
 
-export const PLACEHOLDER_ARTISAN_TEXT = 'Artisan profile — to be supplied by the workshop'
-
 const placeholder = (id: string, n: number): Artisan => ({
   id,
-  name: `${PLACEHOLDER_ARTISAN_TEXT} (${n})`,
-  cluster: 'To be supplied by the workshop',
+  name: `Maker profile ${n}`,
+  cluster: '',
   craft: 'Hand block printing',
-  bio: `${PLACEHOLDER_ARTISAN_TEXT}. This stand-in card shows where the maker's own words, portrait and links will appear once the workshop has supplied and approved them. No real person is described here.`,
+  bio: '',
   portrait: '',
   contact: '',
   website: '',
@@ -56,6 +54,27 @@ export const SEED_ARTISAN_LINKS: Record<string, Record<string, string>> = {
 }
 
 export const findArtisan = (id: string | undefined) => (id ? ARTISANS.find((a) => a.id === id) : undefined)
+
+/** A profile visitors may see: stand-in profiles (`placeholder`) stay hidden until the workshop's details are in. */
+export const findPublicArtisan = (id: string | undefined) => {
+  const a = findArtisan(id)
+  return a && !a.placeholder ? a : undefined
+}
+
+/** Where an object link (config/objects.ts `links`) leads for visitors, or undefined when it leads nowhere yet. */
+export function resolveHref(label: string, href: string | undefined, artisanId: string | undefined): string | undefined {
+  const maker = findPublicArtisan(artisanId)
+  if (maker) {
+    if (/visit the maker/i.test(label)) return safeUrl(maker.website) ?? href
+    if (/^buy/i.test(label)) return safeUrl(maker.shopUrl) ?? href
+  }
+  if (!href) return undefined
+  // a maker page that visitors cannot see (stand-in profile) is not linked
+  const makerPage = /^\/makers\/([^/?#]+)/.exec(href)
+  if (makerPage && !findPublicArtisan(decodeURIComponent(makerPage[1]))) return undefined
+  // only site-relative paths or http(s) URLs
+  return href.startsWith('/') && !href.startsWith('//') ? href : safeUrl(href)
+}
 
 /** Only http(s) links are rendered (no javascript:/data: from content). */
 export const safeUrl = (u: string | undefined) => (u && /^https?:\/\//i.test(u.trim()) ? u.trim() : undefined)

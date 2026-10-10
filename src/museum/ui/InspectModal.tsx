@@ -232,7 +232,6 @@ export function InspectModal() {
   const ex = shown.type === 'exhibit' ? shown.ex : null
   const obj = shown.type === 'object' ? shown.obj : null
   const artwork = ex ? getArtwork(ex.artworkId) : undefined
-  const isPlaceholder = ex ? !!ex.placeholder || !ex.model : !!obj?.placeholder
   const eyebrow = ex ? (loc(ex, 'tradition', lang) ?? '') : obj ? zoneName(obj.zone, lang) : ''
   const title = (ex ? loc(ex, 'title', lang) : obj ? loc(obj, 'title', lang) : '') ?? ''
   const description = ex ? loc(ex, 'description', lang) : obj ? loc(obj, 'description', lang) : undefined
@@ -304,7 +303,6 @@ export function InspectModal() {
         <h2 id="inspect-title" className="inspect-title">
           {title}
         </h2>
-        {isPlaceholder && <span className="inspect-badge">{t('inspect.placeholder')}</span>}
         {facts.some(([, v]) => v) && (
           <dl className="inspect-facts">
             {facts

@@ -42,9 +42,7 @@ function unavailableTexture(aspect: number): THREE.Texture {
   g.fillStyle = '#8a7f71'
   g.textAlign = 'center'
   g.font = '500 22px Inter, system-ui, sans-serif'
-  g.fillText('IMAGE UNAVAILABLE', w / 2, h / 2 - 6)
-  g.font = '400 16px Inter, system-ui, sans-serif'
-  g.fillText('awaiting artwork file', w / 2, h / 2 + 20)
+  g.fillText('IMAGE UNAVAILABLE', w / 2, h / 2 + 8)
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   return t

@@ -41,7 +41,7 @@ export const FRAME_STYLE_IDS = Object.keys(FRAME_STYLES)
 const surface: FieldDef = { path: 'placement.surface', label: 'Wall / surface', type: 'surface', group: 'Placement', options: SURFACE_IDS, required: true }
 const at: FieldDef = { path: 'placement.at', label: 'Position along wall (m)', type: 'at', group: 'Placement', step: 0.05, required: true }
 const centerHeight: FieldDef = { path: 'placement.centerHeight', label: 'Centre height (m)', type: 'number', group: 'Placement', step: 0.05, hint: 'default 1.6' }
-const placeholder: FieldDef = { path: 'placeholder', label: 'Placeholder (shows “Placeholder” badge)', type: 'checkbox', group: 'Flags' }
+const placeholder: FieldDef = { path: 'placeholder', label: 'Needs content from the workshop', type: 'checkbox', group: 'Flags' }
 const title: FieldDef = { path: 'title', label: 'Title', type: 'text', group: 'Details', required: true }
 const description: FieldDef = { path: 'description', label: 'Description', type: 'textarea', group: 'Details' }
 const text = (path: string, label: string, group: FieldDef['group'] = 'Details'): FieldDef => ({ path, label, type: 'text', group })
@@ -63,8 +63,8 @@ export const FIELDS: Record<ContentCollection, FieldDef[]> = {
     description,
     { path: 'context', label: 'Context', type: 'textarea', group: 'Details' },
     { path: 'image', label: 'Image', type: 'media', accept: 'image', group: 'Media', required: true },
-    { path: 'deepZoom', label: 'Deep zoom (.dzi)', type: 'text', group: 'Media', hint: 'Examine-closely pyramid — create one in Capture tools → Deep zoom' },
-    { path: 'highRes', label: 'High-res image (no pyramid)', type: 'media', accept: 'image', group: 'Media', hint: 'optional ≤ 8k px image for the deep-zoom viewer when there is no .dzi' },
+    { path: 'deepZoom', label: 'Deep zoom (Examine closely)', type: 'text', group: 'Media', hint: 'made and filled in by Capture tools → Deep zoom' },
+    { path: 'highRes', label: 'High-resolution image', type: 'media', accept: 'image', group: 'Media', hint: 'optional, up to 8,000 px — used by Examine closely when there is no deep zoom' },
     surface,
     at,
     centerHeight,
@@ -87,18 +87,18 @@ export const FIELDS: Record<ContentCollection, FieldDef[]> = {
     text('material', 'Material'),
     text('technique', 'Technique'),
     description,
-    { path: 'model', label: '3D model (GLB/GLTF)', type: 'media', accept: 'model', group: 'Media', hint: 'empty = procedural placeholder block' },
+    { path: 'model', label: '3D model (GLB/GLTF)', type: 'media', accept: 'model', group: 'Media', hint: 'empty = a modelled block in the chosen motif' },
     num('modelScale', 'Model scale', 'Media', 0.01),
     surface,
     at,
     { path: 'inkColor', label: 'Ink colour', type: 'color', group: 'Display' },
-    { path: 'placeholderMotif', label: 'Placeholder motif', type: 'select', group: 'Display', options: ['rosette', 'teardrop', 'star-lattice', 'leaf-trail', 'diamond'] },
+    { path: 'placeholderMotif', label: 'Motif (when there is no 3D model)', type: 'select', group: 'Display', options: ['rosette', 'teardrop', 'star-lattice', 'leaf-trail', 'diamond'] },
     placeholder,
   ],
   infographics: [
     text('kicker', 'Kicker'),
     title,
-    { path: 'body', label: 'Body', type: 'textarea', group: 'Details', required: true },
+    { path: 'body', label: 'Body', type: 'textarea', group: 'Details' },
     { path: 'steps', label: 'Process steps (one per line)', type: 'lines', group: 'Details' },
     { path: 'icon', label: 'Icon', type: 'select', group: 'Display', options: ['map', 'dye', 'block', 'process'] },
     surface,
@@ -125,7 +125,7 @@ export const FIELDS: Record<ContentCollection, FieldDef[]> = {
   objects: [
     title,
     description,
-    text('kind', 'Procedural kind (fallback)'),
+    text('kind', 'Built-in model (when there is no 3D model file)'),
     { path: 'model', label: '3D model (GLB/GLTF)', type: 'media', accept: 'model', group: 'Media' },
     num('modelScale', 'Model scale', 'Media', 0.01),
     { path: 'position', label: 'Position [x, y, z] (m)', type: 'vec3', group: 'Placement' },

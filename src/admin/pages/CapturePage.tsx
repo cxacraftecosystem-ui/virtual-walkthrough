@@ -29,8 +29,7 @@ export function CapturePage() {
         <div>
           <h1>Capture tools</h1>
           <p className="muted">
-            Turn workshop photographs and phone scans into museum-ready media. Everything is processed in this browser, then uploaded
-            {cfg ? (cfg.directUpload ? ' straight to S3' : ' to the local media store') : ''}. Field guide: <span className="mono">docs/CONTENT_CAPTURE.md</span>.
+            Turn workshop photographs and phone scans into museum-ready media. Everything is prepared in this browser, then uploaded to the media library.
           </p>
         </div>
       </div>
@@ -82,7 +81,7 @@ function DeepZoomTool() {
         if (alive) setDims({ w: b.width, h: b.height })
         b.close()
       })
-      .catch(() => alive && setError('This image format cannot be decoded by the browser (use JPEG, PNG or WebP).'))
+      .catch(() => alive && setError('This browser can’t open this image. Use a JPEG, PNG or WebP file.'))
     return () => {
       alive = false
       URL.revokeObjectURL(url)
@@ -409,7 +408,7 @@ function ScanTool({ cfg }: { cfg: MediaConfig | null }) {
                 <span>Assign to</span>
                 <select value={target} onChange={(e) => setTarget(e.target.value as Target)} disabled={busy}>
                   <option value="exhibits">Exhibit (hand-block table)</option>
-                  <option value="objects">Scene object</option>
+                  <option value="objects">Object (installation)</option>
                 </select>
               </label>
               <label className="field">
@@ -432,7 +431,7 @@ function ScanTool({ cfg }: { cfg: MediaConfig | null }) {
             )}
             <div className="row" style={{ marginTop: 10 }}>
               <button className="btn primary" onClick={uploadAndAssign} disabled={busy || !cfg || !itemId}>Upload &amp; assign model</button>
-              <span className="muted small">Sets <span className="mono">model</span> and <span className="mono">modelScale: 1</span> (the file is already in metres).</span>
+              <span className="muted small">Sets the item’s 3D model, shown at its real size (the file is already in metres).</span>
             </div>
           </div>
         </>

@@ -87,14 +87,14 @@ export function ContentPage({ canReset = false }: { canReset?: boolean }) {
   async function reset() {
     const ok = await confirm({
       title: 'Reset all content?',
-      body: 'This replaces every artwork, exhibit, panel, video, object and text in this exhibition with the bundled defaults from the source code. Your edits will be lost.',
+      body: 'This replaces every artwork, exhibit, panel, video, object and text in this exhibition with the museum’s default content. Your edits will be lost.',
       confirmLabel: 'Reset content',
       danger: true,
     })
     if (!ok) return
     try {
       await api.reset()
-      toast('Content reset to bundled defaults')
+      toast('Content reset to the defaults')
       refreshMeta()
       setResetKey((k) => k + 1) // remount editors → reload lists
     } catch (e) {
@@ -249,7 +249,7 @@ function CollectionEditor({
                     <span className="t">{String(i.title ?? i.id) || i.id}</span>
                     <span className="i">
                       <span className="truncate">{i.id}</span>
-                      {i.placeholder === true && <span className="badge warn">placeholder</span>}
+                      {i.placeholder === true && <span className="badge warn">needs content</span>}
                       {i.__new === true && <span className="badge accent">unsaved</span>}
                     </span>
                   </span>
@@ -423,18 +423,18 @@ function ItemEditor({
     setJsonText(text)
     try {
       const v = JSON.parse(text) as unknown
-      if (typeof v !== 'object' || v === null || Array.isArray(v)) throw new Error('Must be a JSON object')
+      if (typeof v !== 'object' || v === null || Array.isArray(v)) throw new Error('This text must describe one item, inside { }.')
       if ((v as Item).id !== item.id) throw new Error(`"id" must stay "${item.id}"`)
       setDraft(v as Record<string, unknown>)
       setJsonError('')
     } catch (e) {
-      setJsonError(errMsg(e))
+      setJsonError(e instanceof SyntaxError ? 'This text can’t be read — check for a missing comma, quote or bracket.' : errMsg(e))
     }
   }
 
   const saveRef = useRef<() => void>(() => undefined)
   async function save() {
-    if (jsonError) return toast('Fix the raw JSON first', 'error')
+    if (jsonError) return toast('Fix the advanced text first', 'error')
     if (errorCount) {
       setShowErrors(true)
       return toast(`${errorCount} field${errorCount === 1 ? ' needs' : 's need'} attention before saving`, 'error')
@@ -507,7 +507,7 @@ function ItemEditor({
           <h2>{String(draft.title ?? '') || item.id}</h2>
           <div className="fh-meta">
             <span className="mono muted">{collection}/{item.id}</span>
-            {draft.placeholder === true && <span className="badge warn">placeholder</span>}
+            {draft.placeholder === true && <span className="badge warn">needs content</span>}
             {isNew && <span className="badge accent">draft</span>}
           </div>
         </div>
@@ -543,14 +543,14 @@ function ItemEditor({
       })}
 
       <details className="group" open={!!jsonError || undefined}>
-        <summary>Advanced · raw JSON <span className="hint">— every field, including ones without a form control</span></summary>
+        <summary>Advanced · all fields as text <span className="hint">— including ones without a form control</span></summary>
         <textarea
           className={`json-editor ${jsonError ? 'invalid' : ''}`}
           spellCheck={false}
           value={jsonText}
           onChange={(e) => onJson(e.target.value)}
           rows={Math.min(28, jsonText.split('\n').length + 1)}
-          aria-label="Raw JSON"
+          aria-label="All fields as text"
           aria-invalid={!!jsonError}
         />
         {jsonError && <p className="alert" style={{ marginTop: 6 }}>{jsonError}</p>}
@@ -564,7 +564,7 @@ function ItemEditor({
         {showErrors && errorCount > 0 ? (
           <span className="small danger-text">{errorCount} field{errorCount === 1 ? '' : 's'} need{errorCount === 1 ? 's' : ''} attention</span>
         ) : (
-          dirty && <span className="dirty">{isNew ? 'Draft — not published yet' : 'Unsaved changes'}</span>
+          dirty && <span className="dirty">{isNew ? 'Draft — press Create to publish' : 'Unsaved changes'}</span>
         )}
         <span className="spacer" />
         {!dirty && <span className="small muted hide-phone">⌘/Ctrl + S to save</span>}
@@ -654,7 +654,7 @@ function ItemPreview({ collection, draft }: { collection: ContentCollection; dra
     visual = (
       <div className="pv-frame" style={collection === 'exhibits' && !model ? { background: s('inkColor') || undefined } : undefined}>
         <span className="pv-missing" style={collection === 'exhibits' && !model ? { color: '#fbf7f0' } : undefined}>
-          {model ? <>3D model<br /><span className="mono">{model.split('/').pop()}</span></> : collection === 'exhibits' ? `Procedural block · ${s('placeholderMotif') || 'rosette'}` : `Procedural · ${s('kind') || 'object'}`}
+          {model ? <>3D model<br /><span className="mono">{model.split('/').pop()}</span></> : collection === 'exhibits' ? `Modelled block · ${s('placeholderMotif') || 'rosette'}` : `Built-in model · ${s('kind') || 'object'}`}
         </span>
       </div>
     )
@@ -866,7 +866,7 @@ function Field({
               <button type="button" className="icon-btn" onClick={() => onChange(undefined)} aria-label={`Clear ${def.label}`} title="Clear">×</button>
             )}
           </div>
-          {foot ?? <span className="hint">Choose from the media library ({options.length} {def.accept ?? 'file'}{options.length === 1 ? '' : 's'}) or type a path under /public.</span>}
+          {foot ?? <span className="hint">Choose from the media library ({options.length} {def.accept ?? 'file'}{options.length === 1 ? '' : 's'}) or type the address of a file already on the site.</span>}
           {picking && (
             <MediaPicker
               accept={def.accept}

@@ -4,8 +4,8 @@
  * RAW CRAFT TOOL (carved block)  →  PROCESS (impression swatch)  →  FINISHED TEXTILE (artwork)
  *
  * To use a real scanned/modelled block, drop a GLB into /public/models and set `model`.
- * If `model` is omitted or fails to load, a clearly-labelled procedural placeholder
- * block is generated using `placeholderMotif` (the same motif as the placeholder textile).
+ * If `model` is omitted or fails to load, a modelled block is generated using
+ * `placeholderMotif` (the same motif as its textile).
  */
 
 import type { SurfaceId } from './layout'
@@ -50,8 +50,7 @@ export interface ExhibitConfig {
   i18n?: ContentI18n<'title' | 'tradition' | 'artisan' | 'region' | 'material' | 'technique' | 'description' | 'alt'>
 }
 
-const NOTE =
-  'Temporary procedural block modelled for layout. It will be replaced by a 3D model of the authentic carved wooden block supplied by the workshop.'
+const NOTE = 'A carved printing block, modelled for this exhibition.'
 
 /** v3: one table beside each hero work, plus the court features and two Gallery D works. */
 const CZ = COURT_CENTER.z

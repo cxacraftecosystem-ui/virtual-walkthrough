@@ -48,7 +48,7 @@ const str = (v: unknown, name: string, max: number, required = false): string | 
 
 async function slugFree(db: Db, slug: string, exceptId?: string) {
   const hit = await db.one<{ id: string }>('SELECT id FROM exhibitions WHERE (slug = $1 OR id = $1) AND id <> $2', [slug, exceptId ?? ''])
-  if (hit) fail(409, `Slug "${slug}" is already used`)
+  if (hit) fail(409, `The web address /gallery/${slug} is already used`)
 }
 
 /** GET /api/exhibitions — published exhibitions (the default first). */
@@ -69,7 +69,7 @@ export const adminListExhibitions = route(async (c) => {
 
 async function insertExhibition(c: { db: Db; status: number }, b: Record<string, unknown>, from?: ExhibitionRow) {
   const slug = str(b.slug, 'slug', 60, true)!.toLowerCase()
-  if (!SLUG_RE.test(slug)) return fail(400, 'Slug: 2–60 lower-case letters, digits and "-"')
+  if (!SLUG_RE.test(slug)) return fail(400, 'Web address: 2–60 lower-case letters, digits and "-"')
   const title = str(b.title, 'title', 120) || (from ? `${from.title} (copy)` : fail(400, '"title" is required'))
   const subtitle = str(b.subtitle, 'subtitle', 200) ?? from?.subtitle ?? ''
   const theme = b.theme !== undefined ? readTheme(b.theme) : from ? (typeof from.theme === 'string' ? JSON.parse(from.theme) : from.theme) : {}
@@ -146,7 +146,7 @@ export const adminPatchExhibition = route<{ id: string }>(async (c) => {
   if (b.subtitle !== undefined) add('subtitle', str(b.subtitle, 'subtitle', 200) ?? '')
   if (b.slug !== undefined) {
     const slug = str(b.slug, 'slug', 60, true)!.toLowerCase()
-    if (!SLUG_RE.test(slug)) return fail(400, 'Slug: 2–60 lower-case letters, digits and "-"')
+    if (!SLUG_RE.test(slug)) return fail(400, 'Web address: 2–60 lower-case letters, digits and "-"')
     if (slug !== row.slug) await slugFree(c.db, slug, row.id)
     add('slug', slug)
   }
@@ -188,7 +188,7 @@ export const adminDeleteExhibition = route<{ id: string }>(async (c) => {
   await c.requireAdmin()
   const row = await mustFind(c.db, c.params.id)
   if (Number(row.is_default) === 1) return fail(409, 'The default exhibition cannot be deleted')
-  if (row.id === DEFAULT_EXHIBITION_ID && !c.url.searchParams.has('force')) return fail(409, `"${DEFAULT_EXHIBITION_ID}" holds the original content; add ?force=1 to delete it`)
+  if (row.id === DEFAULT_EXHIBITION_ID && !c.url.searchParams.has('force')) return fail(409, 'This exhibition holds the original content and can’t be deleted here.')
   await c.db.tx(async (q) => {
     await q.run('DELETE FROM content_items WHERE exhibition_id = $1', [row.id])
     await q.run('DELETE FROM exhibitions WHERE id = $1', [row.id])

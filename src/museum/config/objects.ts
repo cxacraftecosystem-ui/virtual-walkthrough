@@ -50,7 +50,7 @@ export type ProceduralModelId =
   /** "Print it yourself" studio table, Visitors' Wall (models/printStudio.tsx). */
   | 'print-studio'
   | 'visitors-wall'
-  /** Volumetric artisan capture: Gaussian splat `model` (.splat) or a labelled placeholder (models/artisan.tsx). */
+  /** Volumetric artisan capture: Gaussian splat `model` (.splat) or a glowing stand-in figure (models/artisan.tsx). */
   | 'splat'
   /** Museum shop (models/shop.tsx). */
   | 'shop-shelf'
@@ -100,11 +100,10 @@ export interface SceneObjectConfig {
   i18n?: ContentI18n<'title' | 'description' | 'alt'>
   /** "Meet the maker" profile (src/museum/content/artisans.ts), e.g. for shop products. */
   artisanId?: string
-  /** Links listed in the info panel (shop "Visit the maker / Buy", library Resources). No href = placeholder. */
+  /** Links listed in the info panel (shop "Visit the maker / Buy", library Resources). No href = not shown. */
   links?: { label: string; href?: string; note?: string }[]
 }
 
-const PENDING = 'Interpretive text to be supplied by the workshop.'
 /**
  * Poly Haven CC0 model: the optimised single-file GLB (meshopt + WebP, scripts/optimize-assets.mjs,
  * verified by scripts/verify-optimized-models.mjs); sources in /models/cc0/<id>/ (download-cc0-models.mjs).
@@ -122,10 +121,10 @@ const GDX = (GD.minX + GD.maxX) / 2
 const ART = (f: string) => `/artworks/${f}.jpg`
 
 const CENTREPIECE_TEXT =
-  'A large carved printing block, turning slowly on its table so the relief can be seen from every side: the mirrored central motif, the ring of small motifs and the ruled border band, with a brass-bound face and a turned handle with brass ferrules. PLACEHOLDER — a procedural stand-in modelled for layout; it will be replaced by a 3D model of a block supplied by the workshop.'
+  'A large carved printing block, turning slowly on its table so the relief can be seen from every side: the mirrored central motif, the ring of small motifs and the ruled border band, with a brass-bound face and a turned handle with brass ferrules. The block was modelled for this exhibition.'
 const MAP_TEXT =
-  'A relief map of India (official Government of India depiction). The numbered pins are PLACEHOLDERS: cluster locations are to be confirmed by the workshop and the pins do not mark real places yet. Curatorial text to be supplied by the workshop.'
-const VITRINE_TEXT = 'A table vitrine of placeholder printing blocks, each beside a trial impression of its motif. The blocks will be replaced by 3D models of blocks supplied by the workshop.'
+  'A relief map of India, in the official Government of India depiction.'
+const VITRINE_TEXT = 'A table vitrine of printing blocks, each beside a trial impression of its motif. The blocks were modelled for this exhibition.'
 
 /** Theatre seating: two blocks of six either side of a centre aisle, six rows (x), facing the screen (west). */
 const THEATRE_ROWS = [0, 1, 2, 3, 4, 5].flatMap((r) =>
@@ -160,7 +159,7 @@ export const SCENE_OBJECTS: SceneObjectConfig[] = [
     height: 4.2,
     props: { width: 1.3, image: ['/artworks/hero-04.jpg', '/artworks/drape-02.jpg', '/artworks/drape-01.jpg', '/artworks/drape-03.jpg', '/artworks/hero-01.jpg'][i] },
     interactive: i === 2,
-    description: 'A suspended installation of printed lengths welcoming visitors. (Placeholder textiles.)',
+    description: 'A suspended installation of printed lengths welcoming visitors.',
     zone: 'atrium',
     placeholder: true,
   })),
@@ -255,7 +254,7 @@ export const SCENE_OBJECTS: SceneObjectConfig[] = [
       height: 4.6,
       bottom: 0.65,
       title: 'A Map of Making',
-      // PLACEHOLDER pins: arbitrary layout positions (lon,lat) — no place is claimed.
+      // stand-in pins: arbitrary layout positions (lon,lat), not drawn while the item is `placeholder`.
       pins: '73.6,25.2;78.2,22.6;81.4,19.2;86.4,23.6;76.8,13.4',
     },
     interactive: true,
@@ -275,7 +274,7 @@ export const SCENE_OBJECTS: SceneObjectConfig[] = [
       footprint: [1.3, 0.3],
       props: { width: 1.3, image: ART(['drape-01', 'drape-02', 'drape-03'][(i + row) % 3]) },
       interactive: row === 0 && i === 1,
-      description: 'An avenue of suspended printed lengths leading to the map wall. (Placeholder textiles.)',
+      description: 'An avenue of suspended printed lengths leading to the map wall.',
       zone: 'gallery-d',
       placeholder: true,
     })),
@@ -337,7 +336,6 @@ export const SCENE_OBJECTS: SceneObjectConfig[] = [
     height: 0.86,
     props: { motif, ink, printed: [0.62, 0.4, 0.8, 0.25][i] },
     interactive: true,
-    description: PENDING,
     zone: 'workshop',
     placeholder: true,
   })),
@@ -358,7 +356,6 @@ export const SCENE_OBJECTS: SceneObjectConfig[] = [
     props: { liquid },
     interactive: true,
     inspectable: true,
-    description: PENDING,
     zone: 'workshop',
     placeholder: true,
   })),
@@ -372,17 +369,16 @@ export const SCENE_OBJECTS: SceneObjectConfig[] = [
     height: 2.4,
     interactive: true,
     inspectable: true,
-    description: PENDING,
     zone: 'workshop',
     placeholder: true,
   })),
-  { id: 'wash-tank', title: 'Wash Tank', kind: 'wash-tank', position: [25.2, 0, 3.6], footprint: [2.6, 1.1], height: 0.8, interactive: true, description: PENDING, zone: 'workshop', placeholder: true },
-  { id: 'pigment-station', title: 'Pigment Station', kind: 'pigment-station', position: [14.8, 0, WS.minZ + 0.65], footprint: [2.2, 0.8], height: 0.9, interactive: true, inspectable: true, description: PENDING, zone: 'workshop', placeholder: true },
-  { id: 'workshop-drying-line', title: 'Drying Line', kind: 'drying-line', position: [16.4, 0, 7.0], footprint: [4.6, 0.4], height: 2.6, props: { cloths: 4, images: '/artworks/study-14.jpg,/artworks/drape-03.jpg,/artworks/study-11.jpg,/artworks/study-15.jpg' }, interactive: true, description: PENDING, zone: 'workshop', placeholder: true },
+  { id: 'wash-tank', title: 'Wash Tank', kind: 'wash-tank', position: [25.2, 0, 3.6], footprint: [2.6, 1.1], height: 0.8, interactive: true, zone: 'workshop', placeholder: true },
+  { id: 'pigment-station', title: 'Pigment Station', kind: 'pigment-station', position: [14.8, 0, WS.minZ + 0.65], footprint: [2.2, 0.8], height: 0.9, interactive: true, inspectable: true, zone: 'workshop', placeholder: true },
+  { id: 'workshop-drying-line', title: 'Drying Line', kind: 'drying-line', position: [16.4, 0, 7.0], footprint: [4.6, 0.4], height: 2.6, props: { cloths: 4, images: '/artworks/study-14.jpg,/artworks/drape-03.jpg,/artworks/study-11.jpg,/artworks/study-15.jpg' }, interactive: true, zone: 'workshop', placeholder: true },
   { id: 'workshop-vitrine', title: 'Block Vitrine', kind: 'vitrine', position: [26.0, 0, 7.2], footprint: [1.8, 0.9], height: 0.92, props: { motifs: 'diamond,teardrop,leaf-trail' }, interactive: true, description: VITRINE_TEXT, zone: 'workshop', placeholder: true },
   { id: 'workshop-film-bench', title: 'Bench', kind: 'garden-bench', position: [13.6, 0, 3.0], rotationDeg: 90, footprint: [2.4, 0.5], zone: 'workshop' },
-  { id: 'fabric-rolls', title: 'Cloth Rolls', kind: 'fabric-rolls', position: [12.6, 0, 19.2], footprint: [2.0, 0.9], height: 1.4, interactive: true, description: PENDING, zone: 'workshop', placeholder: true },
-  { id: 'carving-bench', title: 'Block Carving Bench', kind: 'carving-bench', position: [29.2, 0, 16.8], rotationDeg: -90, footprint: [2.0, 0.9], height: 0.85, interactive: true, inspectable: true, description: PENDING, zone: 'workshop', placeholder: true },
+  { id: 'fabric-rolls', title: 'Cloth Rolls', kind: 'fabric-rolls', position: [12.6, 0, 19.2], footprint: [2.0, 0.9], height: 1.4, interactive: true, zone: 'workshop', placeholder: true },
+  { id: 'carving-bench', title: 'Block Carving Bench', kind: 'carving-bench', position: [29.2, 0, 16.8], rotationDeg: -90, footprint: [2.0, 0.9], height: 0.85, interactive: true, inspectable: true, zone: 'workshop', placeholder: true },
   { id: 'workshop-stool-1', title: 'Stool', kind: 'stool', model: cc0('wooden_stool_01'), modelScale: 1, position: [28.3, 0, 16.8], rotationDeg: 15, footprint: [0.45, 0.45], height: 0.44, zone: 'workshop', credit: PH('Kuutti Siitonen', 'wooden_stool_01') },
   { id: 'workshop-stool-2', title: 'Stool', kind: 'stool', model: cc0('wooden_stool_01'), modelScale: 1, position: [14.8, 0, -0.3], rotationDeg: -20, footprint: [0.45, 0.45], height: 0.44, zone: 'workshop', credit: PH('Kuutti Siitonen', 'wooden_stool_01') },
   { id: 'workshop-bucket', title: 'Wooden bucket', kind: 'vessel', model: cc0('wooden_bucket_01'), modelScale: 1, position: [27.1, 0, 3.4], rotationDeg: 60, footprint: [0.4, 0.4], height: 0.55, zone: 'workshop', credit: PH('James Ray Cock', 'wooden_bucket_01') },
@@ -399,7 +395,7 @@ export const SCENE_OBJECTS: SceneObjectConfig[] = [
     footprint: [2.2, 1.0],
     height: 0.86,
     interactive: true,
-    description: 'A printing table for visitors. Choose a block and a dye, press it onto the cloth and hang your print on the Visitors’ Wall. The blocks are placeholder designs made for this museum.',
+    description: 'A printing table for visitors. Choose a block and a dye, press it onto the cloth and hang your print on the Visitors’ Wall. The blocks are designs made for this museum.',
     zone: 'workshop',
   },
   {
@@ -423,7 +419,7 @@ export const SCENE_OBJECTS: SceneObjectConfig[] = [
     ] as const
   ).map<SceneObjectConfig>(([id, x, z, r]) => ({
     id,
-    title: 'Artisan Capture — coming soon',
+    title: 'The Printer’s Place',
     kind: 'splat',
     // model: '/models/splats/<capture>.splat',  ← set when a capture exists
     position: [x, 0, z],
@@ -432,7 +428,7 @@ export const SCENE_OBJECTS: SceneObjectConfig[] = [
     height: 1.45,
     props: { seat: 0.6, tableHeight: 0.86, reach: 0.42 },
     interactive: true,
-    description: 'PLACEHOLDER — a volumetric (Gaussian splat) recording of a printer at work will be shown here once it has been captured with the workshop. The glowing seated figure only marks the place.',
+    description: 'A softly glowing figure, seated at the printing table where the work is done.',
     zone: 'workshop',
     placeholder: true,
   })),
@@ -456,7 +452,6 @@ export const SCENE_OBJECTS: SceneObjectConfig[] = [
     height: 2.6,
     props: { cloths: 4, images },
     interactive: true,
-    description: PENDING,
     zone: 'courtyard',
     placeholder: true,
   })),
@@ -476,11 +471,11 @@ export const SCENE_OBJECTS: SceneObjectConfig[] = [
     footprint: [len, 1.2],
     height: 0.45,
     interactive: true,
-    description: 'Planting bed for dye plants. Species list to be supplied by the workshop.',
+    description: 'A planting bed for dye plants.',
     zone: 'courtyard',
     placeholder: true,
   })),
-  { id: 'water-channel', title: 'Rinsing Channel', kind: 'water-channel', position: [D.workshopToCourtyard.x, 0, CY.minZ + 0.8], footprint: [10.0, 0.9], height: 0.35, interactive: true, description: PENDING, zone: 'courtyard', placeholder: true },
+  { id: 'water-channel', title: 'Rinsing Channel', kind: 'water-channel', position: [D.workshopToCourtyard.x, 0, CY.minZ + 0.8], footprint: [10.0, 0.9], height: 0.35, interactive: true, zone: 'courtyard', placeholder: true },
   ...(
     [
       [14.2, -28.8, 6.5],
@@ -501,7 +496,7 @@ export const SCENE_OBJECTS: SceneObjectConfig[] = [
     height: 5.0,
     props: { width: 1.3, image: ART(['drape-03', 'drape-01', 'drape-02'][i]) },
     interactive: i === 1,
-    description: 'Printed lengths hung high against the courtyard wall. (Placeholder textiles.)',
+    description: 'Printed lengths hung high against the courtyard wall.',
     zone: 'courtyard',
     placeholder: true,
   })),

@@ -1,13 +1,14 @@
 /**
  * "Meet the maker" card in the info panel: portrait, name, bio excerpt and commerce links
  * (Visit the maker / Commission / Buy — fair trade), each shown only when the profile has that URL.
- * Profiles: src/museum/content/artisans.ts (runtime list filled by the content API).
+ * Profiles: src/museum/content/artisans.ts (runtime list filled by the content API). Stand-in
+ * profiles (`placeholder`) are not shown: an item without a real maker simply has no card.
  */
 import { useState } from 'react'
 import { ARTWORKS } from '../config/artworks'
 import { EXHIBITS } from '../config/exhibits'
 import { SCENE_OBJECTS } from '../config/objects'
-import { findArtisan, safeUrl } from '../content/artisans'
+import { findPublicArtisan, safeUrl } from '../content/artisans'
 import type { Selection } from '../state/store'
 import './MakerCard.css'
 
@@ -26,7 +27,7 @@ function artisanIdFor(sel: Selection | null): string | undefined {
 }
 
 export function MakerCard({ selection, tabIndex }: { selection: Selection | null; tabIndex?: number }) {
-  const maker = findArtisan(artisanIdFor(selection))
+  const maker = findPublicArtisan(artisanIdFor(selection))
   const [broken, setBroken] = useState<string | null>(null)
   if (!maker) return null
   const bio = maker.bio.length > EXCERPT ? `${maker.bio.slice(0, EXCERPT).replace(/\s+\S*$/, '')}…` : maker.bio
@@ -36,7 +37,7 @@ export function MakerCard({ selection, tabIndex }: { selection: Selection | null
     { label: 'Buy (fair trade)', href: safeUrl(maker.shopUrl) },
   ].filter((l): l is { label: string; href: string } => !!l.href)
   const portrait = maker.portrait && broken !== maker.portrait ? maker.portrait : ''
-  const initials = maker.placeholder ? '?' : maker.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
+  const initials = maker.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
   return (
     <section className="ui-maker" aria-labelledby={`ui-maker-${maker.id}`}>
@@ -50,8 +51,7 @@ export function MakerCard({ selection, tabIndex }: { selection: Selection | null
         <div className="ui-maker__who">
           <div className="ui-maker__name" id={`ui-maker-${maker.id}`}>{maker.name}</div>
           {(maker.craft || maker.cluster) && <div className="ui-maker__meta">{[maker.craft, maker.cluster].filter(Boolean).join(' · ')}</div>}
-          {maker.placeholder && <span className="ui-maker__badge">Placeholder profile</span>}
-          {!maker.placeholder && maker.verified && <span className="ui-maker__badge ui-maker__badge--ok">Verified by the workshop</span>}
+          {maker.verified &&<span className="ui-maker__badge ui-maker__badge--ok">Verified by the workshop</span>}
         </div>
       </div>
       {bio && <p className="ui-maker__bio">{bio}</p>}

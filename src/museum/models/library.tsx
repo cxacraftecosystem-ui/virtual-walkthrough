@@ -14,6 +14,7 @@
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { MotifId } from '../config/exhibits'
+import { resolveHref } from '../content/artisans'
 import { useAsyncTexture } from '../utils/useAsyncTexture'
 import { resourceBoardTexture, sampleBookSpread, spineTexture } from './amenityTextures'
 import { useLocalSpots } from './amenityLights'
@@ -390,7 +391,8 @@ export function ResourceBoard({ config }: ModelProps) {
   const w = num(config, 'width', 0.9)
   const h = w * 1.39
   const cy = 1.5
-  const items = config.links ?? []
+  // the board lists only the resources that lead somewhere (same rule as the info panel)
+  const items = (config.links ?? []).filter((l) => !!resolveHref(l.label, l.href, config.artisanId))
   const key = JSON.stringify(items)
   const tex = useAsyncTexture(() => resourceBoardTexture(items, w, h), [key, w, h])
   const parts = useBuilt(geoKey('resource-board', config), () => {

@@ -129,7 +129,7 @@ function AccessList() {
                   <span className="mono">{m}</span> <span className="badge ok">master</span>
                 </td>
                 <td>{ROLE_LABEL.master}</td>
-                <td className="muted small">Configured by MASTER_ADMIN_EMAILS — cannot be changed here</td>
+                <td className="muted small">Set by whoever hosts the site — can’t be changed here</td>
                 <td className="num">—</td>
                 <td />
                 <td />
@@ -277,7 +277,7 @@ function UsersTable({ me }: { me: User }) {
                       <select
                         value={u.manualRole ?? 'visitor'}
                         disabled={locked}
-                        title={locked ? (u.isMaster ? 'Master admins are set by MASTER_ADMIN_EMAILS' : 'You cannot change your own role') : 'Manual role (the effective role is the higher of this and the access list)'}
+                        title={locked ? (u.isMaster ? 'Master admins are set by whoever hosts the site' : 'You cannot change your own role') : 'Manual role (the effective role is the higher of this and the access list)'}
                         onChange={(e) => void setRole(u, e.target.value as ManualRole)}
                         aria-label={`Manual role for ${u.email}`}
                         style={{ width: 120 }}

@@ -6,14 +6,13 @@ import '../exhibitions.css'
 
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/
 const URL_RE = /^https?:\/\/\S+$/i
-const PLACEHOLDER = 'Artisan profile — to be supplied by the workshop'
 
 const blank = (id: string): AdminArtisan => ({
   id,
-  name: PLACEHOLDER,
+  name: 'New maker',
   cluster: '',
   craft: 'Hand block printing',
-  bio: `${PLACEHOLDER}.`,
+  bio: '',
   portrait: '',
   contact: '',
   website: '',
@@ -136,7 +135,7 @@ export function MakersPage() {
           <h1>Makers</h1>
           <p className="muted">
             “Meet the maker” profiles (shared by all exhibitions). Enter only information the workshop has supplied and approved — never invent details about real
-            people. Link a profile from an artwork or exhibit with its <span className="mono">artisanId</span> field.
+            people. Link a profile from an artwork or exhibit with its “Maker profile id” field. Profiles marked hidden are not shown to visitors.
           </p>
         </div>
       </div>
@@ -164,7 +163,7 @@ export function MakersPage() {
                     <span className="t">{a.name}</span>
                     <span className="i">
                       {a.id}
-                      {a.placeholder && <span className="badge warn">placeholder</span>}
+                      {a.placeholder && <span className="badge warn">hidden</span>}
                       {a.verified && <span className="badge ok">verified</span>}
                     </span>
                   </button>
@@ -227,7 +226,7 @@ export function MakersPage() {
               <div className="group">
                 <h3>Flags</h3>
                 <label className="check span-all">
-                  <input type="checkbox" checked={draft.placeholder} onChange={(e) => set('placeholder', e.target.checked)} /> Placeholder profile (labelled as such in the museum)
+                  <input type="checkbox" checked={draft.placeholder} onChange={(e) => set('placeholder', e.target.checked)} /> Hidden from visitors — keep ticked until the workshop has supplied and approved this profile
                 </label>
                 <label className="check span-all">
                   <input type="checkbox" checked={draft.verified} onChange={(e) => set('verified', e.target.checked)} /> Verified — details confirmed by the workshop / maker
@@ -244,7 +243,7 @@ export function MakersPage() {
                 {!isNew && saved && (
                   <button className="btn ghost" onClick={() => setDraft(saved)} disabled={busy || !dirty}>Revert</button>
                 )}
-                {dirty && <span className="dirty">{isNew ? 'Not saved yet' : 'Unsaved changes'}</span>}
+                {dirty && <span className="dirty">{isNew ? 'Not saved' : 'Unsaved changes'}</span>}
                 <span className="spacer" />
                 <button className="btn danger small" onClick={remove} disabled={busy}>{isNew ? 'Discard' : 'Delete'}</button>
               </div>

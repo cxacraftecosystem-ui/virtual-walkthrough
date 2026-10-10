@@ -132,17 +132,17 @@ async function request<T>(method: Method, path: string, body?: unknown, timeoutM
         body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
       })
     } catch {
-      throw new ApiError(0, ctrl.signal.aborted ? 'The museum server did not respond in time.' : 'Could not reach the museum server.')
+      throw new ApiError(0, ctrl.signal.aborted ? 'The museum took too long to answer. Please try again.' : 'Couldn’t connect to the museum. Check your connection and try again.')
     }
     const type = res.headers.get('content-type') ?? ''
     const data: unknown = type.includes('json') ? await res.json().catch(() => null) : null
     if (!res.ok) {
-      const msg = data && typeof data === 'object' && 'error' in data ? String((data as { error: unknown }).error) : `Request failed (${res.status})`
+      const msg = data && typeof data === 'object' && 'error' in data ? String((data as { error: unknown }).error) : 'Something went wrong. Please try again.'
       throw new ApiError(res.status, msg)
     }
     if (method === 'GET' && !type.includes('json')) {
       // e.g. the static host answered with index.html — treat as unavailable
-      throw new ApiError(res.status || 0, 'Unexpected response from the museum server.')
+      throw new ApiError(res.status || 0, 'Something went wrong. Please try again.')
     }
     return data as T
   } finally {

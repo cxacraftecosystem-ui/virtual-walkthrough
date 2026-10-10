@@ -92,7 +92,7 @@ async function verifyGoogleIdToken(credential: string): Promise<GoogleClaims> {
     return payload
   } catch (err) {
     if (err instanceof joseErrors.JWTExpired) return fail(401, 'Google sign-in expired, please try again')
-    if (err instanceof joseErrors.JOSEError) return fail(401, 'Invalid Google credential')
+    if (err instanceof joseErrors.JOSEError) return fail(401, 'Google sign-in didn’t work. Please try again.')
     throw err // network trouble fetching the JWKS → 500
   }
 }
@@ -108,7 +108,7 @@ async function verifyGoogleIdToken(credential: string): Promise<GoogleClaims> {
  * The role then comes from the access list (see auth.ts).
  */
 export const google = route(async (c) => {
-  if (!config.googleClientId) return fail(503, 'Google sign-in is not configured on this server (GOOGLE_CLIENT_ID)')
+  if (!config.googleClientId) return fail(503, 'Google sign-in isn’t available here. Use your email and password instead.')
   if (!googleLimit(c.ip)) return fail(429, 'Too many sign-in attempts, try again in a minute')
   const b = await c.json({ maxBytes: 16 * 1024 })
   if (!isRecord(b) || typeof b.credential !== 'string' || !b.credential || b.credential.length > 8192) {

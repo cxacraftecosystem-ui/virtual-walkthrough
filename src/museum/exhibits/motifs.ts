@@ -40,7 +40,7 @@ export type MotifLayer = 'fill' | 'outline' | 'all'
 
 export interface Motif {
   id: MotifId
-  /** Neutral descriptive name (placeholder). */
+  /** Neutral descriptive name. */
   name: string
   fill: MotifPrimitive[]
   outline: MotifPrimitive[]
@@ -218,7 +218,7 @@ function buildRosette(): Motif {
   outline.push({ type: 'circle', cx: 0, cy: 0, r: 0.082, stroke: 0.02 })
   fill.push({ type: 'circle', cx: 0, cy: 0, r: 0.055 })
   fill.push({ type: 'circle', cx: 0, cy: 0, r: 0.02, hole: true })
-  return { id: 'rosette', name: 'Eight-petal rosette (placeholder)', fill, outline }
+  return { id: 'rosette', name: 'Eight-petal rosette', fill, outline }
 }
 
 function buildTeardrop(): Motif {
@@ -251,7 +251,7 @@ function buildTeardrop(): Motif {
     const a = -Math.PI * 0.95 + (i / 6) * Math.PI * 0.9 - Math.PI * 0.05
     outline.push({ type: 'circle', cx: c[0] + Math.cos(a) * 0.405, cy: c[1] - 0.05 + Math.sin(a) * 0.36, r: 0.016 })
   }
-  return { id: 'teardrop', name: 'Curled teardrop (placeholder)', fill, outline }
+  return { id: 'teardrop', name: 'Curled teardrop', fill, outline }
 }
 
 function buildStarLattice(): Motif {
@@ -272,7 +272,7 @@ function buildStarLattice(): Motif {
     fill.push({ type: 'polygon', points: lozenge(0.055, px, py) })
     outline.push({ type: 'polygon', points: lozenge(0.085, px, py), stroke: 0.014 })
   }
-  return { id: 'star-lattice', name: 'Eight-point star lattice (placeholder)', fill, outline }
+  return { id: 'star-lattice', name: 'Eight-point star lattice', fill, outline }
 }
 
 function buildLeafTrail(): Motif {
@@ -313,7 +313,7 @@ function buildLeafTrail(): Motif {
       fill.push({ type: 'circle', cx: bx + Math.cos(a) * 0.1, cy: y + 0.03 + Math.sin(a) * 0.1, r: 0.019 })
     }
   }
-  return { id: 'leaf-trail', name: 'Trailing leaf stem (placeholder)', fill, outline }
+  return { id: 'leaf-trail', name: 'Trailing leaf stem', fill, outline }
 }
 
 function buildDiamond(): Motif {
@@ -331,7 +331,7 @@ function buildDiamond(): Motif {
     { type: 'polygon', points: lozenge(0.37), stroke: 0.014 },
     { type: 'circle', cx: 0, cy: 0, r: 0.022 },
   ]
-  return { id: 'diamond', name: 'Nested lozenge (placeholder)', fill, outline }
+  return { id: 'diamond', name: 'Nested lozenge', fill, outline }
 }
 
 export const MOTIFS: Record<MotifId, Motif> = {

@@ -66,7 +66,7 @@ The building is shared; each exhibition has its own content set (artworks, exhib
 | PUT | `/api/admin/artisans/:id` | full profile → saved `Artisan` (create or replace). URLs must be http(s). |
 | DELETE | `/api/admin/artisans/:id` | `{ ok: true }` |
 
-`Artisan = { id, name, cluster, craft, bio, portrait, contact, website, shopUrl, commissionUrl, verified, placeholder, sort }`. Artworks / exhibits link a profile with `artisanId`; the info panel shows a "Meet the maker" card with *Visit the maker* / *Commission* / *Buy (fair trade)* buttons for the URLs present, and `/makers/<id>` is the accessible, server-rendered profile page. The seed profiles are placeholders ("Artisan profile — to be supplied by the workshop") — never enter details that the workshop has not supplied.
+`Artisan = { id, name, cluster, craft, bio, portrait, contact, website, shopUrl, commissionUrl, verified, placeholder, sort }`. Artworks / exhibits link a profile with `artisanId`; the info panel shows a "Meet the maker" card with *Visit the maker* / *Commission* / *Buy (fair trade)* buttons for the URLs present, and `/makers/<id>` is the accessible, server-rendered profile page. The seed profiles are empty stand-ins (`placeholder: true`); visitors never see a stand-in profile (no card, no link, `/makers/<id>` is a 404 except for curators). Never enter details that the workshop has not supplied.
 
 ## Media (role ≥ curator)
 | Method | Path | Notes |

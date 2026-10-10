@@ -5,10 +5,10 @@
  * drei does not read `.ksplat` (a compressed format of other viewers): convert it to `.splat`.
  * Props: `splatScale` (default 1), `splatY` (vertical offset, m), `splatRotDeg` (extra turn).
  *
- * Until a real capture exists (no `model`, an unsupported file, or a failed load) a clearly
- * labelled placeholder stands in: a softly glowing, translucent seated figure on a real
- * stool, abstracted (no face, no costume, no pose claims) — with a small card
- * "Artisan capture — coming soon". Local frame: the figure faces +z (towards its table).
+ * Until a real capture exists (no `model`, an unsupported file, or a failed load) a figure
+ * stands in: a softly glowing, translucent seated figure on a real stool, abstracted (no face,
+ * no costume, no pose claims) — with a small card "The printer's place". Local frame: the
+ * figure faces +z (towards its table).
  */
 import { Splat } from '@react-three/drei'
 import { Suspense, useEffect, useMemo } from 'react'
@@ -196,8 +196,8 @@ function CapturePlaceholder({ config }: ModelProps) {
   const tableH = num(config, 'tableHeight', 0.86)
   const reach = num(config, 'reach', 0.42)
   const color = str(config, 'glow', '#e6eef5')
-  const title = str(config, 'cardTitle', 'Artisan capture — coming soon')
-  const line = str(config, 'cardText', 'A volumetric recording of a printer at work will appear here once it has been made with the workshop.')
+  const title = str(config, 'cardTitle', 'The printer’s place')
+  const line = str(config, 'cardText', 'A figure in light, seated where the printing is done.')
 
   const figure = useMemo(() => seatedFigure(seat, tableH, reach), [seat, tableH, reach])
   useEffect(() => () => figure.dispose(), [figure])

@@ -106,7 +106,7 @@ const lozenge = (cx: number, hw: number, hh: number, stroke?: number): MotifPrim
 })
 
 /**
- * A generic ruled band with a row of lozenges — PLACEHOLDER, not a documented border design.
+ * A generic ruled band with a row of lozenges — made for this museum, not a documented border design.
  * It occupies y ∈ [−1/6, 1/6] of the unit square, so the block is `size` long and size/3 deep
  * and consecutive impressions abut seamlessly along x.
  */
@@ -123,5 +123,5 @@ export const BORDER_MOTIF: Motif = (() => {
     ...xs.map((x) => lozenge(x, 0.042, 0.046)),
     ...[-0.5, -0.3, -0.1, 0.1, 0.3, 0.5].map<MotifPrimitive>((x) => ({ type: 'circle', cx: x, cy: 0, r: 0.022 })),
   ]
-  return { id: 'rosette', name: 'Ruled lozenge border (placeholder)', fill, outline }
+  return { id: 'rosette', name: 'Ruled lozenge border', fill, outline }
 })()

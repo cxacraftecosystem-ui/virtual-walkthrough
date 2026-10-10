@@ -24,13 +24,13 @@ export async function runScanOptimize(files: File[], options: ScanOptions, onLog
         w.onerror = (e) => {
           e.preventDefault()
           // a worker that failed to even load → fall back below
-          reject(started ? new Error(e.message || 'Optimiser crashed') : new WorkerLoadError())
+          reject(started ? new Error(e.message || 'The optimiser stopped unexpectedly') : new WorkerLoadError())
         }
         w.postMessage({ files: input, options }, input.map((f) => f.data.buffer as ArrayBuffer))
       })
     } catch (err) {
       if (!(err instanceof WorkerLoadError)) throw err
-      onLog('(worker unavailable — optimising on the main thread)')
+      onLog('(working in the page itself — it may pause briefly)')
       // the transferred buffers are gone: re-read the files
       const again: ScanFile[] = await Promise.all(files.map(async (f) => ({ name: f.name, data: new Uint8Array(await f.arrayBuffer()) })))
       const { optimizeScan } = await import('./scanOptimize')

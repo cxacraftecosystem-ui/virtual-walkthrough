@@ -42,14 +42,14 @@ async function resolve(kindRaw: string, idRaw: string) {
   const id = decodeURIComponent(idRaw)
   if (kind === 'zone') {
     const z = ZONES.find((x) => x.id === id)
-    return z ? { kind, id, title: z.name, placeholder: false } : null
+    return z ? { kind, id, title: z.name } : null
   }
   const c = await loadGuideContent()
-  const list: { id: string; title: string; placeholder?: boolean }[] =
+  const list: { id: string; title: string }[] =
     kind === 'artwork' ? c.artworks : kind === 'exhibit' ? c.exhibits : kind === 'object' ? c.objects : kind === 'infographic' ? c.infographics : c.videos
   // amenity fixtures (shop, library, credits) may be missing from an older server content set
   const item = (list ?? []).find((x) => x.id === id) ?? (kind === 'object' ? AMENITY_OBJECTS.find((x) => x.id === id) : undefined)
-  return item ? { kind, id, title: item.title, placeholder: !!item.placeholder } : null
+  return item ? { kind, id, title: item.title } : null
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -86,7 +86,6 @@ export default async function QrLabelPage({ params, searchParams }: Props) {
         <div className="qr-label__text">
           <div className="qr-label__kicker">{KIND_LABEL[it.kind]} · Virtual museum</div>
           <h1 className="qr-label__title">{it.title}</h1>
-          {it.placeholder && <p className="qr-label__note">Placeholder item — content to be supplied by the workshop.</p>}
           <p className="qr-label__cta">Scan to see this in the Hand Block Printing virtual museum.</p>
           <p className="qr-label__url">{url.replace(/^https?:\/\//, '')}</p>
         </div>

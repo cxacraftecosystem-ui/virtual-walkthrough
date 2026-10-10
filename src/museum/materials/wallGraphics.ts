@@ -266,29 +266,13 @@ export async function createInfographicTexture(cfg: InfographicConfig, widthM: n
   setFont(ctx, 400, m(bodySize), SANS)
   const bodyLines = wrap(ctx, cfg.body, Math.min(m(innerW), measureWidthForChars(ctx, 52)))
   const bodyLH = bodySize * 1.6
-  const maxY = heightM - pad - (cfg.placeholder ? 0.06 * u : 0)
+  const maxY = heightM - pad
   for (const l of bodyLines) {
     if (y > maxY) break
     ctx.fillText(l, m(pad), m(y))
     y += bodyLH
   }
 
-  if (cfg.placeholder) {
-    const tagSize = 0.017 * u
-    setFont(ctx, 600, m(tagSize), SANS, 0.2)
-    const label = 'CONTENT PENDING'
-    const tw = ctx.measureText(label).width
-    const px = m(0.018 * u)
-    const bh = m(tagSize * 2.1)
-    const bx = m(widthM - pad) - tw - px * 2
-    const by = m(heightM - pad * 0.62) - bh
-    ctx.strokeStyle = 'rgba(46, 42, 38, 0.35)'
-    ctx.lineWidth = Math.max(1, m(0.0012))
-    roundRect(ctx, bx, by, tw + px * 2, bh, bh / 2)
-    ctx.stroke()
-    ctx.fillStyle = 'rgba(46, 42, 38, 0.55)'
-    ctx.fillText(label, bx + px, by + bh * 0.68)
-  }
 
   return toTexture(ctx.canvas, `infographic-${cfg.id}`)
 }
@@ -305,16 +289,6 @@ function paperGrain(ctx: CanvasRenderingContext2D, W: number, H: number, seed: n
     d[i + 2] += n
   }
   ctx.putImageData(img, 0, 0)
-}
-
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.arcTo(x + w, y, x + w, y + h, r)
-  ctx.arcTo(x + w, y + h, x, y + h, r)
-  ctx.arcTo(x, y + h, x, y, r)
-  ctx.arcTo(x, y, x + w, y, r)
-  ctx.closePath()
 }
 
 interface Box {

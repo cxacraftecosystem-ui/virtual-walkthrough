@@ -94,7 +94,7 @@ export async function createDeepZoom(file: File, opts: DeepZoomOptions, onProgre
     }
   }
   worker.onerror = (e) => {
-    failure = new Error(`Tiling worker failed: ${e.message || 'unknown error'}`)
+    failure = new Error(`Could not prepare the deep zoom: ${e.message || 'unknown error'}`)
     infoReject(failure)
     poke()
   }
@@ -142,7 +142,7 @@ export async function createDeepZoom(file: File, opts: DeepZoomOptions, onProgre
             })
           }
           if (!res.ok) {
-            let msg = `HTTP ${res.status}`
+            let msg = 'A part of the image could not be uploaded'
             try {
               msg = ((await res.json()) as { error?: string }).error ?? msg
             } catch {

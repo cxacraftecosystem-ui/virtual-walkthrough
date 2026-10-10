@@ -511,12 +511,12 @@ function StudioOverlay({ onClose }: { onClose: () => void }) {
               className="ps-btn primary"
               onClick={() => setSend({ kind: 'form' })}
               disabled={empty || !canWall}
-              title={canWall ? undefined : 'The Visitors’ Wall needs the museum server — you can still download your print'}
+              title={canWall ? undefined : 'The Visitors’ Wall isn’t available right now — you can still download your print'}
             >
               Hang it on the Visitors’ Wall
             </button>
           </div>
-          {wallUp === false && <p className="ps-offline">Offline mode: the Visitors’ Wall is unavailable, but you can download your print.</p>}
+          {wallUp === false && <p className="ps-offline">The Visitors’ Wall isn’t available right now, but you can download your print.</p>}
         </main>
 
         <aside className="ps-panel" aria-label="Studio tools">
@@ -611,7 +611,7 @@ function StudioOverlay({ onClose }: { onClose: () => void }) {
               Snap impressions to the guide
             </label>
           </section>
-          <p className="ps-foot">Blocks are placeholder designs made for this museum, not reproductions of documented traditional blocks.</p>
+          <p className="ps-foot">The blocks are designs made for this museum, not copies of documented traditional blocks.</p>
         </aside>
       </div>
       <WallDialog state={send} setState={setSend} />

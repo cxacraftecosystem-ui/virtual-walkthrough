@@ -124,7 +124,7 @@ export function MediaPicker({ accept, value, onPick, onClose }: { accept?: Media
       {!items && !error ? (
         <Skeleton kind="cards" rows={8} />
       ) : shown.length === 0 ? (
-        <EmptyState title={q ? 'No matching files' : `No ${kind}s in the library yet`}>Upload one above, or close this and type a path under /public.</EmptyState>
+        <EmptyState title={q ? 'No matching files' : `No ${kind}s in the library yet`}>Upload one above, or close this and type the address of a file already on the site.</EmptyState>
       ) : (
         <div className="picker-grid" role="listbox" aria-label="Media files">
           {shown.map((m) => (

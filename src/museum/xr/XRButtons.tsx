@@ -52,7 +52,8 @@ export function VRHudButton() {
           if (s.mouseLook) s.setMouseLook(false)
           await vrStore.enterVR()
         } catch (e) {
-          liveToast(`Could not start VR: ${e instanceof Error ? e.message : 'unknown error'}`)
+          console.warn('[museum] VR start failed:', e)
+          liveToast('VR couldn’t start on this device. Please try again.')
         } finally {
           setBusy(false)
         }

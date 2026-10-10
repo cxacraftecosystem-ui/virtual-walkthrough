@@ -487,7 +487,7 @@ export function setHandRaised(v: boolean) {
 
 export async function startHosting(resumeTourId?: string): Promise<string | null> {
   const L = useLive.getState()
-  if (!cryptoAvailable()) return 'This browser cannot sign live-tour messages (needs HTTPS)'
+  if (!cryptoAvailable()) return 'Live tours can’t start here: this browser needs a secure (https) connection.'
   if (L.status !== 'online') return 'Live connection is not available'
   if (L.hosting || L.hostingStarting) return null
   L.set({ hostingStarting: true })
@@ -503,7 +503,7 @@ export async function startHosting(resumeTourId?: string): Promise<string | null
     const j = (await res.json().catch(() => ({}))) as { token?: string; claims?: { exp: number }; error?: string }
     if (!res.ok || !j.token || !j.claims) {
       if (resumeTourId) setSession(K_HOST, null)
-      return j.error ?? `Could not start the live tour (${res.status})`
+      return j.error ?? 'Could not start the live tour. Please try again.'
     }
     const tourId = resumeTourId ?? rid(12)
     host = { tourId, key: privateKey, token: j.token, exp: j.claims.exp, seq: Date.now(), lastAnnounce: 0, lastFocus: '' }

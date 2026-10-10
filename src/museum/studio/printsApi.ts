@@ -39,7 +39,7 @@ export async function submitPrint(png: Blob, displayName: string, summary: { mot
     body: JSON.stringify({ image: await blobToDataUrl(png), sessionId: getSessionId(), displayName, motif: summary.motif, meta: summary.meta }),
   })
   const data = (await res.json().catch(() => null)) as { error?: string; id?: string } | null
-  if (!res.ok) throw new Error(data?.error ?? `The wall could not accept the print (HTTP ${res.status})`)
+  if (!res.ok) throw new Error(data?.error ?? 'The Visitors’ Wall couldn’t take your print just now. Please try again.')
   return data as { id: string; status: 'pending'; createdAt: string }
 }
 

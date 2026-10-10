@@ -5,8 +5,9 @@ A practical field guide for the workshop team: how to photograph printed textile
 the curatorial text, and how to load everything through the admin (`/admin` → **Capture tools**).
 
 > Nothing in the museum should state a fact that the workshop has not supplied. Leave a field
-> empty rather than guess — the museum only shows the fields you fill in, and anything still
-> marked *Placeholder* is labelled as such to visitors.
+> empty rather than guess — the museum only shows the fields you fill in. Visitors never see a
+> "placeholder" label: items still ticked *Needs content from the workshop* simply show what they
+> have (see `docs/CONTENT_STILL_NEEDED.md` for what is outstanding).
 
 ---
 
@@ -111,7 +112,7 @@ Hindi and Bengali translations have their own fields (*Translations* group in th
 
 Style: short sentences, no superlatives, no unexplained jargon (explain *dabu*, *ajrakh*, *bagru*
 once if you use them), cite oral sources as "according to …". Ask the artisan to read their own entry
-before it goes live. When the real text and image are in, untick **Placeholder**.
+before it goes live. When the real text and image are in, untick **Needs content from the workshop**.
 
 ---
 
@@ -145,7 +146,7 @@ desktop Chrome/Edge with ≥ 8 GB RAM for large photos.
    10 cm).
 4. **Upload & assign** to an **Exhibit** (the hand-block table beside a hero textile) or a **Scene
    object**. This sets `model` and `modelScale: 1`. The museum loads meshopt + WebP glTF natively.
-5. Fill in the exhibit's text (section 3) and untick *Placeholder*.
+5. Fill in the exhibit's text (section 3) and untick *Needs content from the workshop*.
 
 ### Checklist before publishing
 - [ ] Colours checked against the real cloth on a calibrated screen
@@ -153,7 +154,7 @@ desktop Chrome/Edge with ≥ 8 GB RAM for large photos.
 - [ ] 3D block the right size next to the 10 cm grid; carving legible in the preview
 - [ ] Text read and approved by the workshop / artisan; translations reviewed by a native speaker
 - [ ] Credits and licence in *Metadata*
-- [ ] *Placeholder* unticked
+- [ ] *Needs content from the workshop* unticked
 
 ---
 

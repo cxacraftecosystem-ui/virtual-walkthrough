@@ -49,7 +49,7 @@ export function ExhibitionsPage({ canManage }: { canManage: boolean }) {
           <h1>Exhibitions</h1>
           <p className="muted">
             One building, several exhibitions. Each has its own artworks, exhibits, panels, films, objects, texts, tour and accent colour. The default
-            exhibition opens at <span className="mono">/gallery</span>; the others at <span className="mono">/gallery/&lt;slug&gt;</span>.
+            exhibition opens at <span className="mono">/gallery</span>; the others at <span className="mono">/gallery/</span> followed by their web address.
           </p>
         </div>
         <span className="spacer" />
@@ -231,7 +231,7 @@ function ExhibitionForm({
           />
         </label>
         <label className="field">
-          <span>Slug (URL)<span className="req"> *</span></span>
+          <span>Web address<span className="req"> *</span></span>
           <input
             type="text"
             value={slug}
@@ -290,8 +290,13 @@ function TourEditor({ exhibition }: { exhibition: AdminExhibition }) {
   }, [exhibition.id])
 
   function parse(): unknown[] | null {
-    const v = JSON.parse(text || '[]') as unknown
-    if (!Array.isArray(v)) throw new Error('Tour must be a JSON array of stops')
+    let v: unknown
+    try {
+      v = JSON.parse(text || '[]')
+    } catch {
+      throw new Error('The tour text can’t be read — check for a missing comma, quote or bracket.')
+    }
+    if (!Array.isArray(v)) throw new Error('The tour text must be a list of stops inside [ ].')
     return v
   }
 
@@ -301,7 +306,7 @@ function TourEditor({ exhibition }: { exhibition: AdminExhibition }) {
       const r = await exApi.putTour(exhibition.id, stops)
       setCustom(!!r.stops)
       if (!r.stops) setText('')
-      toast(r.stops ? `Saved ${r.stops.length} tour stops` : 'Using the bundled tour')
+      toast(r.stops ? `Saved ${r.stops.length} tour stops` : 'Using the standard tour')
       window.dispatchEvent(new Event(EXHIBITIONS_CHANGED))
     } catch (e) {
       toast(errMsg(e), 'error')
@@ -314,11 +319,11 @@ function TourEditor({ exhibition }: { exhibition: AdminExhibition }) {
     <section className="card" style={{ marginTop: 16 }}>
       <div className="form-head">
         <h2>Guided tour — {exhibition.title}</h2>
-        <span className={custom ? 'badge ok' : 'badge'}>{custom ? 'custom tour' : 'bundled tour'}</span>
+        <span className={custom ? 'badge ok' : 'badge'}>{custom ? 'custom tour' : 'standard tour'}</span>
       </div>
       <p className="muted small">
-        Each stop: <span className="mono">{'{ id, place, title, text, view: { x, z, yawDeg, pitchDeg? }, item?: { kind, id }, dwellSec? }'}</span>. Leave empty to use
-        the bundled tour. Stops that name an item missing from this exhibition simply show no “More about this” link.
+        Start from “Load the standard stops”, then change the place, title and caption (“text”) of each stop; “view” is where the visitor stands
+        and looks. Leave the box empty to use the standard tour. A stop that points to an item missing from this exhibition shows no “More about this” link.
       </p>
       {error && <p className="alert">{error}</p>}
       {text === null ? (
@@ -330,9 +335,9 @@ function TourEditor({ exhibition }: { exhibition: AdminExhibition }) {
             spellCheck={false}
             rows={Math.min(24, Math.max(6, text.split('\n').length + 1))}
             value={text}
-            placeholder="[] — empty: the bundled tour is used"
+            placeholder="Empty: the standard tour is used"
             onChange={(e) => setText(e.target.value)}
-            aria-label="Tour stops JSON"
+            aria-label="Tour stops"
           />
           <div className="save-bar">
             <button
@@ -349,10 +354,10 @@ function TourEditor({ exhibition }: { exhibition: AdminExhibition }) {
             >
               Save tour
             </button>
-            <button className="btn ghost" disabled={busy} onClick={() => setText(JSON.stringify(BUNDLED_TOUR_STOPS, null, 2))}>Load bundled stops as a template</button>
+            <button className="btn ghost" disabled={busy} onClick={() => setText(JSON.stringify(BUNDLED_TOUR_STOPS, null, 2))}>Load the standard stops</button>
             <span className="spacer" />
             {custom && (
-              <button className="btn small danger" disabled={busy} onClick={() => void save(null)}>Revert to bundled tour</button>
+              <button className="btn small danger" disabled={busy} onClick={() => void save(null)}>Revert to the standard tour</button>
             )}
           </div>
         </>

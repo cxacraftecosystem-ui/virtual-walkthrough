@@ -111,7 +111,7 @@ export function route<P = Record<string, never>>(
     } catch (err) {
       if (err instanceof HttpError) return jsonResponse({ error: err.message }, err.status, headers)
       console.error(`[museum] ${req.method} ${new URL(req.url).pathname} failed:`, err)
-      return jsonResponse({ error: 'Internal server error' }, 500, headers)
+      return jsonResponse({ error: 'Something went wrong. Please try again.' }, 500, headers)
     }
   }
 }

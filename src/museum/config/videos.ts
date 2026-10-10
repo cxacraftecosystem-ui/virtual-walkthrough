@@ -5,7 +5,7 @@
  * Multichannel (5.1) files are routed channel-by-channel to the virtual speakers in
  * `audio.speakers`; stereo files are up-mixed (L→FL+SL, R→FR+SR, L+R→C).
  *
- * PLACEHOLDER STATUS: every clip below is a generated placeholder (see
+ * STAND-IN STATUS: every clip below is a generated film (see
  * scripts/generate-placeholder-videos.mjs) until the workshop supplies footage.
  */
 import { MUSEUM, type Vec3 } from './museum'
@@ -68,9 +68,8 @@ export interface VideoConfig {
   i18n?: ContentI18n<'title' | 'description' | 'alt'>
 }
 
-const PORTRAIT_PLACEHOLDER =
-  'PLACEHOLDER — a short portrait film introducing a maker from the workshop will play here. Until it is filmed, the screen shows a crop of a placeholder process film.'
-const PLACEHOLDER = 'Placeholder film generated for layout and audio calibration. Replace `src` with the final footage.'
+const PORTRAIT_NOTE = 'A short portrait film of the craft.'
+const FILM_NOTE = 'A short film made for this exhibition.'
 
 /* ------------------------------------------------------------------ */
 /* Immersive theatre — screen + 7.1 layout derived from the room        */
@@ -93,7 +92,7 @@ export const VIDEOS: VideoConfig[] = [
   {
     id: 'welcome-film',
     title: 'Welcome Film',
-    description: PLACEHOLDER,
+    description: FILM_NOTE,
     src: '/videos/welcome-film.webm',
     poster: '/videos/welcome-film.jpg',
     placement: { surface: 'atrium-north-west', at: -5.6, centerHeight: 3.1 },
@@ -108,7 +107,7 @@ export const VIDEOS: VideoConfig[] = [
   {
     id: 'theatre-film',
     title: 'Immersive Theatre — Feature Film',
-    description: PLACEHOLDER,
+    description: FILM_NOTE,
     src: '/videos/theatre-film.webm',
     poster: '/videos/theatre-film.jpg',
     placement: { surface: 'theatre-screen', at: thZ, centerHeight: thCentre },
@@ -143,7 +142,7 @@ export const VIDEOS: VideoConfig[] = [
   {
     id: 'process-film-1',
     title: 'Process Film — Printing',
-    description: PLACEHOLDER,
+    description: FILM_NOTE,
     src: '/videos/process-film-1.webm',
     poster: '/videos/process-film-1.jpg',
     placement: { surface: 'workshop-west', at: 3.0, centerHeight: 2.3 },
@@ -158,7 +157,7 @@ export const VIDEOS: VideoConfig[] = [
   {
     id: 'process-film-2',
     title: 'Process Film — Dyeing',
-    description: PLACEHOLDER,
+    description: FILM_NOTE,
     src: '/videos/process-film-2.webm',
     poster: '/videos/process-film-2.jpg',
     placement: { surface: 'workshop-south', at: 20.3, centerHeight: 2.4 },
@@ -175,7 +174,7 @@ export const VIDEOS: VideoConfig[] = [
   {
     id: 'maker-portrait-1',
     title: 'Meet the Maker — Portrait I',
-    description: PORTRAIT_PLACEHOLDER,
+    description: PORTRAIT_NOTE,
     src: '/videos/process-film-1.webm',
     placement: { surface: 'workshop-east', at: 12.15, centerHeight: 1.45 },
     kind: 'portrait',
@@ -193,7 +192,7 @@ export const VIDEOS: VideoConfig[] = [
   {
     id: 'maker-portrait-2',
     title: 'Meet the Maker — Portrait II',
-    description: PORTRAIT_PLACEHOLDER,
+    description: PORTRAIT_NOTE,
     src: '/videos/process-film-2.webm',
     placement: { surface: 'workshop-east', at: 16.45, centerHeight: 1.45 },
     kind: 'portrait',

@@ -30,14 +30,10 @@ const PH = (author: string, id: string) => ({ author, source: `https://polyhaven
 const MAKER = 'artisan-placeholder-01'
 const MAKER_2 = 'artisan-placeholder-02'
 
-export const PRODUCT_TEXT =
-  'Product — to be supplied by the workshop. This display shows where printed pieces made by the artisans will be offered; names, makers, materials and prices will be added once supplied and approved.'
+export const PRODUCT_TEXT = 'Printed textiles on display in the museum shop.'
 
-/** "Visit the maker / Buy" — PLACEHOLDER links (no URL yet; the maker profile's own links win when present). */
-const PRODUCT_LINKS: NonNullable<SceneObjectConfig['links']> = [
-  { label: 'Visit the maker', note: 'Link to be supplied by the workshop' },
-  { label: 'Buy', note: 'Link to be supplied by the workshop' },
-]
+/** "Visit the maker / Buy" — the maker profile supplies the URLs; a link without one is not shown. */
+const PRODUCT_LINKS: NonNullable<SceneObjectConfig['links']> = [{ label: 'Visit the maker' }, { label: 'Buy' }]
 
 const SHOP = { minX: rx + T, maxX: MUSEUM.gallery.width / 2, minZ: DIV, maxZ: DIV + MUSEUM.reception.length }
 const LIB = { minX: -MUSEUM.gallery.width / 2, maxX: -rx - T, minZ: DIV, maxZ: DIV + MUSEUM.reception.length }
@@ -103,10 +99,9 @@ export const AMENITY_OBJECTS: SceneObjectConfig[] = [
     height: 1.0,
     interactive: true,
     placeholder: true,
-    description:
-      'The museum shop counter. Opening hours, the online shop and how purchases support the makers are to be supplied by the workshop. Everything on display here is a placeholder.',
+    description: 'The museum shop counter.',
     links: [
-      { label: 'Online shop', note: 'Link to be supplied by the workshop' },
+      { label: 'Online shop' },
       { label: 'Meet the makers', href: '/makers/artisan-placeholder-01' },
     ],
     zone: 'shop',
@@ -172,7 +167,7 @@ export const AMENITY_OBJECTS: SceneObjectConfig[] = [
     inspectable: true,
     placeholder: true,
     description:
-      'An open sample book on a lectern: pages of printed swatches, the way printers keep a record of their designs. PLACEHOLDER — the swatches are generated for layout from the museum’s placeholder motifs; the real sample book will be supplied by the workshop.',
+      'An open sample book on a lectern: pages of printed swatches, the way printers keep a record of their designs. The swatches use the motifs made for this museum.',
     zone: 'library',
     alt: 'A timber lectern holding an open book whose pages carry small printed cloth swatches.',
   },
@@ -187,7 +182,7 @@ export const AMENITY_OBJECTS: SceneObjectConfig[] = [
     interactive: true,
     placeholder: true,
     description:
-      'A wall of framed design drawings for printing blocks. PLACEHOLDER ART — these sheets are generated from the museum’s placeholder motifs for layout; the drawings will be supplied by the workshop.',
+      'A wall of framed design drawings for printing blocks, drawn from the motifs made for this museum.',
     zone: 'library',
     alt: 'Six framed ink drawings of block-print motifs on squared paper, hung in two rows.',
   },
@@ -201,15 +196,15 @@ export const AMENITY_OBJECTS: SceneObjectConfig[] = [
     height: 2.2,
     props: { width: 0.9 },
     interactive: true,
-    description:
-      'Further reading and tools for visitors, teachers and researchers. Items marked “to be supplied” are placeholders for future publications from the workshop.',
+    description: 'Further reading and tools for visitors, teachers and researchers.',
     links: [
       { label: 'Accessible text guide', href: '/guide', note: 'Every room and item as plain text — printable, screen-reader friendly' },
-      { label: 'Capture guide', note: 'How the artisans and blocks are recorded in 3D — to be supplied' },
-      { label: 'Future publications', note: 'Catalogues and research papers — to be supplied by the workshop' },
+      // shown (board and info panel) once they have an href
+      { label: 'Capture guide', note: 'How the artisans and blocks are recorded in 3D' },
+      { label: 'Publications', note: 'Catalogues and research papers from the workshop' },
     ],
     zone: 'library',
-    alt: 'A framed wall board titled Resources listing the text guide, the capture guide and future publications.',
+    alt: 'A framed wall board titled Resources, listing the accessible text guide.',
   },
 
   // ══ Credits / partners wall — reception south wall, flanking the atrium portal (faces north) ══
@@ -229,7 +224,7 @@ export const AMENITY_OBJECTS: SceneObjectConfig[] = [
     props: { kicker, logo, width: 2.1, panelHeight: 1.4, center: 1.75 },
     interactive: true,
     placeholder: true,
-    description: 'Partner acknowledgement. The wording on this wall is generic placeholder text; the final credits will be confirmed by the partners.',
+    description: 'The partners who present this exhibition.',
     zone: 'reception',
     alt: `A pale stone panel with brass fillets reading “${kicker}” above a partner logo.`,
   })),

@@ -106,19 +106,19 @@ export const putTour = route(async (c) => {
     await putMetaJson(c.db, 'tour', null, ex.id)
     return { stops: null }
   }
-  if (!Array.isArray(b.stops) || b.stops.length > 80) return fail(400, '"stops" must be an array (max 80)')
+  if (!Array.isArray(b.stops) || b.stops.length > 80) return fail(400, 'A tour is a list of at most 80 stops.')
   const ids = new Set<string>()
   const stops = b.stops.map((s, i) => {
-    if (!isRecord(s)) return fail(400, `stops[${i}] must be an object`)
-    if (typeof s.id !== 'string' || !ID_RE.test(s.id) || ids.has(s.id)) return fail(400, `stops[${i}].id must be a unique id`)
+    if (!isRecord(s)) return fail(400, `Stop ${i + 1} couldn’t be read as a stop.`)
+    if (typeof s.id !== 'string' || !ID_RE.test(s.id) || ids.has(s.id)) return fail(400, `Stop ${i + 1} needs its own “id” (letters, digits, “-” or “_”).`)
     ids.add(s.id)
-    for (const k of ['place', 'title', 'text'] as const) if (typeof s[k] !== 'string') return fail(400, `stops[${i}].${k} must be a string`)
+    for (const k of ['place', 'title', 'text'] as const) if (typeof s[k] !== 'string') return fail(400, `Stop ${i + 1} needs a “${k}”.`)
     const v = s.view
     if (!isRecord(v) || !num(v.x) || !num(v.z) || !num(v.yawDeg) || (v.pitchDeg !== undefined && !num(v.pitchDeg))) {
-      return fail(400, `stops[${i}].view must be { x, z, yawDeg, pitchDeg? } (numbers)`)
+      return fail(400, `Stop ${i + 1}: “view” needs numbers for x, z and yawDeg.`)
     }
-    if (s.dwellSec !== undefined && (!num(s.dwellSec) || (s.dwellSec as number) < 1 || (s.dwellSec as number) > 600)) return fail(400, `stops[${i}].dwellSec must be 1–600`)
-    if (s.item !== undefined && (!isRecord(s.item) || typeof s.item.kind !== 'string' || typeof s.item.id !== 'string')) return fail(400, `stops[${i}].item must be { kind, id }`)
+    if (s.dwellSec !== undefined && (!num(s.dwellSec) || (s.dwellSec as number) < 1 || (s.dwellSec as number) > 600)) return fail(400, `Stop ${i + 1}: “dwellSec” must be between 1 and 600 seconds.`)
+    if (s.item !== undefined && (!isRecord(s.item) || typeof s.item.kind !== 'string' || typeof s.item.id !== 'string')) return fail(400, `Stop ${i + 1}: “item” needs a kind and an id.`)
     return s
   })
   await putMetaJson(c.db, 'tour', stops, ex.id)

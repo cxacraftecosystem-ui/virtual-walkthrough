@@ -7,7 +7,7 @@ import '../../../src/museum/ui/standalone.css'
 /**
  * /gallery/<slug> — the same building with another exhibition's content (multi-exhibition platform).
  * Unknown slug → 404. A draft is shown only to curators and above (preview); everyone else
- * gets a "not open yet" page.
+ * gets a "not on view" page.
  */
 export const dynamic = 'force-dynamic'
 
@@ -36,8 +36,8 @@ export default async function ExhibitionPage({ params }: Props) {
             <a href="/gallery">← Back to the museum</a>
           </nav>
           <div className="sp-kicker">Exhibition</div>
-          <h1 className="sp-title">Not open yet</h1>
-          <p className="sp-sub">This exhibition is still being prepared. Please visit the current exhibition in the meantime.</p>
+          <h1 className="sp-title">Not on view</h1>
+          <p className="sp-sub">This exhibition isn’t open to visitors. The current exhibition is open now.</p>
           <a className="sp-btn sp-btn--primary" href="/gallery">Visit the current exhibition</a>
         </div>
       </main>
