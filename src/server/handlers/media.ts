@@ -162,7 +162,7 @@ export const uploadMedia = route(async (c) => {
             await storage.remove(saved.key)
             throw new HttpError(413, TOO_LARGE)
           }
-          out = { folder: p.folder, storedName: p.storedName, filename: info.filename, mime: p.mime, size: saved.size }
+          out = { folder: p.folder, storedName: p.storedName, filename: info.filename ?? '', mime: p.mime, size: saved.size }
         })
         .catch(async (err) => {
           await storage.remove(p.key).catch(() => undefined)
