@@ -15,6 +15,7 @@ import { createDeepZoom, type DeepZoomProgress } from '../pipeline/deepZoomUploa
 import { ModelPreview } from '../pipeline/ModelPreview'
 import { runScanOptimize } from '../pipeline/runScan'
 import { SCAN_DEFAULTS, type ScanResult, type ScanStats } from '../pipeline/scanOptimize'
+import { safeUrl } from '../safeUrl'
 import { errMsg, formatBytes, useToast } from '../ui'
 import '../pipeline/capture.css'
 
@@ -89,6 +90,8 @@ function DeepZoomTool() {
   }, [file])
 
   const current = artworks.find((a) => a.id === target)
+  /** The object URL of the chosen file; checked like any other address before it reaches <img src>. */
+  const safeThumb = safeUrl(thumb, 'image')
   const estimate = useMemo(() => (dims ? dziTileCount(pyramidInfo(dims.w, dims.h, { format })) : 0), [dims, format])
 
   async function start() {
@@ -174,7 +177,7 @@ function DeepZoomTool() {
 
       {file && (
         <div className="cap-file">
-          {thumb && <img src={thumb} alt="" />}
+          {safeThumb && <img src={safeThumb} alt="" />}
           <div className="small">
             <strong>{file.name}</strong> · {formatBytes(file.size)}
             {dims && (

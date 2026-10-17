@@ -22,6 +22,7 @@ import { zoneAt } from '../config/layout'
 import { useMuseum } from '../state/store'
 import { visitor } from '../state/visitor'
 import { startCuratorTracking } from './curatorTracking'
+import { newSessionId } from './ids'
 import { createOutbox } from './outbox'
 
 const FLUSH_MS = 10000
@@ -38,25 +39,16 @@ const outbox = createOutbox({
   beacon: (batch) => api.analytics.beacon(getSessionId(), batch.id, batch.events),
 })
 
-function makeId() {
-  try {
-    if (crypto?.randomUUID) return crypto.randomUUID()
-  } catch {
-    /* fall through */
-  }
-  return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
-}
-
 export function getSessionId() {
   if (sessionId) return sessionId
   try {
     sessionId = sessionStorage.getItem(SESSION_KEY) ?? ''
     if (!sessionId) {
-      sessionId = makeId()
+      sessionId = newSessionId()
       sessionStorage.setItem(SESSION_KEY, sessionId)
     }
   } catch {
-    sessionId = sessionId || makeId()
+    sessionId = sessionId || newSessionId()
   }
   return sessionId
 }

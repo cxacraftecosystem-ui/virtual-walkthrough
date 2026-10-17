@@ -7,6 +7,7 @@ import { MediaPicker, mediaMatches } from '../MediaPicker'
 import { useExhibitionList } from '../ExhibitionSwitcher'
 import { useSelectedExhibition } from '../exhibitionsApi'
 import { EmptyState, Modal, PageHeader, Skeleton, errMsg, hasUnsavedChanges, useConfirm, useToast, useUnsavedGuard } from '../ui'
+import { safeUrl } from '../safeUrl'
 
 const COLLECTIONS: { id: ContentCollection; label: string; singular: string; hash: string }[] = [
   { id: 'artworks', label: 'Artworks', singular: 'artwork', hash: 'artwork' },
@@ -620,7 +621,8 @@ function ItemPreview({ collection, draft }: { collection: ContentCollection; dra
 
   let visual: ReactNode
   if (collection === 'artworks') {
-    const img = s('image')
+    const rawImg = s('image')
+    const img = safeUrl(rawImg, 'image')
     const frame = resolveFrame((draft.frame as FrameConfig | FrameStyleId | undefined) ?? undefined)
     const K = 110 // px per metre in the preview
     const fw = Math.round(frame.frameWidth * K)
@@ -637,16 +639,16 @@ function ItemPreview({ collection, draft }: { collection: ContentCollection; dra
             </div>
           </div>
         ) : (
-          <span className="pv-missing">{img ? 'Image not found' : 'No image yet'}</span>
+          <span className="pv-missing">{img ? 'Image not found' : rawImg ? 'Unsupported image address' : 'No image yet'}</span>
         )}
       </div>
     )
   } else if (collection === 'videos') {
-    const poster = s('poster')
-    const src = s('src')
+    const poster = safeUrl(s('poster'), 'image')
+    const src = safeUrl(s('src'), 'video')
     visual = (
       <div className="pv-frame">
-        {src ? <video src={src} poster={poster || undefined} muted playsInline preload="metadata" controls /> : poster ? <img src={poster} alt="" /> : <span className="pv-missing">No video yet</span>}
+        {src ? <video src={src} poster={poster} muted playsInline preload="metadata" controls /> : poster ? <img src={poster} alt="" /> : <span className="pv-missing">{s('src') ? 'Unsupported video address' : 'No video yet'}</span>}
       </div>
     )
   } else if (collection === 'exhibits' || collection === 'objects') {
@@ -669,7 +671,7 @@ function ItemPreview({ collection, draft }: { collection: ContentCollection; dra
       </div>
     )
   }
-  const model = s('model')
+  const modelHref = safeUrl(s('model'), 'link')
   return (
     <div className="preview-panel">
       {visual}
@@ -677,7 +679,7 @@ function ItemPreview({ collection, draft }: { collection: ContentCollection; dra
         <span className="kicker">Preview</span>
         {place}
         {collection === 'artworks' && <span className="muted">Frame: {typeof draft.frame === 'object' && draft.frame ? String((draft.frame as { style?: string }).style) + ' (custom)' : s('frame') || 'default (thin black)'}</span>}
-        {model && <a className="small" href={model} target="_blank" rel="noreferrer">Open model file ↗</a>}
+        {modelHref && <a className="small" href={modelHref} target="_blank" rel="noreferrer">Open model file ↗</a>}
         {s('description') && <span className="muted truncate">{s('description')}</span>}
       </div>
     </div>
@@ -849,7 +851,7 @@ function Field({
       const v = typeof value === 'string' ? value : ''
       const listId = `media-${def.accept ?? 'any'}`
       const options = media.filter((m) => mediaMatches(m, def.accept))
-      const thumb = def.accept === 'image' ? v : def.accept === 'video' ? null : null
+      const thumb = def.accept === 'image' ? safeUrl(v, 'image') : undefined
       return (
         <div className={cls('span-all')}>
           {label}

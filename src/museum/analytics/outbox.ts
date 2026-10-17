@@ -10,6 +10,7 @@
  * drives it directly.
  */
 import type { AnalyticsEvent } from '../api/client'
+import { secureRandomId } from './ids'
 
 export interface Batch {
   /** Made in the browser; the same on every attempt. */
@@ -30,15 +31,14 @@ export const MAX_BATCH = 200
 export const MAX_QUEUE = 2000
 
 /**
- * 128 random bits. crypto.randomUUID exists only in secure contexts (HTTPS, localhost), so elsewhere
- * (a LAN address in development) the same strength comes from getRandomValues, as base64url.
+ * 128 random bits (./ids.ts). A batch id only has to be unique within its session, so with no Web
+ * Crypto at all Math.random is enough here; the session id never takes this path.
  */
 export function newBatchId(c: Partial<Crypto> | undefined = globalThis.crypto): string {
-  if (typeof c?.randomUUID === 'function') return c.randomUUID()
+  const id = secureRandomId(c)
+  if (id) return id
   const bytes = new Uint8Array(16)
-  if (typeof c?.getRandomValues === 'function') c.getRandomValues(bytes)
-  // No Web Crypto at all: Math.random is guessable, but a batch id only has to be unique.
-  else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256)
+  for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256)
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
