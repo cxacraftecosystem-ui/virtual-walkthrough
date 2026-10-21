@@ -5,10 +5,12 @@
 import 'server-only'
 import {
   ACCESS_ROLES,
+  type AccessList,
   type AccessRole,
-  accessRoleFor,
+  accessRoleFromList,
   getUserRow,
   isMasterEmail,
+  loadAccessList,
   MANUAL_ROLES,
   type ManualRole,
   normalizeAccessPattern,
@@ -24,7 +26,8 @@ import { fail, isRecord } from '../util'
 const isManualRole = (v: unknown): v is ManualRole => typeof v === 'string' && (MANUAL_ROLES as readonly string[]).includes(v)
 const isAccessRole = (v: unknown): v is AccessRole => typeof v === 'string' && (ACCESS_ROLES as readonly string[]).includes(v)
 
-async function toAdminUser(db: Db, r: UserRow) {
+/** `list` is the access list loaded once for the whole response (`loadAccessList`), never once per user. */
+function toAdminUser(list: AccessList, r: UserRow) {
   const verified = Number(r.email_verified) === 1
   return {
     id: r.id,
@@ -34,7 +37,7 @@ async function toAdminUser(db: Db, r: UserRow) {
     /** role set by an admin (null = none) */
     manualRole: r.manual_role,
     /** role granted by the access list for this address (applies once the email is verified) */
-    accessRole: await accessRoleFor(db, r.email),
+    accessRole: accessRoleFromList(list, r.email),
     emailVerified: verified,
     google: Boolean(r.google_sub),
     hasPassword: r.password_hash.startsWith('scrypt$'),
@@ -48,11 +51,13 @@ async function toAdminUser(db: Db, r: UserRow) {
 /* Users (admin)                                                       */
 /* ------------------------------------------------------------------ */
 
-/** GET /api/admin/users?q= — staff first, then most recent sign-in (max 1000). */
-export const listUsers = route(async (c) => {
-  await c.requireAdmin()
-  const q = (c.url.searchParams.get('q') ?? '').trim().toLowerCase().slice(0, 100)
-  const rows = await c.db.query<UserRow>(
+/**
+ * The admin user list: staff first, then most recent sign-in (max 1000). Two queries whatever its length —
+ * the users, and the access list each user's access-list role is read from in memory.
+ */
+export async function adminUserList(db: Db, query: string) {
+  const q = query.trim().toLowerCase().slice(0, 100)
+  const rows = await db.query<UserRow>(
     `SELECT * FROM users
      WHERE $1 = '' OR email LIKE $2 OR LOWER(display_name) LIKE $2
      ORDER BY CASE role WHEN 'master' THEN 0 WHEN 'admin' THEN 1 WHEN 'curator' THEN 2 ELSE 3 END,
@@ -60,7 +65,14 @@ export const listUsers = route(async (c) => {
      LIMIT 1000`,
     [q, `%${q}%`],
   )
-  return Promise.all(rows.map((r) => toAdminUser(c.db, r)))
+  const list = await loadAccessList(db)
+  return rows.map((r) => toAdminUser(list, r))
+}
+
+/** GET /api/admin/users?q= — staff first, then most recent sign-in (max 1000). */
+export const listUsers = route(async (c) => {
+  await c.requireAdmin()
+  return adminUserList(c.db, c.url.searchParams.get('q') ?? '')
 })
 
 /**
@@ -78,7 +90,7 @@ export const patchUser = route<{ id: string }>(async (c) => {
   if (target.role === 'master' || isMasterEmail(target.email)) return fail(403, 'Master admins are set by whoever hosts the site and can’t be changed here.')
   await c.db.run('UPDATE users SET manual_role = $1 WHERE id = $2', [b.role === 'visitor' ? null : b.role, target.id])
   await syncRole(c.db, target.id)
-  return toAdminUser(c.db, (await getUserRow(c.db, target.id))!)
+  return toAdminUser(await loadAccessList(c.db), (await getUserRow(c.db, target.id))!)
 })
 
 /* ------------------------------------------------------------------ */
@@ -98,6 +110,10 @@ async function toEntry(db: Db, r: AccessRow) {
   const users = r.pattern.startsWith('@')
     ? await db.one<{ n: number }>('SELECT COUNT(*) AS n FROM users WHERE email LIKE $1', ['%' + r.pattern])
     : await db.one<{ n: number }>('SELECT COUNT(*) AS n FROM users WHERE email = $1', [r.pattern])
+  return entryOf(r, Number(users?.n ?? 0))
+}
+
+function entryOf(r: AccessRow, users: number) {
   return {
     pattern: r.pattern,
     kind: r.pattern.startsWith('@') ? ('domain' as const) : ('email' as const),
@@ -107,7 +123,7 @@ async function toEntry(db: Db, r: AccessRow) {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     /** existing accounts this entry applies to */
-    users: Number(users?.n ?? 0),
+    users,
   }
 }
 
@@ -121,11 +137,27 @@ function parsePattern(raw: unknown) {
 
 const noteOf = (v: unknown) => (typeof v === 'string' ? v.trim().slice(0, 200) : '')
 
+/**
+ * Every editable access-list entry with the number of existing accounts it applies to, in ONE query: the
+ * same exact-address / whole-domain match `toEntry` counts for a single entry, as a grouped join instead of
+ * a COUNT per entry.
+ */
+export async function accessEntries(db: Db) {
+  const rows = await db.query<AccessRow & { users: number }>(
+    `SELECT a.pattern, a.role, a.note, a.created_by, a.created_at, a.updated_at, COUNT(u.id) AS users
+     FROM access_list a
+     LEFT JOIN users u ON (CASE WHEN a.pattern LIKE '@%' THEN u.email LIKE '%' || a.pattern ELSE u.email = a.pattern END)
+     WHERE a.role <> 'master'
+     GROUP BY a.pattern, a.role, a.note, a.created_by, a.created_at, a.updated_at
+     ORDER BY a.pattern`,
+  )
+  return rows.map((r) => entryOf(r, Number(r.users ?? 0)))
+}
+
 /** GET /api/admin/access → `{ masters, entries }` (masters come from MASTER_ADMIN_EMAILS, read-only) */
 export const listAccess = route(async (c) => {
   await c.requireMaster()
-  const rows = await c.db.query<AccessRow>("SELECT * FROM access_list WHERE role <> 'master' ORDER BY pattern")
-  return { masters: config.masterAdminEmails, entries: await Promise.all(rows.map((r) => toEntry(c.db, r))) }
+  return { masters: config.masterAdminEmails, entries: await accessEntries(c.db) }
 })
 
 /** POST /api/admin/access `{ pattern, role, note? }` — create or update (upsert) → 201 entry. */

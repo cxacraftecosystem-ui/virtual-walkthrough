@@ -6,7 +6,7 @@
  */
 import 'server-only'
 import { bundledContent } from '../museum/content/content'
-import { type Db, nowIso, parseJson, type Queryable } from './db'
+import { type Db, nowIso, type Param, parseJson, type Queryable } from './db'
 
 export const COLLECTIONS = ['artworks', 'exhibits', 'infographics', 'videos', 'objects'] as const
 export type Collection = (typeof COLLECTIONS)[number]
@@ -260,6 +260,9 @@ export function readSeed(): ContentDoc {
 
 const SEED_LOCK = 72_2601
 
+/** Content rows per seed INSERT: 6 parameters a row keeps a statement far under both drivers' parameter limits. */
+const SEED_INSERT_ROWS = 200
+
 /**
  * Replace ALL content of one exhibition (default: the default exhibition) with the seed.
  * The version keeps increasing (clients compare versions).
@@ -280,18 +283,12 @@ export function seedContent(db: Db, seed: ContentDoc, onlyIfEmpty = false, exhib
       )
     }
     await q.run('DELETE FROM content_items WHERE exhibition_id = $1', [ex])
-    for (const c of COLLECTIONS) {
-      const items = seed[c] ?? []
-      for (let i = 0; i < items.length; i++) {
-        await q.run('INSERT INTO content_items (exhibition_id, collection, id, json, sort, updated_at) VALUES ($1, $2, $3, $4, $5, $6)', [
-          ex,
-          c,
-          String(items[i].id),
-          JSON.stringify(items[i]),
-          i,
-          now,
-        ])
-      }
+    // Multi-row INSERTs (SEED_INSERT_ROWS a statement) rather than one round trip per item; same rows, same order.
+    const rows: Param[][] = COLLECTIONS.flatMap((c) => (seed[c] ?? []).map((item, i) => [ex, c, String(item.id), JSON.stringify(item), i, now]))
+    for (let start = 0; start < rows.length; start += SEED_INSERT_ROWS) {
+      const chunk = rows.slice(start, start + SEED_INSERT_ROWS)
+      const values = chunk.map((_, r) => `(${Array.from({ length: 6 }, (_, k) => `$${r * 6 + k + 1}`).join(', ')})`).join(', ')
+      await q.run(`INSERT INTO content_items (exhibition_id, collection, id, json, sort, updated_at) VALUES ${values}`, chunk.flat())
     }
     await q.run('UPDATE exhibitions SET exhibition_text = $1, welcome = $2, updated_at = $3 WHERE id = $4', [
       JSON.stringify(seed.exhibition ?? {}),

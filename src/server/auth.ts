@@ -16,7 +16,7 @@
 import 'server-only'
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual, type ScryptOptions } from 'node:crypto'
 import { config } from './config'
-import { type Db, nowIso } from './db'
+import { type Db, nowIso, type Queryable } from './db'
 import { HttpError } from './util'
 
 export const SESSION_COOKIE = 'museum_session'
@@ -155,6 +155,22 @@ export async function accessRoleFor(db: Db, email: string): Promise<AccessRole |
   return best === 'visitor' ? null : (best as AccessRole)
 }
 
+/** The access list (minus the 'master' mirror rows) as pattern → role, for resolving many addresses with one read. */
+export type AccessList = ReadonlyMap<string, AccessRole>
+
+export async function loadAccessList(db: Queryable): Promise<AccessList> {
+  const rows = await db.query<{ pattern: string; role: AccessRole }>("SELECT pattern, role FROM access_list WHERE role <> 'master'")
+  return new Map(rows.map((r) => [r.pattern, r.role]))
+}
+
+/** `accessRoleFor` against an already-loaded list: the same exact-entry-or-@domain rule, no query. */
+export function accessRoleFromList(list: AccessList, email: string): AccessRole | null {
+  const at = email.lastIndexOf('@')
+  if (at < 0) return null
+  const best = maxRole(list.get(email), list.get(email.slice(at)))
+  return best === 'visitor' ? null : (best as AccessRole)
+}
+
 export const isMasterEmail = (email: string) => config.masterAdminEmails.includes(email.trim().toLowerCase())
 
 /**
@@ -181,6 +197,13 @@ export async function computeRole(db: Db, u: Pick<UserRow, 'email' | 'email_veri
   return maxRole(verified ? await accessRoleFor(db, u.email) : null, u.manual_role)
 }
 
+/** `computeRole` against an already-loaded access list. */
+export function computeRoleFromList(list: AccessList, u: Pick<UserRow, 'email' | 'email_verified' | 'manual_role'>): Role {
+  const verified = Number(u.email_verified) === 1
+  if (verified && isMasterEmail(u.email)) return 'master'
+  return maxRole(verified ? accessRoleFromList(list, u.email) : null, u.manual_role)
+}
+
 /** Recompute + store a user's effective role; returns it (undefined when the user is gone). */
 export async function syncRole(db: Db, userId: string): Promise<Role | undefined> {
   const u = await getUserRow(db, userId)
@@ -190,20 +213,45 @@ export async function syncRole(db: Db, userId: string): Promise<Role | undefined
   return role
 }
 
+/**
+ * `syncRole` for many users at once: the access list is read ONCE and every role computed from it, and only
+ * the users whose role actually changes are written — one UPDATE per resulting role, not per user. Calling
+ * `syncRole` per user cost a user read, an access-list read and an UPDATE each, and a domain entry can cover
+ * hundreds of accounts.
+ */
+async function syncRolesOf(db: Db, users: readonly UserRow[]) {
+  if (!users.length) return
+  const list = await loadAccessList(db)
+  const changed = new Map<Role, string[]>()
+  for (const u of users) {
+    const role = computeRoleFromList(list, u)
+    if (role !== u.role) changed.set(role, [...(changed.get(role) ?? []), u.id])
+  }
+  for (const [role, ids] of changed) {
+    for (let start = 0; start < ids.length; start += ROLE_UPDATE_IDS) {
+      const chunk = ids.slice(start, start + ROLE_UPDATE_IDS)
+      await db.run(`UPDATE users SET role = $1 WHERE id IN (${chunk.map((_, i) => `$${i + 2}`).join(', ')})`, [role, ...chunk])
+    }
+  }
+}
+
+/** Ids per role UPDATE — far under both drivers' parameter limits. */
+const ROLE_UPDATE_IDS = 500
+
 /** Re-sync every user an access-list pattern applies to (exact email or whole domain). */
 export async function syncRolesForPattern(db: Db, pattern: string) {
   const rows = pattern.startsWith('@')
-    ? await db.query<{ id: string }>('SELECT id FROM users WHERE email LIKE $1', ['%' + pattern])
-    : await db.query<{ id: string }>('SELECT id FROM users WHERE email = $1', [pattern])
-  for (const r of rows) await syncRole(db, r.id)
+    ? await db.query<UserRow>('SELECT * FROM users WHERE email LIKE $1', ['%' + pattern])
+    : await db.query<UserRow>('SELECT * FROM users WHERE email = $1', [pattern])
+  await syncRolesOf(db, rows)
 }
 
 /** Bootstrap: re-sync staff, master addresses and manual roles (covers MASTER_ADMIN_EMAILS changes). */
 export async function syncStaffRoles(db: Db) {
-  const rows = await db.query<{ id: string }>(
-    "SELECT id FROM users WHERE role <> 'visitor' OR manual_role IS NOT NULL OR email IN (SELECT pattern FROM access_list WHERE role = 'master')",
+  const rows = await db.query<UserRow>(
+    "SELECT * FROM users WHERE role <> 'visitor' OR manual_role IS NOT NULL OR email IN (SELECT pattern FROM access_list WHERE role = 'master')",
   )
-  for (const r of rows) await syncRole(db, r.id)
+  await syncRolesOf(db, rows)
 }
 
 /** After any successful sign-in: stamp last_login_at and refresh the role from the access list. */
