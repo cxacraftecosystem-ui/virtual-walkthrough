@@ -457,8 +457,8 @@ two repos by design.
   the other app's deployed code keeps running against the new schema.
 - **Deploy order.** 1) Merge the identical migration into both repos; one app's CI applies it, the other
   then records nothing new. 2) Deploy hand-block. 3) Deploy the clay pavilion. (Between steps old
-  hand-block code keeps working: everything it writes defaults to `hand-block`.) The S3 CORS rule needs
-  the clay origin for direct uploads (`infra/s3-cors.json`, placeholder `https://clay-pavilion.invalid`).
+  hand-block code keeps working: everything it writes defaults to `hand-block`.) The S3 CORS rule allows
+  the clay origins for direct uploads (`infra/s3-cors.json`).
   Details: `infra/deploy-vercel.md` → *The second app*.
 
 ### Deploy

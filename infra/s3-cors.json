@@ -2,23 +2,44 @@
   "CORSRules": [
     {
       "ID": "public-read",
-      "AllowedMethods": ["GET", "HEAD"],
-      "AllowedOrigins": ["*"],
-      "AllowedHeaders": ["*"],
-      "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges", "ETag"],
+      "AllowedMethods": [
+        "GET",
+        "HEAD"
+      ],
+      "AllowedOrigins": [
+        "*"
+      ],
+      "AllowedHeaders": [
+        "*"
+      ],
+      "ExposeHeaders": [
+        "Content-Length",
+        "Content-Range",
+        "Accept-Ranges",
+        "ETag"
+      ],
       "MaxAgeSeconds": 86400
     },
     {
       "ID": "admin-direct-upload",
-      "AllowedMethods": ["PUT"],
+      "AllowedMethods": [
+        "PUT"
+      ],
       "AllowedOrigins": [
         "https://hand-block-museum.vercel.app",
         "https://hand-block-museum-*.vercel.app",
-        "https://clay-pavilion.invalid",
-        "http://localhost:3000"
+        "http://localhost:3000",
+        "https://clay-traditions.vercel.app",
+        "https://clay-traditions-*.vercel.app",
+        "http://localhost:3001"
       ],
-      "AllowedHeaders": ["Content-Type", "Cache-Control"],
-      "ExposeHeaders": ["ETag"],
+      "AllowedHeaders": [
+        "Content-Type",
+        "Cache-Control"
+      ],
+      "ExposeHeaders": [
+        "ETag"
+      ],
       "MaxAgeSeconds": 3600
     }
   ]

@@ -104,9 +104,10 @@ matches the file and a deployment that ignores it cannot fall back to `iad1`.
   `S3_PREFIX` breaks every media address the other app stored.
 - **Different:** `NEXT_PUBLIC_LIVE_ROOM` (leave it unset — each app defaults to its own room from `src/site.ts`),
   `NEXT_PUBLIC_SITE_URL`, and the Google OAuth origins (add the clay origin to the same OAuth client).
-- **S3 CORS:** replace the placeholder `https://clay-pavilion.invalid` in `infra/s3-cors.json` with the clay app's
-  origin(s), then re-apply it (`APP_ORIGINS=<hand-block origins>,<clay origins> ./infra/setup-s3.sh`, as for a
-  custom domain below). Until then the clay admin can upload only through the API (small files), not direct to S3.
+- **S3 CORS:** `infra/s3-cors.json` lists the clay origins (`https://clay-traditions.vercel.app`, its previews
+  `https://clay-traditions-*.vercel.app` and `http://localhost:3001`) beside the hand-block ones, and is applied to
+  the bucket. Re-apply it after adding a custom domain (`APP_ORIGINS=<all origins> ./infra/setup-s3.sh`, see below);
+  an origin missing there can upload only through the API (small files), not direct to S3.
 - **Deploy order** for a schema change: merge the identical migration into both repos; let one app's CI apply it
   (the other's records nothing new); deploy hand-block, then clay. Both apps' migration runners check every applied
   file's sha256 and refuse to start on a mismatch, and warn when the database has a migration they lack.
