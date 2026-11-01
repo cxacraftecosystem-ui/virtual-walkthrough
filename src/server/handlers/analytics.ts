@@ -3,6 +3,7 @@ import { after } from 'next/server'
 import type { Db, Param } from '../db'
 import { EVENT_MAX_AGE_MS, EVENT_MAX_AHEAD_MS, HeatBatch, maybeAutoCleanup, resolveEventExhibition, summaryExhibition } from './curatorAnalytics'
 import { route } from '../http'
+import { siteId } from '../site'
 import { createRateLimiter, fail, isRecord } from '../util'
 
 const EVENT_TYPES = new Set([
@@ -17,6 +18,12 @@ const EVENT_TYPES = new Set([
   'tour_start',
   'tour_complete',
   'tour_step',
+  // the clay pavilion's experiences; their fields pass the same caps as every other event below
+  'stamp', // a Clay Passport stamp collected (itemId: the stamp)
+  'perch', // climbed to a perch (zone: where it leads)
+  'cue', // a theatre or show cue played (itemId: the cue)
+  'film_end', // a film watched to its end (itemId, seconds)
+  'moment', // a timed moment seen (itemId: which one)
   'pos', // rolled up into analytics_heat (see curatorAnalytics.ts), never stored raw
 ])
 const MAX_BATCH = 200
@@ -45,6 +52,7 @@ export interface EventBatch {
  */
 export async function storeBatch(db: Db, batch: EventBatch, now = Date.now()): Promise<{ accepted: number; duplicate: boolean }> {
   const rows: Param[][] = []
+  const site = siteId()
   const heat = new HeatBatch(batch.exhibitionId)
   for (const e of batch.events) {
     if (!isRecord(e) || typeof e.type !== 'string' || !EVENT_TYPES.has(e.type)) continue
@@ -60,7 +68,7 @@ export async function storeBatch(db: Db, batch: EventBatch, now = Date.now()): P
       const s = JSON.stringify(e.meta).split('\\u0000').join('') // JSON escape of NUL, rejected by Postgres
       if (s.length <= 500) meta = s
     }
-    rows.push([batch.sessionId, t, e.type, str(e.zone), str(e.itemKind, 30), str(e.itemId), seconds, str(e.tier, 20), meta, now, batch.exhibitionId])
+    rows.push([batch.sessionId, t, e.type, str(e.zone), str(e.itemKind, 30), str(e.itemId), seconds, str(e.tier, 20), meta, now, batch.exhibitionId, site])
   }
   // Nothing to store, so nothing that could be stored twice: no transaction, no marker.
   if (!rows.length && heat.empty) return { accepted: 0, duplicate: false }
@@ -74,9 +82,9 @@ export async function storeBatch(db: Db, batch: EventBatch, now = Date.now()): P
       if (!first) return { accepted: 0, duplicate: true }
     }
     if (rows.length) {
-      const values = rows.map((_, i) => `(${Array.from({ length: 11 }, (_, j) => `$${i * 11 + j + 1}`).join(', ')})`).join(', ')
+      const values = rows.map((_, i) => `(${Array.from({ length: 12 }, (_, j) => `$${i * 12 + j + 1}`).join(', ')})`).join(', ')
       await q.run(
-        `INSERT INTO analytics_events (session_id, t, type, zone, item_kind, item_id, seconds, tier, meta, received_at, exhibition_id) VALUES ${values}`,
+        `INSERT INTO analytics_events (session_id, t, type, zone, item_kind, item_id, seconds, tier, meta, received_at, exhibition_id, site) VALUES ${values}`,
         rows.flat(),
       )
     }
@@ -117,10 +125,10 @@ export const summary = route(async (c) => {
     const db = c.db
     const days = Math.min(Math.max(Math.round(Number(c.url.searchParams.get('days') ?? 7)) || 7, 1), 365)
     const since = Date.now() - days * 86_400_000
-    // optional ?exhibition=<id|slug> filter (omitted = all exhibitions)
+    // optional ?exhibition=<id|slug> filter (omitted = all of this site's exhibitions)
     const exId = await summaryExhibition(db, c.url.searchParams.get('exhibition'))
-    const exWhere = exId ? ' AND exhibition_id = $2' : ''
-    const sp = exId ? [since, exId] : [since]
+    const exWhere = exId ? ' AND site = $2 AND exhibition_id = $3' : ' AND site = $2'
+    const sp = exId ? [since, siteId(), exId] : [since, siteId()]
     const dayExpr =
       db.dialect === 'postgres'
         ? `to_char(to_timestamp(t / 1000.0) AT TIME ZONE 'UTC', 'YYYY-MM-DD')`

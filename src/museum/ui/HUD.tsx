@@ -17,6 +17,7 @@ import { zoneName } from '../i18n/content'
 import { LanguageMenu } from './LanguageMenu'
 import { TrailButton } from '../trail/TrailUI'
 import { LiveHudButton } from '../live/LivePanel'
+import { StaffHudButton } from '../staff/StaffGate'
 import { VRHudButton } from '../xr/XRButtons'
 import {
   IconCamera,
@@ -249,6 +250,7 @@ export function HUD() {
           <IconTour />
         </button>
         <LiveHudButton />
+        <StaffHudButton />
         <VRHudButton />
         {!coarse && (
           <button

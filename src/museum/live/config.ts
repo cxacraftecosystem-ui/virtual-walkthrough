@@ -1,3 +1,5 @@
+import { SITE } from '../../site'
+
 /**
  * Live presence / guided tours configuration (Supabase Realtime).
  * NEXT_PUBLIC_* values are inlined at build time; when either is missing, or `?static` /
@@ -5,8 +7,8 @@
  */
 export const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim()
 export const SUPABASE_ANON_KEY = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').trim()
-/** One channel per exhibition. */
-export const LIVE_ROOM = ((process.env.NEXT_PUBLIC_LIVE_ROOM ?? '').trim() || 'hand-block-printing').toLowerCase()
+/** One channel per site (src/site.ts), so visitors of the two museums never meet in one room. */
+export const LIVE_ROOM = ((process.env.NEXT_PUBLIC_LIVE_ROOM ?? '').trim() || SITE.liveRoom).toLowerCase()
 
 export function liveConfigured() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return false

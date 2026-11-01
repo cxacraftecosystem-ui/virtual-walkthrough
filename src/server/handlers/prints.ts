@@ -6,15 +6,19 @@
  *   GET    /api/admin/prints?status=  curator+; moderation queue
  *   PATCH  /api/admin/prints/:id      curator+; { status: 'approved' | 'rejected' | 'pending' }
  *   DELETE /api/admin/prints/:id      curator+; removes the file and the row
+ *   POST   /api/admin/prints/bulk     curator+; { ids, action: 'approve' | 'reject' | 'pending' | 'delete' }
  *
- * Images are stored through the storage driver under `prints/<uuid>.png` (local disk or S3).
+ * Images are stored through the storage driver under `prints/<uuid>.png` (local disk or S3). Prints belong
+ * to the site they were made in (visitor_prints.site): each museum's wall and queue show only its own.
  */
 import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { Readable } from 'node:stream'
-import { nowIso, parseJson } from '../db'
+import { audit } from '../audit'
+import { nowIso, type Param, parseJson } from '../db'
 import { route } from '../http'
-import { createRateLimiter, fail, isRecord } from '../util'
+import { siteId } from '../site'
+import { createRateLimiter, fail, inList, isRecord, readBulkIds } from '../util'
 
 export const PRINT_MAX_BYTES = 2 * 1024 * 1024
 const PRINT_MAX_SIDE = 2400
@@ -140,9 +144,9 @@ export const submitPrint = route(async (c) => {
   }
 
   if (!perIp(c.ip) || !perSession(sessionId)) return fail(429, 'You have sent several prints already — please wait a few minutes')
-  const pending = await c.db.one<{ n: number }>("SELECT COUNT(*) AS n FROM visitor_prints WHERE status = 'pending'")
+  const pending = await c.db.one<{ n: number }>("SELECT COUNT(*) AS n FROM visitor_prints WHERE site = $1 AND status = 'pending'", [siteId()])
   if (Number(pending?.n ?? 0) >= MAX_PENDING) return fail(503, 'The wall’s review queue is full right now — please try again later')
-  const mine = await c.db.one<{ n: number }>("SELECT COUNT(*) AS n FROM visitor_prints WHERE status = 'pending' AND session_id = $1", [sessionId])
+  const mine = await c.db.one<{ n: number }>("SELECT COUNT(*) AS n FROM visitor_prints WHERE site = $1 AND status = 'pending' AND session_id = $2", [siteId(), sessionId])
   if (Number(mine?.n ?? 0) >= MAX_PENDING_PER_SESSION) return fail(429, 'Your earlier prints are still waiting for review')
 
   const user = await c.user()
@@ -157,9 +161,9 @@ export const submitPrint = route(async (c) => {
   const createdAt = nowIso()
   try {
     await c.db.run(
-      `INSERT INTO visitor_prints (id, session_id, user_id, display_name, motif, meta, storage_key, url, width, height, size, status, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12)`,
-      [id, sessionId, user?.id ?? null, displayName, motif, JSON.stringify(meta), key, url, dim.width, dim.height, stored.size || buf.length, createdAt],
+      `INSERT INTO visitor_prints (id, session_id, user_id, display_name, motif, meta, storage_key, url, width, height, size, status, created_at, site)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12, $13)`,
+      [id, sessionId, user?.id ?? null, displayName, motif, JSON.stringify(meta), key, url, dim.width, dim.height, stored.size || buf.length, createdAt, siteId()],
     )
   } catch (err) {
     await c.storage.remove(key).catch(() => undefined)
@@ -175,8 +179,8 @@ export const listPrints = route(async (c) => {
   if (status !== 'approved') return fail(403, 'Only approved prints are public')
   const limit = Math.max(1, Math.min(PUBLIC_LIMIT, Number(c.url.searchParams.get('limit')) || PUBLIC_LIMIT))
   const rows = await c.db.query<Row>(
-    "SELECT * FROM visitor_prints WHERE status = 'approved' ORDER BY reviewed_at DESC, created_at DESC LIMIT $1",
-    [limit],
+    "SELECT * FROM visitor_prints WHERE site = $2 AND status = 'approved' ORDER BY reviewed_at DESC, created_at DESC LIMIT $1",
+    [limit, siteId()],
   )
   c.headers.set('cache-control', 'public, max-age=30, stale-while-revalidate=120')
   return rows.map(toPublic)
@@ -189,34 +193,86 @@ export const adminListPrints = route(async (c) => {
   if (status !== 'all' && !isStatus(status)) return fail(400, 'Invalid status')
   const rows =
     status === 'all'
-      ? await c.db.query<Row>('SELECT * FROM visitor_prints ORDER BY created_at DESC LIMIT 1000')
-      : await c.db.query<Row>('SELECT * FROM visitor_prints WHERE status = $1 ORDER BY created_at DESC LIMIT 1000', [status])
+      ? await c.db.query<Row>('SELECT * FROM visitor_prints WHERE site = $1 ORDER BY created_at DESC LIMIT 1000', [siteId()])
+      : await c.db.query<Row>('SELECT * FROM visitor_prints WHERE site = $2 AND status = $1 ORDER BY created_at DESC LIMIT 1000', [status, siteId()])
   return rows.map(toAdmin)
 })
+
+const STATUS_LABEL: Record<Status, string> = { approved: 'Approved', rejected: 'Rejected', pending: 'Moved back to review' }
+const printName = (r: Pick<Row, 'display_name' | 'motif'>) => (r.display_name ? `the print by ${r.display_name}` : r.motif ? `a “${r.motif}” print` : 'an anonymous print')
 
 /** PATCH /api/admin/prints/:id — `{ status }` */
 export const adminPatchPrint = route<{ id: string }>(async (c) => {
   const user = await c.requireCurator()
   const b = await c.json()
   if (!isRecord(b) || !isStatus(b.status)) return fail(400, "Body must be { status: 'pending' | 'approved' | 'rejected' }")
-  const reviewed = b.status === 'pending' ? null : nowIso()
-  const n = await c.db.run('UPDATE visitor_prints SET status = $1, reviewed_at = $2, reviewed_by = $3 WHERE id = $4', [
-    b.status,
-    reviewed,
-    reviewed ? user.email : null,
-    c.params.id,
-  ])
-  if (n === 0) return fail(404, 'Print not found')
-  const row = await c.db.one<Row>('SELECT * FROM visitor_prints WHERE id = $1', [c.params.id])
+  const status = b.status
+  const reviewed = status === 'pending' ? null : nowIso()
+  const row = await c.db.tx(async (q) => {
+    const n = await q.run('UPDATE visitor_prints SET status = $1, reviewed_at = $2, reviewed_by = $3 WHERE id = $4 AND site = $5', [
+      status,
+      reviewed,
+      reviewed ? user.email : null,
+      c.params.id,
+      siteId(),
+    ])
+    if (n === 0) return fail(404, 'Print not found')
+    const r = await q.one<Row>('SELECT * FROM visitor_prints WHERE id = $1', [c.params.id])
+    await audit(q, user, { action: 'prints.status', targetKind: 'print', targetId: c.params.id, summary: `${STATUS_LABEL[status]} ${r ? printName(r) : 'a print'}`, detail: { status } })
+    return r
+  })
   return row ? toAdmin(row) : { ok: true }
 })
 
 /** DELETE /api/admin/prints/:id */
 export const adminDeletePrint = route<{ id: string }>(async (c) => {
-  await c.requireCurator()
-  const row = await c.db.one<Row>('SELECT * FROM visitor_prints WHERE id = $1', [c.params.id])
+  const user = await c.requireCurator()
+  const row = await c.db.one<Row>('SELECT * FROM visitor_prints WHERE id = $1 AND site = $2', [c.params.id, siteId()])
   if (!row) return fail(404, 'Print not found')
   await c.storage.remove(row.storage_key).catch((err: unknown) => console.warn('[museum] print file removal failed:', (err as Error).message))
-  await c.db.run('DELETE FROM visitor_prints WHERE id = $1', [c.params.id])
+  await c.db.tx(async (q) => {
+    await q.run('DELETE FROM visitor_prints WHERE id = $1 AND site = $2', [c.params.id, siteId()])
+    await audit(q, user, { action: 'prints.delete', targetKind: 'print', targetId: c.params.id, summary: `Deleted ${printName(row)}` })
+  })
   return { ok: true }
+})
+
+const BULK_STATUS: Record<string, Status> = { approve: 'approved', reject: 'rejected', pending: 'pending' }
+const BULK_VERB: Record<string, string> = { approve: 'Approved', reject: 'Rejected', pending: 'Moved back to review', delete: 'Deleted' }
+
+/** POST /api/admin/prints/bulk — `{ ids: string[] (≤ 200), action: 'approve' | 'reject' | 'pending' | 'delete' }` → `{ updated }` */
+export const adminBulkPrints = route(async (c) => {
+  const user = await c.requireCurator()
+  const b = await c.json()
+  if (!isRecord(b)) return fail(400, "Body must be { ids, action: 'approve' | 'reject' | 'pending' | 'delete' }")
+  const ids = readBulkIds(b.ids)
+  const action = b.action
+  if (typeof action !== 'string' || !Object.hasOwn(BULK_VERB, action)) return fail(400, '"action" must be approve, reject, pending or delete')
+  const site = siteId()
+  const rows = await c.db.query<Row>(`SELECT * FROM visitor_prints WHERE site = $1 AND id IN (${inList(ids, 1)})`, [site, ...ids])
+  if (!rows.length) return { updated: 0 }
+  const found = rows.map((r) => r.id)
+  if (action === 'delete') {
+    for (const r of rows) await c.storage.remove(r.storage_key).catch((err: unknown) => console.warn('[museum] print file removal failed:', (err as Error).message))
+  }
+  const updated = await c.db.tx(async (q) => {
+    let n: number
+    if (action === 'delete') {
+      n = await q.run(`DELETE FROM visitor_prints WHERE site = $1 AND id IN (${inList(found, 1)})`, [site, ...found])
+    } else {
+      const status = BULK_STATUS[action]
+      const reviewed = status === 'pending' ? null : nowIso()
+      const params: Param[] = [status, reviewed, reviewed ? user.email : null, site, ...found]
+      n = await q.run(`UPDATE visitor_prints SET status = $1, reviewed_at = $2, reviewed_by = $3 WHERE site = $4 AND id IN (${inList(found, 4)})`, params)
+    }
+    await audit(q, user, {
+      action: 'prints.bulk',
+      targetKind: 'print',
+      targetId: found.length === 1 ? found[0] : '',
+      summary: `${BULK_VERB[action]} ${n} visitor print${n === 1 ? '' : 's'}`,
+      detail: { action, ids: found },
+    })
+    return n
+  })
+  return { updated }
 })

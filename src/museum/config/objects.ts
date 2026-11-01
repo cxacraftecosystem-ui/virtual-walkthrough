@@ -67,6 +67,50 @@ export type ProceduralModelId =
   /** Credits / partners wall panel (models/credits.tsx). */
   | 'credits-panel'
 
+/** Every ProceduralModelId once (a missing or extra key fails the type check). Lists for the admin's kind select. */
+const KIND_SET: Record<ProceduralModelId, true> = {
+  'printing-table': true,
+  'dye-vat': true,
+  'drying-line': true,
+  'block-shelf': true,
+  'pigment-station': true,
+  'wash-tank': true,
+  'fabric-rolls': true,
+  'carving-bench': true,
+  'textile-banner': true,
+  'plant-bed': true,
+  tree: true,
+  'water-channel': true,
+  'grand-desk': true,
+  planter: true,
+  speaker: true,
+  'theatre-seating': true,
+  'garden-bench': true,
+  column: true,
+  vessel: true,
+  stool: true,
+  crate: true,
+  centrepiece: true,
+  'map-wall': true,
+  vitrine: true,
+  pedestal: true,
+  'print-studio': true,
+  'visitors-wall': true,
+  splat: true,
+  'shop-shelf': true,
+  'shop-table': true,
+  'shop-counter': true,
+  'stole-rail': true,
+  bookcase: true,
+  'reading-table': true,
+  'lounge-set': true,
+  'pattern-lectern': true,
+  'drawing-wall': true,
+  'resource-board': true,
+  'credits-panel': true,
+}
+export const PROCEDURAL_KINDS: readonly ProceduralModelId[] = Object.keys(KIND_SET) as ProceduralModelId[]
+
 export interface SceneObjectConfig {
   id: string
   title: string

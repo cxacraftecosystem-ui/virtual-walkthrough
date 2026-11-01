@@ -5,15 +5,18 @@
  *  - 'pos' events (visitor position sampled every 2 s by the tracker) are NOT stored raw: they are
  *    aggregated on insert into `analytics_heat` (0.5 m cells per exhibition / UTC day / zone).
  *  - 'tour_step' events: `itemId` = tour stop id, `meta.index` = stop index.
- *  - Retention: meta 'analytics_retention_days' (default 180). Rows older than that are deleted by
- *    POST /api/admin/analytics/cleanup (admin, or `Authorization: Bearer $CRON_SECRET` for a
- *    scheduled job) and automatically at most once a day from the ingestion endpoint. The same job
- *    deletes batch markers (analytics_batches) after BATCH_MARKER_MS, whatever the retention.
+ *  - Retention: meta 'analytics_retention_days' (default 180), per site like every meta key this module
+ *    keeps. Rows of THIS site older than that are deleted by POST /api/admin/analytics/cleanup (admin, or
+ *    `Authorization: Bearer $CRON_SECRET` for a scheduled job) and automatically at most once a day from
+ *    the ingestion endpoint; the other site's rows follow its own retention. The same job deletes batch
+ *    markers (analytics_batches, shared) after BATCH_MARKER_MS, whatever the retention.
  */
 import 'server-only'
-import { DEFAULT_EXHIBITION_ID, defaultExhibitionRow, findExhibition, getMeta, setMeta } from '../contentStore'
+import { type Actor, audit } from '../audit'
+import { defaultExhibitionRow, findExhibition, getMeta, setMeta } from '../contentStore'
 import { type Db, nowIso, type Param, type Queryable } from '../db'
 import { type Call, route } from '../http'
+import { currentSite, metaKey, siteId } from '../site'
 import { fail, isRecord } from '../util'
 
 export const HEAT_CELL_M = 0.5
@@ -42,13 +45,14 @@ export const BATCH_MARKER_MS = EVENT_MAX_AGE_MS + EVENT_MAX_AHEAD_MS
 
 const exCache = new Map<string, { id: string; at: number }>()
 
-/** Exhibition id for an ingestion batch (`exhibition` slug/id in the body); unknown/absent → default. */
+/** Exhibition id for an ingestion batch (`exhibition` slug/id in the body); unknown/absent → this site's default. */
 export async function resolveEventExhibition(db: Db, v: unknown): Promise<string> {
-  const key = typeof v === 'string' && v.length <= 100 ? v : ''
+  const slug = typeof v === 'string' && v.length <= 100 ? v : ''
+  const key = `${siteId()}|${slug}`
   const hit = exCache.get(key)
   if (hit && Date.now() - hit.at < 60_000) return hit.id
-  const row = key ? ((await findExhibition(db, key)) ?? (await defaultExhibitionRow(db))) : await defaultExhibitionRow(db)
-  const id = row?.id ?? DEFAULT_EXHIBITION_ID
+  const row = slug ? ((await findExhibition(db, slug)) ?? (await defaultExhibitionRow(db))) : await defaultExhibitionRow(db)
+  const id = row?.id ?? currentSite().defaultExhibitionId
   if (exCache.size > 500) exCache.clear()
   exCache.set(key, { id, at: Date.now() })
   return id
@@ -84,22 +88,27 @@ export class HeatBatch {
     if (!this.cells.size) return 0
     const list = [...this.cells.values()]
     const params: Param[] = []
+    const site = siteId()
     const values = list.map((c) => {
-      params.push(this.exhibitionId, c.day, c.zone, c.cx, c.cz, c.n)
-      const b = params.length - 6
-      return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, $${b + 6})`
+      params.push(this.exhibitionId, c.day, c.zone, c.cx, c.cz, c.n, site)
+      const b = params.length - 7
+      return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, $${b + 6}, $${b + 7})`
     })
-    // keys are unique within the statement (aggregated above), as Postgres requires
+    // Keys are unique within the statement (aggregated above), as Postgres requires. The conflict key has no
+    // site (the primary key predates sites and ON CONFLICT clauses of deployed code name it), so a cell
+    // another site still holds under the same exhibition id (its exhibition deleted, the id reused here) is
+    // left alone: these samples are not added to the other site's count, nor deleted by its retention.
     await q.run(
-      `INSERT INTO analytics_heat (exhibition_id, day, zone, cx, cz, samples) VALUES ${values.join(', ')}
-       ON CONFLICT (exhibition_id, day, zone, cx, cz) DO UPDATE SET samples = analytics_heat.samples + excluded.samples`,
+      `INSERT INTO analytics_heat (exhibition_id, day, zone, cx, cz, samples, site) VALUES ${values.join(', ')}
+       ON CONFLICT (exhibition_id, day, zone, cx, cz) DO UPDATE SET samples = analytics_heat.samples + excluded.samples
+       WHERE analytics_heat.site = excluded.site`,
       params,
     )
     return list.reduce((s, c) => s + c.n, 0)
   }
 }
 
-/** `?exhibition=` for the summary: null = all exhibitions. */
+/** `?exhibition=` for the summary: null = all of this site's exhibitions. */
 export async function summaryExhibition(db: Db, v: string | null): Promise<string | null> {
   if (!v) return null
   const row = await findExhibition(db, v)
@@ -143,20 +152,21 @@ const round1 = (n: unknown) => Math.round(Number(n ?? 0) * 10) / 10
 /* ------------------------------------------------------------------ */
 
 async function heatmap(db: Db, r: Range, zone: string | null) {
-  const zoneWhere = zone ? ' AND zone = $4' : ''
-  const params: Param[] = zone ? [r.exhibitionId, r.from, r.to, zone] : [r.exhibitionId, r.from, r.to]
+  const site = siteId()
+  const zoneWhere = zone ? ' AND zone = $5' : ''
+  const params: Param[] = zone ? [r.exhibitionId, r.from, r.to, site, zone] : [r.exhibitionId, r.from, r.to, site]
   const [cells, zones] = await Promise.all([
     db.query<{ cx: number; cz: number; n: number }>(
       `SELECT cx, cz, SUM(samples) AS n FROM analytics_heat
-       WHERE exhibition_id = $1 AND day >= $2 AND day <= $3${zoneWhere}
+       WHERE exhibition_id = $1 AND day >= $2 AND day <= $3 AND site = $4${zoneWhere}
        GROUP BY cx, cz`,
       params,
     ),
     db.query<{ zone: string; n: number }>(
       `SELECT zone, SUM(samples) AS n FROM analytics_heat
-       WHERE exhibition_id = $1 AND day >= $2 AND day <= $3
+       WHERE exhibition_id = $1 AND day >= $2 AND day <= $3 AND site = $4
        GROUP BY zone ORDER BY n DESC`,
-      [r.exhibitionId, r.from, r.to],
+      [r.exhibitionId, r.from, r.to, site],
     ),
   ])
   const list = cells.map((c) => [Number(c.cx), Number(c.cz), Number(c.n)] as [number, number, number])
@@ -177,18 +187,18 @@ async function heatmap(db: Db, r: Range, zone: string | null) {
 
 async function funnel(db: Db, r: Range) {
   const idx = db.dialect === 'postgres' ? `CASE WHEN meta->>'index' ~ '^[0-9]{1,6}$' THEN (meta->>'index')::int END` : `CAST(json_extract(meta, '$.index') AS INTEGER)`
-  const base = [r.exhibitionId, r.fromMs, r.toMs]
+  const base = [r.exhibitionId, r.fromMs, r.toMs, siteId()]
   const [steps, ends] = await Promise.all([
     db.query<{ stopId: string; idx: number | null; sessions: number }>(
       `SELECT item_id AS "stopId", MIN(${idx}) AS idx, COUNT(DISTINCT session_id) AS sessions
        FROM analytics_events
-       WHERE type = 'tour_step' AND exhibition_id = $1 AND t >= $2 AND t < $3 AND item_id IS NOT NULL
+       WHERE type = 'tour_step' AND exhibition_id = $1 AND t >= $2 AND t < $3 AND site = $4 AND item_id IS NOT NULL
        GROUP BY item_id`,
       base,
     ),
     db.query<{ type: string; sessions: number }>(
       `SELECT type, COUNT(DISTINCT session_id) AS sessions FROM analytics_events
-       WHERE type IN ('tour_start', 'tour_complete') AND exhibition_id = $1 AND t >= $2 AND t < $3
+       WHERE type IN ('tour_start', 'tour_complete') AND exhibition_id = $1 AND t >= $2 AND t < $3 AND site = $4
        GROUP BY type`,
       base,
     ),
@@ -203,15 +213,15 @@ async function funnel(db: Db, r: Range) {
 async function attention(db: Db, r: Range, kind: string | null) {
   const kinds = ['artwork', 'exhibit', 'object', 'infographic', 'video']
   if (kind && !kinds.includes(kind)) return fail(400, `"kind" must be one of ${kinds.join(', ')}`)
-  const kindWhere = kind ? ' AND item_kind = $4' : ` AND item_kind IN (${kinds.map((k) => `'${k}'`).join(', ')})`
-  const params: Param[] = kind ? [r.exhibitionId, r.fromMs, r.toMs, kind] : [r.exhibitionId, r.fromMs, r.toMs]
+  const kindWhere = kind ? ' AND item_kind = $5' : ` AND item_kind IN (${kinds.map((k) => `'${k}'`).join(', ')})`
+  const params: Param[] = kind ? [r.exhibitionId, r.fromMs, r.toMs, siteId(), kind] : [r.exhibitionId, r.fromMs, r.toMs, siteId()]
   const rows = await db.query<{ itemKind: string; itemId: string; views: number; viewers: number; dwellSec: number }>(
     `SELECT item_kind AS "itemKind", item_id AS "itemId",
             SUM(CASE WHEN type = 'item_view' THEN 1 ELSE 0 END) AS views,
             COUNT(DISTINCT session_id) AS viewers,
             COALESCE(SUM(CASE WHEN type = 'item_dwell' THEN seconds ELSE 0 END), 0) AS "dwellSec"
      FROM analytics_events
-     WHERE exhibition_id = $1 AND t >= $2 AND t < $3 AND item_id IS NOT NULL
+     WHERE exhibition_id = $1 AND t >= $2 AND t < $3 AND site = $4 AND item_id IS NOT NULL
        AND type IN ('item_view', 'item_dwell', 'panel_open', 'inspect_open')${kindWhere}
      GROUP BY item_kind, item_id
      ORDER BY "dwellSec" DESC, views DESC
@@ -304,16 +314,18 @@ export const exportRoute = route(async (c) => {
 /* ------------------------------------------------------------------ */
 
 export async function retentionDays(db: Db): Promise<number> {
-  const v = Number(await getMeta(db, 'analytics_retention_days'))
+  const v = Number(await getMeta(db, metaKey('analytics_retention_days')))
   return Number.isFinite(v) && v >= 1 ? Math.round(v) : DEFAULT_RETENTION_DAYS
 }
 
+/** Delete this site's analytics older than its retention (and every batch marker past BATCH_MARKER_MS). */
 export async function cleanupAnalytics(db: Db) {
   const days = await retentionDays(db)
   const cutoffMs = Date.now() - days * DAY_MS
   const cutoffDay = new Date(cutoffMs).toISOString().slice(0, 10)
-  const events = await db.run('DELETE FROM analytics_events WHERE t < $1', [cutoffMs])
-  const heat = await db.run('DELETE FROM analytics_heat WHERE day < $1', [cutoffDay])
+  const site = siteId()
+  const events = await db.run('DELETE FROM analytics_events WHERE site = $1 AND t < $2', [site, cutoffMs])
+  const heat = await db.run('DELETE FROM analytics_heat WHERE site = $1 AND day < $2', [site, cutoffDay])
   const markers = await db.run('DELETE FROM analytics_batches WHERE received_at < $1', [Date.now() - BATCH_MARKER_MS])
   const result = {
     retentionDays: days,
@@ -323,11 +335,11 @@ export async function cleanupAnalytics(db: Db) {
     deletedBatchMarkers: markers,
     ranAt: nowIso(),
   }
-  await setMeta(db, 'analytics_last_cleanup', JSON.stringify(result))
+  await setMeta(db, metaKey('analytics_last_cleanup'), JSON.stringify(result))
   return result
 }
 
-const g = globalThis as { __museumAnalyticsCleanupAt?: number }
+const g = globalThis as { __museumAnalyticsCleanupAt?: Record<string, number> }
 /**
  * At most once per day per process (and per DB via meta), from ingestion. Call it in after(), which
  * keeps the function alive until it finishes (a bare promise can be frozen mid-query).
@@ -335,9 +347,11 @@ const g = globalThis as { __museumAnalyticsCleanupAt?: number }
 export async function maybeAutoCleanup(db: Db) {
   try {
     const now = Date.now()
-    if (g.__museumAnalyticsCleanupAt && now - g.__museumAnalyticsCleanupAt < DAY_MS) return
-    g.__museumAnalyticsCleanupAt = now
-    const last = await getMeta(db, 'analytics_last_cleanup')
+    const ran = (g.__museumAnalyticsCleanupAt ??= {})
+    const site = siteId()
+    if (ran[site] && now - ran[site] < DAY_MS) return
+    ran[site] = now
+    const last = await getMeta(db, metaKey('analytics_last_cleanup'))
     const at = last ? Date.parse((JSON.parse(last) as { ranAt?: string }).ranAt ?? '') : 0
     if (at && now - at < DAY_MS) return
     await cleanupAnalytics(db)
@@ -347,7 +361,7 @@ export async function maybeAutoCleanup(db: Db) {
 }
 
 async function retentionInfo(db: Db) {
-  const last = await getMeta(db, 'analytics_last_cleanup')
+  const last = await getMeta(db, metaKey('analytics_last_cleanup'))
   return { days: await retentionDays(db), defaultDays: DEFAULT_RETENTION_DAYS, lastCleanup: last ? JSON.parse(last) : null }
 }
 
@@ -359,12 +373,23 @@ export const getRetention = route(async (c) => {
 
 /** PUT /api/admin/analytics/retention — admin. `{ days: 7–1825 }` */
 export const putRetention = route(async (c) => {
-  await c.requireAdmin()
+  const user = await c.requireAdmin()
   const b = await c.json()
   if (!isRecord(b) || typeof b.days !== 'number' || !Number.isInteger(b.days) || b.days < 7 || b.days > 1825) {
     return fail(400, '"days" must be an integer between 7 and 1825')
   }
-  await setMeta(c.db, 'analytics_retention_days', String(b.days))
+  const days = b.days
+  const before = await retentionDays(c.db)
+  await c.db.tx(async (q) => {
+    await setMeta(q, metaKey('analytics_retention_days'), String(days))
+    await audit(q, user, {
+      action: 'analytics.retention',
+      targetKind: 'analytics',
+      targetId: 'retention',
+      summary: `Set visitor analytics to be kept ${days} days (was ${before})`,
+      detail: { days, before },
+    })
+  })
   return retentionInfo(c.db)
 })
 
@@ -375,9 +400,18 @@ export const putRetention = route(async (c) => {
 export const cleanupRoute = route(async (c) => {
   const secret = process.env.CRON_SECRET ?? ''
   const auth = c.req.headers.get('authorization') ?? ''
+  let actor: Actor | null = null // the scheduler
   if (!(secret && auth === `Bearer ${secret}`)) {
     if (c.req.method === 'GET') return fail(401, 'Bearer token required')
-    await c.requireAdmin()
+    actor = await c.requireAdmin()
   }
-  return cleanupAnalytics(c.db)
+  const result = await cleanupAnalytics(c.db)
+  await audit(c.db, actor, {
+    action: 'analytics.cleanup',
+    targetKind: 'analytics',
+    targetId: 'cleanup',
+    summary: `Removed visitor analytics older than ${result.retentionDays} days (${result.deletedEvents} events, ${result.deletedHeatRows} heatmap rows)`,
+    detail: result,
+  })
+  return result
 })

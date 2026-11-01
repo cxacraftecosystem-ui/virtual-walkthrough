@@ -5,11 +5,11 @@
  * browser of the next editor who opens it.
  *
  * Allowed: http(s) and site-relative addresses everywhere; `blob:` (a local file being previewed) for
- * images and videos; `data:` only for raster images (PNG, JPEG, GIF, WebP, AVIF). SVG is excluded
+ * images, video and audio; `data:` only for raster images (PNG, JPEG, GIF, WebP, AVIF). SVG is excluded
  * because an SVG document can carry script.
  */
 
-export type UrlUse = 'image' | 'video' | 'link'
+export type UrlUse = 'image' | 'video' | 'audio' | 'link'
 
 const DATA_IMAGE = /^data:image\/(?:png|jpeg|gif|webp|avif)(?:;[a-z0-9=._+-]+)*,/i
 
@@ -34,7 +34,7 @@ export function safeUrl(raw: unknown, use: UrlUse, baseUrl: string = base()): st
     case 'https:':
       return href
     case 'blob:':
-      return use === 'link' ? undefined : href
+      return use === 'link' ? undefined : href // image, video, audio
     case 'data:':
       return use === 'image' && DATA_IMAGE.test(href) ? href : undefined
     default:

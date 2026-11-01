@@ -83,9 +83,12 @@ async function cacheFirst(req, cacheName, max) {
 async function staleWhileRevalidate(event, req, cacheName, max) {
   const c = await caches.open(cacheName)
   const hit = await c.match(req)
+  // A failed cache write must never fail the response: Chrome rejects a put while another put
+  // for the same URL is in flight ("Entry already exists"), which happens whenever the page asks
+  // for one file twice at once on a first visit.
   const refresh = () =>
     fetch(req).then((res) => {
-      if (cacheable(res)) return c.put(req, res.clone()).then(() => (max ? trim(cacheName, max) : undefined)).then(() => res)
+      if (cacheable(res)) event.waitUntil(c.put(req, res.clone()).then(() => (max ? trim(cacheName, max) : undefined)).catch(() => undefined))
       return res
     })
   if (!hit) return refresh()

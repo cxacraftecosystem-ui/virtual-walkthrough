@@ -19,6 +19,7 @@
 import 'server-only'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { route } from '../http'
+import { currentSite } from '../site'
 import { createRateLimiter, fail, isRecord } from '../util'
 
 const TOKEN_TTL_SEC = 30 * 60
@@ -40,6 +41,14 @@ export interface LiveClaims {
 }
 
 const b64u = (buf: Buffer) => buf.toString('base64url')
+
+/**
+ * The presence room of this site: NEXT_PUBLIC_LIVE_ROOM when set (src/museum/live/config.ts reads the same),
+ * else the site's own (src/site.ts). Both museums share one Supabase project, so their rooms must differ.
+ */
+export function liveRoom(): string {
+  return ((process.env.NEXT_PUBLIC_LIVE_ROOM ?? '').trim() || currentSite().liveRoom).toLowerCase()
+}
 
 function secret(): string | null {
   const s = process.env.LIVE_TOKEN_SECRET?.trim()
@@ -81,6 +90,8 @@ export const liveToken = route(async (c) => {
   const room = typeof b.room === 'string' ? b.room : ''
   const pub = typeof b.pub === 'string' ? b.pub : ''
   if (!ROOM_RE.test(room)) return fail(400, 'Invalid room')
+  // a docent token only for this museum's room (the other museum's followers would reject it anyway)
+  if (room !== liveRoom()) return fail(400, 'This room belongs to another museum.')
   // uncompressed P-256 point = 65 bytes → 87 base64url chars
   if (!/^[A-Za-z0-9_-]{80,100}$/.test(pub) || Buffer.from(pub, 'base64url').length !== 65) return fail(400, 'Invalid public key')
   const iat = Math.floor(Date.now() / 1000)

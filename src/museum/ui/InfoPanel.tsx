@@ -13,6 +13,7 @@ import { openExamine } from './deepzoom/deepZoomStore'
 import { MakerCard } from './MakerCard'
 import { ItemLinks } from './ItemLinks'
 import { ShareButton } from '../share/ShareButton'
+import { StaffEditLink } from '../staff/StaffGate'
 
 /**
  * CUSTOM WINDOW EVENTS (video screens):
@@ -246,6 +247,7 @@ export function InfoPanel() {
           </header>
 
           <div className="ui-info__body" ref={bodyRef}>
+            <StaffEditLink selection={shown} tabIndex={open ? 0 : -1} />
             {vm.image && imgFailed !== vm.image && (
               <figure className="ui-info__thumb">
                 <img src={vm.image} alt={vm.alt ?? vm.title} loading="lazy" decoding="async" onError={() => setImgFailed(vm.image ?? null)} />

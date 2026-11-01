@@ -5,6 +5,7 @@ import { hasRole, userFromRequest } from './auth'
 import { type ArtisanRow, findExhibition, toArtisan, toExhibition } from './contentStore'
 import { parseJson } from './db'
 import { services } from './services'
+import { siteId } from './site'
 
 /** The signed-in user of the current page request (null when signed out / DB unavailable). */
 export async function pageUser() {
@@ -35,17 +36,18 @@ export async function exhibitionForPage(slug: string) {
   }
 }
 
-/** Maker profile + the items (in published exhibitions) that reference it. */
+/** One of this site's maker profiles + the items (in this site's published exhibitions) that reference it. */
 export async function makerForPage(id: string) {
   const { db } = await services()
-  const row = await db.one<ArtisanRow>('SELECT * FROM artisans WHERE id = $1', [id])
+  const row = await db.one<ArtisanRow>('SELECT * FROM artisans WHERE id = $1 AND site = $2', [id, siteId()])
   if (!row) return null
   // items referencing this maker, in published exhibitions only (small tables → filter in JS)
   const items = await db.query<{ collection: string; json: unknown; slug: string; ex_title: string; is_default: number }>(
     `SELECT ci.collection, ci.json, e.slug, e.title AS ex_title, e.is_default
      FROM content_items ci JOIN exhibitions e ON e.id = ci.exhibition_id
-     WHERE e.status = 'published' AND ci.collection IN ('artworks', 'exhibits')
+     WHERE e.site = $1 AND e.status = 'published' AND ci.collection IN ('artworks', 'exhibits')
      ORDER BY e.is_default DESC, e.sort, ci.sort`,
+    [siteId()],
   )
   const works = items
     .map((r) => ({ r, item: parseJson<{ id: string; title?: string; artisanId?: string }>(r.json) }))

@@ -232,6 +232,8 @@ export interface DisplaySurface {
   /** Usable extent along the run axis [min, max]. */
   range: [number, number]
   height: number
+  /** Kept for a built-in installation (named here); the admin warns before placing content on it. None in this building. */
+  reserved?: string
 }
 
 const PO = partitionOuter
@@ -331,6 +333,8 @@ export interface Zone {
   spawn: { x: number; z: number; yawDeg: number }
   /** Ceiling / wall height of the space (for lighting mounts). */
   height: number
+  /** Storey (absent = ground). Upper-level zones are left out of the admin's zone lists and the heatmap. None in this building. */
+  level?: number
 }
 
 /** Side rooms flanking the reception (between the reception walls and the gallery/wing walls). */

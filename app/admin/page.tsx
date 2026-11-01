@@ -1,6 +1,6 @@
 import { AdminApp } from '../../src/admin/AdminApp'
 
-/** /admin — client-side admin app (sections via #/content, #/media, #/analytics, #/comments). */
+/** /admin — client-side admin app; pages live in the hash (#/home, #/content/<tab>/<id>, #/media, …). */
 export default function AdminPage() {
   return <AdminApp />
 }

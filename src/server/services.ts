@@ -6,9 +6,10 @@
 import 'server-only'
 import { purgeExpiredSessions, seedAdmin, syncMasterEntries, syncStaffRoles } from './auth'
 import { config } from './config'
-import { isSeeded, readSeed, seedContent } from './contentStore'
+import { ensureSiteExhibition, isSeeded, markSiteAware, readSeed, seedContent } from './contentStore'
 import { ensureArtisanSeed } from './artisanSeed'
 import { type Db, getDb, migratePostgres } from './db'
+import { currentSite } from './site'
 import { LocalDiskStorage, S3Storage, type StorageDriver } from './storage'
 
 export interface Services {
@@ -33,23 +34,36 @@ export function getStorage(): StorageDriver {
 
 const log = (m: string) => console.log(`[museum] ${m}`)
 
+/**
+ * This site's content on first start: its own default exhibition (never another site's), the bundled seed
+ * into it when this site has not seeded yet (meta `seeded_at`, per site), and the placeholder makers.
+ * Leaves the other site's exhibitions, items and makers alone. First records that this site's build is
+ * site-aware (the migration-order guard in ensureSiteExhibition).
+ */
+export async function seedSite(db: Db, logFn: (msg: string) => void = log) {
+  const site = currentSite()
+  await markSiteAware(db)
+  const present = await ensureSiteExhibition(db)
+  if (present && !(await isSeeded(db))) {
+    const v = await seedContent(db, readSeed(), true, site.defaultExhibitionId)
+    if (v !== null) logFn(`seeded ${site.id} content into "${site.defaultExhibitionId}" from bundled config (version ${v})`)
+  }
+  await ensureArtisanSeed(db) // placeholder maker profiles + links (once per site)
+}
+
 async function bootstrap(db: Db) {
   try {
     // Local/self-hosted Postgres: apply migrations automatically. On Vercel run `npm run db:migrate`
     // (or `supabase db push`) as a deliberate step instead.
     if (!config.isVercel) await migratePostgres(db, log)
-    if (!(await isSeeded(db))) {
-      const v = await seedContent(db, readSeed(), true)
-      if (v !== null) log(`seeded content from bundled config (version ${v})`)
-    }
-    await ensureArtisanSeed(db) // placeholder maker profiles + links (once)
+    await seedSite(db)
     await seedAdmin(db, log)
     await syncMasterEntries(db)
     await syncStaffRoles(db)
     await purgeExpiredSessions(db)
   } catch (err) {
     const msg = (err as Error).message
-    if (db.dialect === 'postgres' && /relation .* does not exist/.test(msg)) {
+    if (db.dialect === 'postgres' && /(relation|column) .* does not exist/.test(msg)) {
       throw new Error(`database schema missing, run \`npm run db:migrate\` (or \`supabase db push\`): ${msg}`, { cause: err })
     }
     throw err

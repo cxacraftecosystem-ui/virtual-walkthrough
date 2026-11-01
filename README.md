@@ -403,8 +403,11 @@ src/server/
   storage.ts            StorageDriver: LocalDiskStorage, S3Storage (presigned PUT)
   auth.ts               scrypt passwords, DB-backed sessions (SHA-256 token hash), cookie helpers,
                         roles (visitor < curator < admin < master), access-list role resolution
-  contentStore.ts       content rows (JSON/jsonb) + version, seeding from bundledContent()
-  handlers/             content, auth (+ Google), favorites, comments, analytics, media, users (+ access list)
+  contentStore.ts       content rows (JSON/jsonb) + version, revisions, seeding from bundledContent()
+  site.ts               the site every query is scoped to (src/site.ts), metaKey(), runAsSite() for tests
+  audit.ts              the activity log (audit_log)
+  handlers/             content, auth (+ Google), favorites, comments, analytics, media, users (+ access list),
+                        overview (dashboard + activity)
   http.ts               route() wrapper: JSON errors, same-origin check, auth helpers
 supabase/migrations/    Postgres schema (used by `supabase db push` and `npm run db:migrate`)
 .data/                  local SQLite DB + uploaded media (git-ignored)
@@ -412,7 +415,51 @@ supabase/migrations/    Postgres schema (used by `supabase db push` and `npm run
 
 Content editing: every save bumps `MuseumContent.version`; the museum loads `/api/content` at
 start-up (falling back to bundled content when the API is unreachable). **Reset to bundled
-defaults** in the admin re-seeds from `src/museum/config`.
+defaults** in the admin re-seeds from `src/museum/config`; what it replaces stays in the trash.
+
+Every save, delete and restore of an item is kept as a revision (admin: history, restore, trash), and
+every admin change — content, texts, tour, exhibitions, makers, media, moderation, roles, access list,
+analytics retention — writes one line to the activity log (`GET /api/admin/activity`, the dashboard's
+*Recent activity*). An editor can send the stamp it loaded (`X-Expected-Updated-At`), so a save that
+would overwrite a colleague's newer change is refused with a 409 that carries their version.
+
+### Two apps, one database
+
+This app (the hand block printing museum) and `virtual-walkthrough-clay` (the clay pavilion) are two
+Vercel projects that share **one Supabase database and one S3 bucket**. Which museum a build is comes
+from `src/site.ts` (`SITE.id`: `hand-block` here, `clay` there) — the only file that differs between the
+two repos by design.
+
+- **Site scoping.** Exhibitions, makers, media, visitor prints, comments, favourites, analytics events and
+  heatmap rows, client errors, content revisions and the activity log carry a `site` column
+  (`supabase/migrations/20261101000000_sites.sql`); every query filters by it (`siteId()` in
+  `src/server/site.ts`), and every by-id admin route answers 404 for the other site's rows. Content items
+  are scoped through their exhibition. Meta keys this app owns are prefixed (`metaKey()`: none for
+  hand-block, `clay:` for the clay app); the content `version` stays shared. Rows written before sites
+  existed belong to `hand-block`.
+- **Shared on purpose.** Users, sessions and the access list: staff keep one login and one role in both
+  admins. Analytics batch markers and the migration ledger are shared too.
+- **Seeding.** On first start each app creates its own default exhibition (`SITE.defaultExhibitionId`,
+  published, its site's default) and seeds its bundled content into it when *its* `seeded_at` is missing.
+  It never seeds into, resets or deletes the other site's exhibitions. Slugs and maker ids are still
+  unique across both sites; one the other site uses is refused with a clear 409.
+- **Env vars that must be identical in both deployments:** `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
+  `MASTER_ADMIN_EMAILS` (otherwise each cold start re-syncs the access list's master rows and re-hashes
+  the admin password, revoking the other app's admin sessions), `LIVE_TOKEN_SECRET`, `S3_PREFIX` (media
+  rows store keys without it; each app rebuilds addresses with its own), and of course `DATABASE_URL`,
+  `S3_BUCKET`, `S3_PUBLIC_BASE_URL`. `NEXT_PUBLIC_LIVE_ROOM` must **differ** — leave it unset and each app
+  uses its own room (`SITE.liveRoom`); docent tokens are only minted for that room.
+- **Migrations.** `supabase/migrations/` must be byte-identical in both repos, and the SQLite mirror in
+  `src/server/db/sqlite.ts` too. The runner records each applied file's sha256 and **refuses to start**
+  when a file differs from what was applied; it warns loudly when the database has a migration this build
+  lacks (the other app deployed first). Runners serialise on a Postgres advisory lock. Every migration must
+  be additive, with constant defaults, and must not change a constraint an `ON CONFLICT` names, because
+  the other app's deployed code keeps running against the new schema.
+- **Deploy order.** 1) Merge the identical migration into both repos; one app's CI applies it, the other
+  then records nothing new. 2) Deploy hand-block. 3) Deploy the clay pavilion. (Between steps old
+  hand-block code keeps working: everything it writes defaults to `hand-block`.) The S3 CORS rule needs
+  the clay origin for direct uploads (`infra/s3-cors.json`, placeholder `https://clay-pavilion.invalid`).
+  Details: `infra/deploy-vercel.md` → *The second app*.
 
 ### Deploy
 

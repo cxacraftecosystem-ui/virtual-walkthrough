@@ -11,12 +11,14 @@
  *  • Materials: MeshStandard/Physical go straight through (PBR, emissive, transmission/opacity
  *    for glass). Basic/Lambert/Phong are mapped to equivalent standard materials (basic → emissive,
  *    so video screens and signage glow), custom shader materials are skipped. Instanced meshes are
- *    expanded when small. Lights: spot, directional and rect-area lights are supported by the
+ *    expanded when small; multi-material meshes are split into one single-material mesh per slot
+ *    (the tracer's merge assumes one material per mesh). Lights: spot, directional and rect-area lights are supported by the
  *    library (hemisphere fill is replaced by real global illumination). The sky is captured into a
  *    cube map (sun disc removed — the sun is the directional light) and used as background +
  *    image-based environment.
  *  • EXPERIMENTAL: off by default on every tier; the photo-bar "Ray-trace" toggle opts in (remembered).
  *    Scene builds time out (worker 25 s → main-thread retry, 60 s → unsupported).
+ *  • Not offered on Intel GPUs under Chrome's Direct3D 11 backend, which mis-runs the shader.
  *  • Everything is feature-detected and try/catch guarded — failure marks the tracer unsupported
  *    and the museum carries on rasterised.
  */
@@ -45,6 +47,18 @@ const setStatus = (status: RayTraceStatus, samples?: number) => {
 }
 
 let unsupported = false
+
+/**
+ * Chrome's Direct3D 11 backend (the Windows default) on Intel graphics mis-runs the tracing
+ * shader: whole screen tiles come back as sky or garbage, while the same scene renders correctly
+ * on the Vulkan/OpenGL/Metal backends. Checked on Intel Iris Xe with three-gpu-pathtracer 0.0.27.
+ */
+function brokenBackend(gl: THREE.WebGLRenderer) {
+  const ctx = gl.getContext()
+  const info = ctx.getExtension('WEBGL_debug_renderer_info')
+  const name = String(ctx.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : ctx.RENDERER) ?? '')
+  return /Direct3D11|D3D11/i.test(name) && /Intel/i.test(name)
+}
 
 /** Float render targets are the hard requirement of the path tracer. */
 function supported(gl: THREE.WebGLRenderer) {
@@ -107,8 +121,9 @@ async function getEngine(gl: THREE.WebGLRenderer, tier: QualityTier, useWorker =
       try {
         // Not 'three-mesh-bvh/worker': that entry also bundles parallelMeshBVH.worker.js, which spawns
         // itself as a Worker — Turbopack's worker graph never terminates on it (next build hangs).
-        const w = await import('three-mesh-bvh/src/workers/GenerateMeshBVHWorker.js')
-        const bvhWorker = new w.GenerateMeshBVHWorker()
+        // Not the library's GenerateMeshBVHWorker either: its worker crashes on load (bvhWorkerGlobals.ts).
+        const { createBVHWorker } = await import('./bvhWorker')
+        const bvhWorker = createBVHWorker()
         pt.setBVHWorker(bvhWorker as unknown as Parameters<WebGLPathTracer['setBVHWorker']>[0])
         worker = bvhWorker
       } catch (err) {
@@ -200,14 +215,77 @@ function convertMaterial(e: Engine, m: AnyMat): THREE.Material | null {
 
 const MAX_INSTANCED_TRIS = 250_000
 
+/** Attributes the tracer's geometry merge reads (three-gpu-pathtracer PathTracingSceneGenerator). */
+const PT_ATTRIBUTES = ['position', 'normal', 'tangent', 'color', 'uv', 'uv1', 'uv2']
+
+/** Per-slot sub-geometries of multi-material geometries (CPU only, never uploaded to the GPU). */
+const splitCache = new WeakMap<THREE.BufferGeometry, { version: string; parts: (THREE.BufferGeometry | null)[] }>()
+
+/**
+ * One compact geometry per material slot of `g` (the triangles of every group using that slot),
+ * or null for a slot no group uses. The tracer's merge gives every mesh exactly one material:
+ * it flattens a mesh's material array into its list but indexes that list by mesh, so a single
+ * multi-material mesh would shift every later mesh onto someone else's material.
+ */
+function splitByMaterial(g: THREE.BufferGeometry, slots: number): (THREE.BufferGeometry | null)[] {
+  const pos = g.attributes.position
+  const posVersion = !pos ? 0 : 'isInterleavedBufferAttribute' in pos ? pos.data.version : pos.version
+  const version = `${slots}|${posVersion}|${g.index?.version ?? -1}|${g.groups.length}`
+  const hit = splitCache.get(g)
+  if (hit && hit.version === version) return hit.parts
+  const parts: (THREE.BufferGeometry | null)[] = []
+  if (!pos) return parts
+  const total = g.index ? g.index.count : pos.count
+  const groups = g.groups.length ? g.groups : [{ start: 0, count: total, materialIndex: 0 }]
+  const names = PT_ATTRIBUTES.filter((n) => g.attributes[n])
+  for (let slot = 0; slot < slots; slot++) {
+    const remap = new Map<number, number>()
+    const order: number[] = []
+    const index: number[] = []
+    for (const gr of groups) {
+      if ((gr.materialIndex ?? 0) !== slot) continue
+      const end = Math.min(total, gr.start + gr.count)
+      for (let i = gr.start; i < end; i++) {
+        const v = g.index ? g.index.getX(i) : i
+        let n = remap.get(v)
+        if (n === undefined) {
+          n = order.length
+          remap.set(v, n)
+          order.push(v)
+        }
+        index.push(n)
+      }
+    }
+    if (index.length < 3) {
+      parts.push(null)
+      continue
+    }
+    const sub = new THREE.BufferGeometry()
+    for (const name of names) {
+      const src = g.attributes[name] as THREE.BufferAttribute | THREE.InterleavedBufferAttribute
+      const size = src.itemSize
+      const arr = new Float32Array(order.length * size)
+      // getComponent de-normalises quantised (meshopt / KHR_mesh_quantization) data.
+      for (let k = 0; k < order.length; k++) for (let c = 0; c < size; c++) arr[k * size + c] = src.getComponent(order[k], c)
+      sub.setAttribute(name, new THREE.BufferAttribute(arr, size))
+    }
+    sub.setIndex(order.length > 65535 ? new THREE.Uint32BufferAttribute(index, 1) : new THREE.Uint16BufferAttribute(index, 1))
+    parts.push(sub)
+  }
+  splitCache.set(g, { version, parts })
+  return parts
+}
+
 /**
  * Temporarily hide/swap what the path tracer can't use (sky mesh, custom shaders, invisible
- * helpers) and expand small instanced meshes into `e.extra`. Returns the undo function; the
- * geometry merge in setScene is synchronous, so the undo runs right after it.
+ * helpers), expand small instanced meshes into `e.extra`, and stand in one single-material
+ * mesh per slot for multi-material meshes. Returns the undo function; the geometry merge in
+ * setScene is synchronous, so the undo runs right after it.
  */
 function prepareObjects(e: Engine, scene: THREE.Scene): () => void {
   const hidden: THREE.Object3D[] = []
   const swapped: [THREE.Mesh, THREE.Material | THREE.Material[]][] = []
+  const regeo: [THREE.Mesh, THREE.BufferGeometry][] = []
   e.extra.clear()
   const inst = new THREE.Matrix4()
   scene.traverseVisible((o) => {
@@ -217,7 +295,32 @@ function prepareObjects(e: Engine, scene: THREE.Scene): () => void {
     }
     const mesh = o as THREE.Mesh
     if (!mesh.isMesh || o.userData?.noPathTrace) return
-    if (Array.isArray(mesh.material)) return
+    if (Array.isArray(mesh.material)) {
+      // The mesh keeps its first usable slot (so its children stay in the scene); the other
+      // slots are added as single-material stand-ins.
+      const mats = mesh.material
+      let own = false
+      if (!(mesh as THREE.InstancedMesh).isInstancedMesh) {
+        splitByMaterial(mesh.geometry, mats.length).forEach((part, slot) => {
+          const conv = part && mats[slot] ? convertMaterial(e, mats[slot] as AnyMat) : null
+          if (!part || !conv) return
+          if (!own) {
+            own = true
+            regeo.push([mesh, mesh.geometry])
+            swapped.push([mesh, mats])
+            mesh.geometry = part
+            mesh.material = conv
+            return
+          }
+          const c = new THREE.Mesh(part, conv)
+          c.matrixAutoUpdate = false
+          c.matrix.copy(mesh.matrixWorld)
+          e.extra.add(c)
+        })
+      }
+      if (!own) hidden.push(mesh)
+      return
+    }
     const conv = convertMaterial(e, mesh.material as AnyMat)
     const im = mesh as THREE.InstancedMesh
     if (im.isInstancedMesh) {
@@ -245,6 +348,7 @@ function prepareObjects(e: Engine, scene: THREE.Scene): () => void {
   return () => {
     for (const h of hidden) h.visible = true
     for (const [m, mat] of swapped) m.material = mat
+    for (const [m, geo] of regeo) m.geometry = geo
   }
 }
 
@@ -330,6 +434,21 @@ export function RayTraceManager() {
   const [tracing, setTracing] = useState(false)
   const last = useRef({ m: new THREE.Matrix4(), p: new THREE.Matrix4(), still: 0 })
   const enabled = (choice ?? preset.pathTracing) && supported(gl)
+
+  // Known-bad GPU backend: hide the toggle (status 'unsupported') and stay rasterised.
+  useEffect(() => {
+    if (unsupported || isWebGPU()) return
+    let bad = false
+    try {
+      bad = brokenBackend(gl)
+    } catch {
+      /* unknown renderer: let the tracer try */
+    }
+    if (!bad) return
+    console.info('[museum] ray-traced view disabled: this GPU backend (Intel on Direct3D 11) mis-renders the path tracer')
+    unsupported = true
+    setStatus('unsupported')
+  }, [gl])
 
   useEffect(() => {
     useRayTrace.setState({ target: tier === 'ultra' ? 384 : tier === 'high' ? 256 : 160 })

@@ -1,11 +1,16 @@
 import 'server-only'
 
-/** Error with an HTTP status; rendered as `{ error }` by `route()`. */
+/**
+ * Error with an HTTP status; rendered as `{ error }` by `route()`, or as `body` when one is given (a 409
+ * conflict carries the current item, a 400 the path of the field at fault).
+ */
 export class HttpError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  body?: Record<string, unknown>
+  constructor(status: number, message: string, body?: Record<string, unknown>) {
     super(message)
     this.status = status
+    this.body = body
   }
 }
 
@@ -44,3 +49,18 @@ export const isItemKind = (v: unknown): v is ItemKind =>
 
 /** Allowed ids for content items / favourites (URL-safe). */
 export const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/
+
+/** Most ids one bulk request may name (prints, comments, errors). */
+export const BULK_MAX = 200
+
+/** `ids` of a bulk request: 1–BULK_MAX distinct strings that pass `valid`. */
+export function readBulkIds(v: unknown, name = 'ids', valid: (s: string) => boolean = (s) => s.length > 0 && s.length <= 100): string[] {
+  if (!Array.isArray(v) || v.length === 0) return fail(400, `"${name}" must be a non-empty list`)
+  if (v.length > BULK_MAX) return fail(400, `At most ${BULK_MAX} at a time`)
+  const ids = [...new Set(v)]
+  if (!ids.every((x): x is string => typeof x === 'string' && valid(x))) return fail(400, `"${name}" must be a list of ids`)
+  return ids
+}
+
+/** `(id IN ($2, $3, …))` for ids after `offset` existing parameters. */
+export const inList = (ids: string[], offset: number) => ids.map((_, i) => `$${offset + i + 1}`).join(', ')

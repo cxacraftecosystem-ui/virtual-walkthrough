@@ -6,9 +6,11 @@ import { Readable } from 'node:stream'
 import type { ReadableStream as NodeWebReadableStream } from 'node:stream/web'
 import Busboy from 'busboy'
 import { config } from '../config'
-import { type Db, nowIso } from '../db'
+import { type Actor, audit } from '../audit'
+import { type Db, nowIso, type Param, parseJson } from '../db'
 import { route } from '../http'
 import { getStorage } from '../services'
+import { siteId } from '../site'
 import { LocalDiskStorage, type StorageDriver } from '../storage'
 import { fail, HttpError, isRecord } from '../util'
 import { DEEPZOOM_FOLDER, DZI_MIME, isDeepZoomKey, removeDeepZoomSet } from './deepzoom'
@@ -80,17 +82,21 @@ const toRecord = (storage: StorageDriver, r: MediaRow) => ({
   createdAt: r.created_at,
 })
 
-async function record(db: Db, storage: StorageDriver, folder: string, storedName: string, filename: string, mime: string, size: number) {
+async function record(db: Db, storage: StorageDriver, actor: Actor, folder: string, storedName: string, filename: string, mime: string, size: number) {
   const row: MediaRow = { id: randomUUID(), folder, stored_name: storedName, filename: filename.slice(0, 255), mime, size, created_at: nowIso() }
-  await db.run('INSERT INTO media (id, folder, stored_name, filename, mime, size, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
-    row.id,
-    row.folder,
-    row.stored_name,
-    row.filename,
-    row.mime,
-    row.size,
-    row.created_at,
-  ])
+  await db.tx(async (q) => {
+    await q.run('INSERT INTO media (id, folder, stored_name, filename, mime, size, created_at, site) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [
+      row.id,
+      row.folder,
+      row.stored_name,
+      row.filename,
+      row.mime,
+      row.size,
+      row.created_at,
+      siteId(),
+    ])
+    await audit(q, actor, { action: 'media.upload', targetKind: 'media', targetId: row.id, summary: `Uploaded “${row.filename}” to ${folder}` })
+  })
   return toRecord(storage, row)
 }
 
@@ -114,7 +120,7 @@ export const mediaConfig = route(async (c) => {
  * long-running servers; on Vercel use the presigned flow (request bodies are capped ~4.5 MB).
  */
 export const uploadMedia = route(async (c) => {
-  await c.requireCurator()
+  const user = await c.requireCurator()
   const ct = c.req.headers.get('content-type') ?? ''
   if (!ct.startsWith('multipart/form-data')) return fail(415, 'Expected multipart/form-data')
   if (!c.req.body) return fail(400, 'Empty body')
@@ -179,7 +185,7 @@ export const uploadMedia = route(async (c) => {
     Readable.fromWeb(c.req.body as unknown as NodeWebReadableStream).on('error', reject).pipe(bb)
   })
   c.status = 201
-  return record(db, storage, result.folder, result.storedName, result.filename, result.mime, result.size)
+  return record(db, storage, user, result.folder, result.storedName, result.filename, result.mime, result.size)
 })
 
 /** POST /api/admin/media/presign — direct-to-S3 upload URL (serverless-safe, up to 500 MB). */
@@ -198,7 +204,7 @@ export const presignMedia = route(async (c) => {
 
 /** POST /api/admin/media/complete — record an object uploaded via /presign. */
 export const completeMedia = route(async (c) => {
-  await c.requireCurator()
+  const user = await c.requireCurator()
   const b = await c.json()
   if (!isRecord(b) || typeof b.key !== 'string' || typeof b.filename !== 'string') return fail(400, 'Body must be { key, filename }')
   const m = KEY_RE.exec(b.key)
@@ -212,25 +218,127 @@ export const completeMedia = route(async (c) => {
     return fail(413, TOO_LARGE)
   }
   c.status = 201
-  return record(c.db, c.storage, folder, storedName, b.filename, MIME_BY_EXT[ext], stat.size)
+  return record(c.db, c.storage, user, folder, storedName, b.filename, MIME_BY_EXT[ext], stat.size)
 })
 
-/** GET /api/admin/media */
+export const MEDIA_KINDS = ['image', 'model', 'video', 'audio', 'other'] as const
+type MediaKind = (typeof MEDIA_KINDS)[number]
+
+/** SQL condition for one kind (deep zoom pyramids count as images). */
+const KIND_SQL: Record<MediaKind, string> = {
+  image: "(mime LIKE 'image/%' OR folder = 'deepzoom')",
+  model: "mime LIKE 'model/%'",
+  video: "mime LIKE 'video/%'",
+  audio: "mime LIKE 'audio/%'",
+  other: "NOT (mime LIKE 'image/%' OR mime LIKE 'model/%' OR mime LIKE 'video/%' OR mime LIKE 'audio/%' OR folder = 'deepzoom')",
+}
+
+/** Opaque page cursor: the last row's (created_at, id). */
+const encodeCursor = (r: MediaRow) => Buffer.from(JSON.stringify([r.created_at, r.id])).toString('base64url')
+function decodeCursor(v: string): [string, string] {
+  try {
+    const c = JSON.parse(Buffer.from(v, 'base64url').toString('utf8')) as unknown
+    if (Array.isArray(c) && c.length === 2 && typeof c[0] === 'string' && typeof c[1] === 'string' && !Number.isNaN(Date.parse(c[0]))) return [c[0], c[1]]
+  } catch {
+    /* fall through */
+  }
+  return fail(400, 'Invalid cursor')
+}
+
+/**
+ * GET /api/admin/media — this site's library, newest first. Without `limit`: every record (array, as before).
+ * With `limit` (1–200), `cursor`, `q` (file name contains), `kind` (image|model|video|audio|other):
+ * `{ items, nextCursor }` — pass `nextCursor` back as `cursor` for the next page (null = last page).
+ */
 export const listMedia = route(async (c) => {
   await c.requireCurator()
-  const rows = await c.db.query<MediaRow>('SELECT * FROM media ORDER BY created_at DESC')
-  return rows.map((r) => toRecord(c.storage, r))
+  const sp = c.url.searchParams
+  if (!sp.has('limit')) {
+    const rows = await c.db.query<MediaRow>('SELECT * FROM media WHERE site = $1 ORDER BY created_at DESC, id DESC', [siteId()])
+    return rows.map((r) => toRecord(c.storage, r))
+  }
+  const limit = Math.max(1, Math.min(200, Math.round(Number(sp.get('limit'))) || 60))
+  const where = ['site = $1']
+  const params: Param[] = [siteId()]
+  const cursor = sp.get('cursor')
+  if (cursor) {
+    const [at, id] = decodeCursor(cursor)
+    params.push(at, id)
+    where.push(`(created_at < $${params.length - 1} OR (created_at = $${params.length - 1} AND id < $${params.length}))`)
+  }
+  const q = (sp.get('q') ?? '').trim().toLowerCase().slice(0, 100)
+  if (q) {
+    params.push(`%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`)
+    where.push(`LOWER(filename) LIKE $${params.length} ESCAPE '\\'`)
+  }
+  const kind = sp.get('kind')
+  if (kind) {
+    if (!(MEDIA_KINDS as readonly string[]).includes(kind)) return fail(400, `"kind" must be one of ${MEDIA_KINDS.join(', ')}`)
+    where.push(KIND_SQL[kind as MediaKind])
+  }
+  const rows = await c.db.query<MediaRow>(`SELECT * FROM media WHERE ${where.join(' AND ')} ORDER BY created_at DESC, id DESC LIMIT ${limit + 1}`, params)
+  const page = rows.slice(0, limit)
+  return { items: page.map((r) => toRecord(c.storage, r)), nextCursor: rows.length > limit ? encodeCursor(page[page.length - 1]) : null }
 })
+
+const findMedia = (db: Db, id: string) => db.one<MediaRow>('SELECT * FROM media WHERE id = $1 AND site = $2', [id, siteId()])
 
 /** DELETE /api/admin/media/:id */
 export const deleteMedia = route<{ id: string }>(async (c) => {
-  await c.requireCurator()
-  const row = await c.db.one<MediaRow>('SELECT * FROM media WHERE id = $1', [c.params.id])
+  const user = await c.requireCurator()
+  const row = await findMedia(c.db, c.params.id)
   if (!row) return fail(404, 'Media not found')
   if (row.folder === DEEPZOOM_FOLDER) await removeDeepZoomSet(c.storage, row.stored_name) // whole tile pyramid
   else await c.storage.remove(`${row.folder}/${row.stored_name}`)
-  await c.db.run('DELETE FROM media WHERE id = $1', [row.id])
+  await c.db.tx(async (q) => {
+    await q.run('DELETE FROM media WHERE id = $1 AND site = $2', [row.id, siteId()])
+    await audit(q, user, { action: 'media.delete', targetKind: 'media', targetId: row.id, summary: `Deleted “${row.filename}” from the media library` })
+  })
   return { ok: true }
+})
+
+/** Every string inside `v` that contains `needle`, with its path ('image', 'gallery[2].src', …). */
+function findRefs(v: unknown, needle: string, path = '', out: string[] = []): string[] {
+  if (typeof v === 'string') {
+    if (v.includes(needle)) out.push(path || '(value)')
+  } else if (Array.isArray(v)) {
+    v.forEach((x, i) => findRefs(x, needle, `${path}[${i}]`, out))
+  } else if (v && typeof v === 'object') {
+    for (const [k, x] of Object.entries(v)) findRefs(x, needle, path ? `${path}.${k}` : k, out)
+  }
+  return out
+}
+
+/**
+ * Where one media record is used: content items of this site's exhibitions (any field, nested too) and maker
+ * portraits whose value contains the object's key (`<folder>/<file>`, or `deepzoom/<set>/` for a pyramid) —
+ * which matches local /media/… addresses and S3 / CDN addresses alike.
+ */
+export async function mediaUsage(db: Db, row: Pick<MediaRow, 'folder' | 'stored_name'>) {
+  const needle = row.folder === DEEPZOOM_FOLDER ? `${DEEPZOOM_FOLDER}/${row.stored_name.split('/')[0]}/` : `${row.folder}/${row.stored_name}`
+  const [items, makers] = await Promise.all([
+    db.query<{ exhibition_id: string; title: string; collection: string; json: unknown }>(
+      `SELECT ci.exhibition_id, e.title, ci.collection, ci.json FROM content_items ci JOIN exhibitions e ON e.id = ci.exhibition_id
+       WHERE e.site = $1 ORDER BY e.is_default DESC, e.sort, ci.collection, ci.sort`,
+      [siteId()],
+    ),
+    db.query<{ id: string; name: string; portrait: string }>('SELECT id, name, portrait FROM artisans WHERE site = $1 ORDER BY sort, name', [siteId()]),
+  ])
+  const usage = items.flatMap((r) => {
+    const item = parseJson<Record<string, unknown>>(r.json)
+    const id = String(item.id ?? '')
+    const title = typeof item.title === 'string' && item.title ? item.title : id
+    return findRefs(item, needle).map((field) => ({ exhibitionId: r.exhibition_id, exhibitionTitle: r.title, collection: r.collection, id, title, field }))
+  })
+  return { usage, artisans: makers.filter((m) => m.portrait.includes(needle)).map((m) => ({ id: m.id, name: m.name })) }
+}
+
+/** GET /api/admin/media/:id/usage — curator → `{ usage: [{ exhibitionId, exhibitionTitle, collection, id, title, field }], artisans: [{ id, name }] }` */
+export const mediaUsageRoute = route<{ id: string }>(async (c) => {
+  await c.requireCurator()
+  const row = await findMedia(c.db, c.params.id)
+  if (!row) return fail(404, 'Media not found')
+  return mediaUsage(c.db, row)
 })
 
 /* ------------------------------------------------------------------ */

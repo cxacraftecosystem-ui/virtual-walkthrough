@@ -6,7 +6,7 @@
  *   export const GET = route(async (c) => ({ hello: 'world' }))
  *
  * A handler returns data (sent as JSON, status `c.status`), or a Response. Throw HttpError
- * (or call `fail`) for 4xx/5xx; the body is always `{ error }`.
+ * (or call `fail`) for 4xx/5xx; the body is `{ error }` (plus what the HttpError's `body` adds).
  */
 import 'server-only'
 import { requireRoleUser, requireUser, type Role, type User, userFromRequest } from './auth'
@@ -109,7 +109,7 @@ export function route<P = Record<string, never>>(
       if (out instanceof Response) return out
       return jsonResponse(out ?? { ok: true }, call.status, headers)
     } catch (err) {
-      if (err instanceof HttpError) return jsonResponse({ error: err.message }, err.status, headers)
+      if (err instanceof HttpError) return jsonResponse({ error: err.message, ...err.body }, err.status, headers)
       console.error(`[museum] ${req.method} ${new URL(req.url).pathname} failed:`, err)
       return jsonResponse({ error: 'Something went wrong. Please try again.' }, 500, headers)
     }

@@ -34,7 +34,8 @@ export function ModelPreview({ url, size }: { url: string; size: [number, number
   return (
     <div className="cap-preview">
       <Boundary>
-        <Canvas shadows dpr={[1, 2]} camera={{ fov: 35, near: 0.01, far: 200, position: [r * 1.2, r * 0.9, r * 1.6] }} gl={{ antialias: true }}>
+        {/* PCF ('percentage'): three r186 removed PCFSoftShadowMap, which a bare `shadows` asks for. */}
+        <Canvas shadows="percentage" dpr={[1, 2]} camera={{ fov: 35, near: 0.01, far: 200, position: [r * 1.2, r * 0.9, r * 1.6] }} gl={{ antialias: true }}>
           <color attach="background" args={['#efe9df']} />
           <hemisphereLight args={['#fffaf0', '#8a7a66', 1.1]} />
           <directionalLight position={[2, 4, 3]} intensity={2.2} castShadow shadow-mapSize={[1024, 1024]} />

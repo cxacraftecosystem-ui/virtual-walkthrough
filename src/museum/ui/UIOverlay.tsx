@@ -25,6 +25,7 @@ import { isCoarsePointer } from './HelpOverlay'
 import { A11yLayer } from '../a11y/A11yLayer'
 import { PrintStudio } from '../studio/PrintStudio'
 import { ErrorBoundary } from '../utils/ErrorBoundary'
+import { StaffLayer } from '../staff/StaffGate'
 
 function isTypingTarget(t: EventTarget | null) {
   if (!(t instanceof HTMLElement)) return false
@@ -153,6 +154,9 @@ export function UIOverlay() {
       </ErrorBoundary>
       <ErrorBoundary fallback={null}>
         <InfoPanel />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={null}>
+        <StaffLayer />
       </ErrorBoundary>
       <ErrorBoundary fallback={null}>
         <SocialDrawer />

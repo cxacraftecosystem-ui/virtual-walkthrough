@@ -15,12 +15,13 @@
 import assert from 'node:assert/strict'
 import { after, before, beforeEach, describe, it } from 'node:test'
 import { accessRoleFor, computeRole, syncRolesForPattern, syncStaffRoles, type UserRow } from '../../src/server/auth'
-import { type ContentDoc, getContent, readSeed, seedContent } from '../../src/server/contentStore'
+import { type ContentDoc, ensureSiteExhibition, getContent, readSeed, seedContent } from '../../src/server/contentStore'
 import { migratePostgres } from '../../src/server/db'
 import { PostgresDb } from '../../src/server/db/postgres'
 import { SqliteDb } from '../../src/server/db/sqlite'
 import type { Db, Param, Queryable } from '../../src/server/db/types'
 import { accessEntries, adminUserList } from '../../src/server/handlers/users'
+import { SITE } from '../../src/site'
 
 /** A `Db` that records every statement sent through it, transactions included. */
 function counting(db: Db): { db: Db; statements: string[]; reset: () => void } {
@@ -196,9 +197,10 @@ for (const dialect of DIALECTS) {
       const grown: ContentDoc = { ...seed }
       grown.artworks = Array.from({ length: 450 }, (_, i) => ({ ...(seed.artworks[0] ?? {}), id: `bulk-${i}`, title: `Bulk ${i}` }))
 
-      const original = await measure(c, () => seedContent(c.db, seed))
+      await ensureSiteExhibition(raw) // the site's own default exhibition, which the seed goes into
+      const original = await measure(c, () => seedContent(c.db, seed, false, SITE.defaultExhibitionId))
       const contentAfterOriginal = await getContent(raw)
-      const big = await measure(c, () => seedContent(c.db, grown))
+      const big = await measure(c, () => seedContent(c.db, grown, false, SITE.defaultExhibitionId))
       const content = await getContent(raw)
 
       const items = (doc: ContentDoc) => (['artworks', 'exhibits', 'infographics', 'videos', 'objects'] as const).reduce((n, k) => n + (doc[k]?.length ?? 0), 0)

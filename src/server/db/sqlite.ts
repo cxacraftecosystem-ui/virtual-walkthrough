@@ -162,6 +162,56 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX IF NOT EXISTS analytics_batches_received ON analytics_batches(received_at);
   `,
+  // sites, revisions, audit log: two apps share the database (supabase/migrations/20261101000000_sites.sql).
+  // favorites is rebuilt for its new primary key (user_id, site, item_kind, item_id).
+  `
+  ALTER TABLE exhibitions ADD COLUMN site TEXT NOT NULL DEFAULT 'hand-block';
+  DROP INDEX IF EXISTS exhibitions_one_default;
+  CREATE UNIQUE INDEX IF NOT EXISTS exhibitions_one_default_per_site ON exhibitions(site) WHERE is_default = 1;
+  CREATE INDEX IF NOT EXISTS exhibitions_site ON exhibitions(site, status, sort);
+  ALTER TABLE artisans ADD COLUMN site TEXT NOT NULL DEFAULT 'hand-block';
+  ALTER TABLE media ADD COLUMN site TEXT NOT NULL DEFAULT 'hand-block';
+  ALTER TABLE visitor_prints ADD COLUMN site TEXT NOT NULL DEFAULT 'hand-block';
+  ALTER TABLE comments ADD COLUMN site TEXT NOT NULL DEFAULT 'hand-block';
+  ALTER TABLE analytics_events ADD COLUMN site TEXT NOT NULL DEFAULT 'hand-block';
+  ALTER TABLE analytics_heat ADD COLUMN site TEXT NOT NULL DEFAULT 'hand-block';
+  ALTER TABLE client_errors ADD COLUMN site TEXT NOT NULL DEFAULT 'hand-block';
+  ALTER TABLE client_error_groups ADD COLUMN site TEXT NOT NULL DEFAULT 'hand-block';
+  CREATE TABLE favorites_new (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    site TEXT NOT NULL DEFAULT 'hand-block',
+    item_kind TEXT NOT NULL, item_id TEXT NOT NULL, created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, site, item_kind, item_id)
+  );
+  INSERT INTO favorites_new (user_id, site, item_kind, item_id, created_at) SELECT user_id, 'hand-block', item_kind, item_id, created_at FROM favorites;
+  DROP TABLE favorites;
+  ALTER TABLE favorites_new RENAME TO favorites;
+  CREATE INDEX IF NOT EXISTS artisans_site ON artisans(site, sort);
+  CREATE INDEX IF NOT EXISTS media_site ON media(site, created_at);
+  CREATE INDEX IF NOT EXISTS visitor_prints_site ON visitor_prints(site, status, created_at);
+  CREATE INDEX IF NOT EXISTS comments_site_item ON comments(site, item_kind, item_id, created_at);
+  CREATE INDEX IF NOT EXISTS analytics_site_t ON analytics_events(site, t);
+  CREATE INDEX IF NOT EXISTS analytics_heat_site_day ON analytics_heat(site, day);
+  CREATE INDEX IF NOT EXISTS client_errors_site ON client_errors(site, created_at);
+  CREATE INDEX IF NOT EXISTS client_error_groups_site ON client_error_groups(site, last_seen);
+  ALTER TABLE content_items ADD COLUMN updated_by TEXT;
+  CREATE TABLE IF NOT EXISTS content_revisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, site TEXT NOT NULL DEFAULT 'hand-block',
+    exhibition_id TEXT NOT NULL, collection TEXT NOT NULL, item_id TEXT NOT NULL,
+    op TEXT NOT NULL CHECK (op IN ('create','update','delete','restore')), json TEXT,
+    actor_id TEXT, actor_email TEXT, created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS content_revisions_item ON content_revisions(exhibition_id, collection, item_id, id);
+  CREATE INDEX IF NOT EXISTS content_revisions_op ON content_revisions(site, exhibition_id, op, id);
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, site TEXT NOT NULL DEFAULT 'hand-block', at TEXT NOT NULL,
+    actor_id TEXT, actor_email TEXT, actor_role TEXT, action TEXT NOT NULL,
+    target_kind TEXT NOT NULL DEFAULT '', target_id TEXT NOT NULL DEFAULT '', exhibition_id TEXT,
+    summary TEXT NOT NULL DEFAULT '', detail TEXT
+  );
+  CREATE INDEX IF NOT EXISTS audit_log_site ON audit_log(site, id);
+  CREATE INDEX IF NOT EXISTS audit_log_target ON audit_log(site, target_kind, target_id, id);
+  `,
 ]
 
 /** Schema version of this code (a dev-server singleton opened by older code is reopened). */

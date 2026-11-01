@@ -92,6 +92,25 @@ matches the file and a deployment that ignores it cannot fall back to `iad1`.
 2. Sign in at `https://<app>/admin` with `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 3. Media → upload a file (goes straight to S3 through a presigned URL) → paste its URL into an artwork.
 
+## The second app: the clay pavilion
+
+`virtual-walkthrough-clay` is a second Vercel project on the **same** Supabase database and S3 bucket (README →
+*Two apps, one database*). Set its env vars like this project's, with these rules:
+
+- **Identical in both projects:** `DATABASE_URL` (and the CI `DATABASE_URL` / `DIRECT_DATABASE_URL` secrets),
+  `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `MASTER_ADMIN_EMAILS`, `LIVE_TOKEN_SECRET`, `S3_BUCKET`, `S3_PREFIX`,
+  `S3_PUBLIC_BASE_URL`, `AWS_REGION`. Different admin values make each cold start undo the other app (the access
+  list's master rows are re-synced, the admin password is re-hashed and its sessions revoked); a different
+  `S3_PREFIX` breaks every media address the other app stored.
+- **Different:** `NEXT_PUBLIC_LIVE_ROOM` (leave it unset — each app defaults to its own room from `src/site.ts`),
+  `NEXT_PUBLIC_SITE_URL`, and the Google OAuth origins (add the clay origin to the same OAuth client).
+- **S3 CORS:** replace the placeholder `https://clay-pavilion.invalid` in `infra/s3-cors.json` with the clay app's
+  origin(s), then re-apply it (`APP_ORIGINS=<hand-block origins>,<clay origins> ./infra/setup-s3.sh`, as for a
+  custom domain below). Until then the clay admin can upload only through the API (small files), not direct to S3.
+- **Deploy order** for a schema change: merge the identical migration into both repos; let one app's CI apply it
+  (the other's records nothing new); deploy hand-block, then clay. Both apps' migration runners check every applied
+  file's sha256 and refuse to start on a mismatch, and warn when the database has a migration they lack.
+
 ## Custom domain
 
 There is no custom domain yet; the app is served from `*.vercel.app`. To add one, e.g. `museum.example.org`:

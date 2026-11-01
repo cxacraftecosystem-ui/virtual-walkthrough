@@ -1,12 +1,16 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
+import { audit } from '../audit'
 import { route } from '../http'
-import { createRateLimiter, fail, isRecord } from '../util'
+import { siteId } from '../site'
+import { createRateLimiter, fail, inList, isRecord, readBulkIds } from '../util'
 
 /**
  * Client error reporting (src/museum/utils/errorReporter.ts → POST /api/errors).
  * PII-free: no IP, no user id, query strings / emails / tokens scrubbed; grouped by fingerprint
  * in `client_error_groups`, raw occurrences in `client_errors` (pruned to 30 days / 50 per group).
+ * Per site: the fingerprint hash includes the site, so the same error in both museums is two groups and
+ * `client_error_groups.fingerprint` stays the primary key; every query and prune is scoped to this site.
  */
 
 const KINDS = new Set(['error', 'unhandledrejection', 'react', 'webgl', 'manual'])
@@ -26,8 +30,8 @@ function scrub(s: string): string {
 }
 const text = (v: unknown, max: number): string | null => (typeof v === 'string' && v.trim() ? scrub(v).slice(0, max) : null)
 
-/** Group key: kind + message with volatile numbers removed + first stack frame (file:line, minus hashes). */
-function fingerprint(kind: string, message: string, stack: string | null) {
+/** Group key: site + kind + message with volatile numbers removed + first stack frame (file:line, minus hashes). */
+export function fingerprint(kind: string, message: string, stack: string | null, site = siteId()) {
   const norm = message.replace(/\d+/g, '#').replace(/\s+/g, ' ').trim().toLowerCase()
   const frame =
     (stack ?? '')
@@ -35,7 +39,9 @@ function fingerprint(kind: string, message: string, stack: string | null) {
       .map((l) => l.trim())
       .find((l) => /^at\s|@|:\d+:\d+/.test(l) && !l.startsWith('---')) ?? ''
   const f = frame.replace(/\?[^:)\s]*/g, '').replace(/[0-9a-f]{8,}/gi, '#').replace(/:\d+(?=\)?$)/, '')
-  return createHash('sha1').update(`${kind}\n${norm}\n${f}`).digest('hex').slice(0, 20)
+  // hand-block keeps the hash it had before sites existed, so its open groups carry on
+  const key = site === 'hand-block' ? `${kind}\n${norm}\n${f}` : `${site}\n${kind}\n${norm}\n${f}`
+  return createHash('sha1').update(key).digest('hex').slice(0, 20)
 }
 
 let lastPrune = 0
@@ -68,26 +74,27 @@ export const postError = route(
     const fp = fingerprint(kind, message, stack)
     const now = Date.now()
     const db = c.db
+    const site = siteId()
 
     await db.run(
-      `INSERT INTO client_errors (fingerprint, kind, message, stack, url, ua, tier, gpu, release, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [fp, kind, message, stack, url, ua, tier, gpu, release, now],
+      `INSERT INTO client_errors (fingerprint, kind, message, stack, url, ua, tier, gpu, release, created_at, site)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [fp, kind, message, stack, url, ua, tier, gpu, release, now, site],
     )
     // resolved group that recurs → reopened (regression)
     await db.run(
-      `INSERT INTO client_error_groups (fingerprint, kind, message, count, first_seen, last_seen, resolved_at, last_stack, last_url, last_ua, last_tier, last_gpu, last_release)
-       VALUES ($1, $2, $3, 1, $4, $4, NULL, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO client_error_groups (fingerprint, kind, message, count, first_seen, last_seen, resolved_at, last_stack, last_url, last_ua, last_tier, last_gpu, last_release, site)
+       VALUES ($1, $2, $3, 1, $4, $4, NULL, $5, $6, $7, $8, $9, $10, $11)
        ON CONFLICT (fingerprint) DO UPDATE SET
          count = client_error_groups.count + 1, last_seen = excluded.last_seen, resolved_at = NULL, message = excluded.message,
          last_stack = excluded.last_stack, last_url = excluded.last_url, last_ua = excluded.last_ua,
          last_tier = excluded.last_tier, last_gpu = excluded.last_gpu, last_release = excluded.last_release`,
-      [fp, kind, message, now, stack, url, ua, tier, gpu, release],
+      [fp, kind, message, now, stack, url, ua, tier, gpu, release, site],
     )
     if (now - lastPrune > 3_600_000) {
       lastPrune = now
-      await db.run('DELETE FROM client_errors WHERE created_at < $1', [now - RETENTION_MS])
-      await db.run('DELETE FROM client_error_groups WHERE last_seen < $1', [now - RETENTION_MS])
+      await db.run('DELETE FROM client_errors WHERE site = $1 AND created_at < $2', [site, now - RETENTION_MS])
+      await db.run('DELETE FROM client_error_groups WHERE site = $1 AND last_seen < $2', [site, now - RETENTION_MS])
     }
     // keep at most PER_GROUP raw rows for this group
     await db.run(
@@ -132,16 +139,18 @@ const FP_RE = /^[0-9a-f]{20}$/
 export const listErrors = route(async (c) => {
   await c.requireAdmin()
   const status = c.url.searchParams.get('status') ?? 'open'
-  const where = status === 'resolved' ? 'WHERE g.resolved_at IS NOT NULL' : status === 'all' ? '' : 'WHERE g.resolved_at IS NULL'
+  const where = status === 'resolved' ? ' AND g.resolved_at IS NOT NULL' : status === 'all' ? '' : ' AND g.resolved_at IS NULL'
   const since = Date.now() - 86_400_000
   const rows = await c.db.query<GroupRow>(
     `SELECT ${GROUP_COLS.replace(/(^|,\s*)(\w+)/g, '$1g.$2')},
        (SELECT COUNT(*) FROM client_errors e WHERE e.fingerprint = g.fingerprint AND e.created_at >= $1) AS "last24h"
-     FROM client_error_groups g ${where} ORDER BY g.last_seen DESC LIMIT 500`,
-    [since],
+     FROM client_error_groups g WHERE g.site = $2${where} ORDER BY g.last_seen DESC LIMIT 500`,
+    [since, siteId()],
   )
   const totals = await c.db.one<{ open: number; resolved: number }>(
-    `SELECT SUM(CASE WHEN resolved_at IS NULL THEN 1 ELSE 0 END) AS open, SUM(CASE WHEN resolved_at IS NULL THEN 0 ELSE 1 END) AS resolved FROM client_error_groups`,
+    `SELECT SUM(CASE WHEN resolved_at IS NULL THEN 1 ELSE 0 END) AS open, SUM(CASE WHEN resolved_at IS NULL THEN 0 ELSE 1 END) AS resolved
+     FROM client_error_groups WHERE site = $1`,
+    [siteId()],
   )
   return { groups: rows.map(toGroup), open: Number(totals?.open ?? 0), resolved: Number(totals?.resolved ?? 0) }
 })
@@ -151,7 +160,7 @@ export const getError = route<{ fingerprint: string }>(async (c) => {
   await c.requireAdmin()
   const fp = c.params.fingerprint
   if (!FP_RE.test(fp)) fail(404, 'Not found')
-  const g = await c.db.one<GroupRow>(`SELECT ${GROUP_COLS} FROM client_error_groups WHERE fingerprint = $1`, [fp])
+  const g = await c.db.one<GroupRow>(`SELECT ${GROUP_COLS} FROM client_error_groups WHERE fingerprint = $1 AND site = $2`, [fp, siteId()])
   if (!g) return fail(404, 'Not found')
   const occ = await c.db.query<{ id: number; url: string | null; ua: string | null; tier: string | null; gpu: string | null; release: string | null; stack: string | null; createdAt: number }>(
     `SELECT id, url, ua, tier, gpu, release, stack, created_at AS "createdAt" FROM client_errors WHERE fingerprint = $1 ORDER BY created_at DESC, id DESC LIMIT 20`,
@@ -160,23 +169,67 @@ export const getError = route<{ fingerprint: string }>(async (c) => {
   return { group: toGroup(g), occurrences: occ.map((o) => ({ ...o, id: Number(o.id), createdAt: new Date(Number(o.createdAt)).toISOString() })) }
 })
 
+const short = (m: string) => (m.length > 80 ? `${m.slice(0, 77).trimEnd()}…` : m)
+
 /** PATCH /api/admin/errors/:fingerprint { resolved: boolean } */
 export const patchError = route<{ fingerprint: string }>(async (c) => {
-  await c.requireAdmin()
+  const user = await c.requireAdmin()
   const fp = c.params.fingerprint
   const b = await c.json()
   if (!isRecord(b) || typeof b.resolved !== 'boolean') return fail(400, 'Body must be { resolved: boolean }')
-  const n = await c.db.run('UPDATE client_error_groups SET resolved_at = $1 WHERE fingerprint = $2', [b.resolved ? Date.now() : null, fp])
-  if (!n) fail(404, 'Not found')
+  const resolved = b.resolved
+  await c.db.tx(async (q) => {
+    const g = await q.one<{ message: string }>('SELECT message FROM client_error_groups WHERE fingerprint = $1 AND site = $2', [fp, siteId()])
+    if (!g) return fail(404, 'Not found')
+    await q.run('UPDATE client_error_groups SET resolved_at = $1 WHERE fingerprint = $2 AND site = $3', [resolved ? Date.now() : null, fp, siteId()])
+    await audit(q, user, { action: resolved ? 'errors.resolve' : 'errors.reopen', targetKind: 'error', targetId: fp, summary: `${resolved ? 'Resolved' : 'Reopened'} error “${short(g.message)}”` })
+  })
   return { ok: true }
 })
 
 /** DELETE /api/admin/errors/:fingerprint — forget a group and its occurrences */
 export const deleteError = route<{ fingerprint: string }>(async (c) => {
-  await c.requireAdmin()
+  const user = await c.requireAdmin()
   const fp = c.params.fingerprint
-  await c.db.run('DELETE FROM client_errors WHERE fingerprint = $1', [fp])
-  const n = await c.db.run('DELETE FROM client_error_groups WHERE fingerprint = $1', [fp])
-  if (!n) fail(404, 'Not found')
+  await c.db.tx(async (q) => {
+    const g = await q.one<{ message: string }>('SELECT message FROM client_error_groups WHERE fingerprint = $1 AND site = $2', [fp, siteId()])
+    if (!g) return fail(404, 'Not found')
+    await q.run('DELETE FROM client_errors WHERE fingerprint = $1 AND site = $2', [fp, siteId()])
+    await q.run('DELETE FROM client_error_groups WHERE fingerprint = $1 AND site = $2', [fp, siteId()])
+    await audit(q, user, { action: 'errors.delete', targetKind: 'error', targetId: fp, summary: `Deleted error “${short(g.message)}” and its reports` })
+  })
   return { ok: true }
+})
+
+const BULK_VERB: Record<string, string> = { resolve: 'Resolved', reopen: 'Reopened', delete: 'Deleted' }
+
+/** POST /api/admin/errors/bulk — admin. `{ fingerprints: string[] (≤ 200), action: 'resolve' | 'reopen' | 'delete' }` → `{ updated }` */
+export const bulkErrors = route(async (c) => {
+  const user = await c.requireAdmin()
+  const b = await c.json()
+  if (!isRecord(b)) return fail(400, "Body must be { fingerprints, action: 'resolve' | 'reopen' | 'delete' }")
+  const fps = readBulkIds(b.fingerprints, 'fingerprints', (s) => FP_RE.test(s))
+  const action = b.action
+  if (typeof action !== 'string' || !Object.hasOwn(BULK_VERB, action)) return fail(400, '"action" must be resolve, reopen or delete')
+  const site = siteId()
+  const updated = await c.db.tx(async (q) => {
+    let n: number
+    if (action === 'delete') {
+      await q.run(`DELETE FROM client_errors WHERE site = $1 AND fingerprint IN (${inList(fps, 1)})`, [site, ...fps])
+      n = await q.run(`DELETE FROM client_error_groups WHERE site = $1 AND fingerprint IN (${inList(fps, 1)})`, [site, ...fps])
+    } else {
+      n = await q.run(`UPDATE client_error_groups SET resolved_at = $1 WHERE site = $2 AND fingerprint IN (${inList(fps, 2)})`, [action === 'resolve' ? Date.now() : null, site, ...fps])
+    }
+    if (n) {
+      await audit(q, user, {
+        action: 'errors.bulk',
+        targetKind: 'error',
+        targetId: fps.length === 1 ? fps[0] : '',
+        summary: `${BULK_VERB[action]} ${n} error group${n === 1 ? '' : 's'}`,
+        detail: { action, fingerprints: fps },
+      })
+    }
+    return n
+  })
+  return { updated }
 })

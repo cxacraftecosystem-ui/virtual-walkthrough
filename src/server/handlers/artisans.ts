@@ -1,12 +1,16 @@
 /**
- * "Meet the maker": artisan profiles (global, shared by every exhibition). Artworks and
+ * "Meet the maker": artisan profiles (per site, shared by all of the site's exhibitions). Artworks and
  * exhibits reference a profile with `artisanId`. Curators create/edit/delete profiles.
  * The seed is placeholder-only (src/museum/content/artisans.ts) — no real people are invented.
+ * Profile ids are unique across both sites: an id the other site uses is refused with a 409.
  */
 import 'server-only'
 import { upsertArtisan } from '../artisanSeed'
+import { audit } from '../audit'
 import { type ArtisanRow, bumpVersion, listArtisansPublic, toArtisan } from '../contentStore'
+import { parseJson, type Queryable } from '../db'
 import { route } from '../http'
+import { siteId } from '../site'
 import { fail, ID_RE, isRecord } from '../util'
 
 const TEXT_FIELDS = [
@@ -23,12 +27,15 @@ const URL_FIELDS = [
   ['commissionUrl', 'commission_url'],
 ] as const
 
-/** GET /api/artisans — public maker profiles. */
+const findArtisan = (db: Queryable, id: string) =>
+  db.one<ArtisanRow>('SELECT * FROM artisans WHERE id = $1 AND site = $2', [id, siteId()])
+
+/** GET /api/artisans — this site's public maker profiles. */
 export const publicArtisans = route(async ({ db }) => listArtisansPublic(db))
 
 /** GET /api/artisans/:id */
 export const publicArtisan = route<{ id: string }>(async (c) => {
-  const r = await c.db.one<ArtisanRow>('SELECT * FROM artisans WHERE id = $1', [decodeURIComponent(c.params.id)])
+  const r = await findArtisan(c.db, decodeURIComponent(c.params.id))
   return r ? toArtisan(r) : fail(404, 'Maker not found')
 })
 
@@ -40,7 +47,7 @@ export const adminListArtisans = route(async (c) => {
 
 /** PUT /api/admin/artisans/:id — curator; full profile → saved profile (create or replace). */
 export const adminPutArtisan = route<{ id: string }>(async (c) => {
-  await c.requireCurator()
+  const user = await c.requireCurator()
   const id = decodeURIComponent(c.params.id)
   if (!ID_RE.test(id)) return fail(400, 'Invalid id (letters, digits, "_", "-", "." — max 100)')
   const b = await c.json({ maxBytes: 64 * 1024 })
@@ -66,22 +73,55 @@ export const adminPutArtisan = route<{ id: string }>(async (c) => {
   v.verified = b.verified === true ? 1 : 0
   v.placeholder = b.placeholder === true ? 1 : 0
   v.sort = typeof b.sort === 'number' && Number.isFinite(b.sort) ? Math.round(b.sort) : 0
+  const existed = !!(await findArtisan(c.db, id))
   await c.db.tx(async (q) => {
-    await upsertArtisan(q, id, v)
+    if (!(await upsertArtisan(q, id, v))) fail(409, 'This id is already used by a maker of the other museum that shares this database. Choose another id.')
+    await audit(q, user, {
+      action: existed ? 'artisan.update' : 'artisan.create',
+      targetKind: 'artisan',
+      targetId: id,
+      summary: `${existed ? 'Saved' : 'Added'} maker profile “${String(v.name)}”`,
+    })
     await bumpVersion(q)
   })
-  const r = await c.db.one<ArtisanRow>('SELECT * FROM artisans WHERE id = $1', [id])
+  const r = await findArtisan(c.db, id)
   return toArtisan(r!)
 })
 
 /** DELETE /api/admin/artisans/:id — curator. Items keep their (now dangling) artisanId; the museum ignores it. */
 export const adminDeleteArtisan = route<{ id: string }>(async (c) => {
+  const user = await c.requireCurator()
+  const id = decodeURIComponent(c.params.id)
+  const row = await findArtisan(c.db, id)
+  if (!row) return fail(404, 'Maker not found')
+  await c.db.tx(async (q) => {
+    const k = await q.run('DELETE FROM artisans WHERE id = $1 AND site = $2', [id, siteId()])
+    if (!k) return
+    await audit(q, user, { action: 'artisan.delete', targetKind: 'artisan', targetId: id, summary: `Deleted maker profile “${row.name}”` })
+    await bumpVersion(q)
+  })
+  return { ok: true }
+})
+
+/** Items of this site's exhibitions whose `artisanId` names a maker (small tables: filtered in JS). */
+export async function artisanUsage(db: Queryable, id: string) {
+  const rows = await db.query<{ exhibition_id: string; collection: string; json: unknown }>(
+    `SELECT ci.exhibition_id, ci.collection, ci.json FROM content_items ci JOIN exhibitions e ON e.id = ci.exhibition_id
+     WHERE e.site = $1 ORDER BY e.is_default DESC, e.sort, ci.collection, ci.sort`,
+    [siteId()],
+  )
+  return rows.flatMap((r) => {
+    const item = parseJson<{ id?: unknown; title?: unknown; artisanId?: unknown }>(r.json)
+    if (item.artisanId !== id) return []
+    const itemId = String(item.id ?? '')
+    return [{ exhibitionId: r.exhibition_id, collection: r.collection, id: itemId, title: typeof item.title === 'string' && item.title ? item.title : itemId }]
+  })
+}
+
+/** GET /api/admin/artisans/:id/usage — curator → `{ usage: [{ exhibitionId, collection, id, title }] }` */
+export const adminArtisanUsage = route<{ id: string }>(async (c) => {
   await c.requireCurator()
   const id = decodeURIComponent(c.params.id)
-  const n = await c.db.tx(async (q) => {
-    const k = await q.run('DELETE FROM artisans WHERE id = $1', [id])
-    if (k) await bumpVersion(q)
-    return k
-  })
-  return n ? { ok: true } : fail(404, 'Maker not found')
+  if (!(await findArtisan(c.db, id))) return fail(404, 'Maker not found')
+  return { usage: await artisanUsage(c.db, id) }
 })

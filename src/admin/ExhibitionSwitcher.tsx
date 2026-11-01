@@ -1,10 +1,13 @@
 /**
- * Admin header: which exhibition the content pages edit. Every content call carries
- * `?exhibition=<id>` (exhibitionsApi.ts → exQuery). Refreshes when the list changes
- * (window event 'museum-admin:exhibitions').
+ * Sidebar switcher: which exhibition the content pages edit. Every content call carries
+ * `?exhibition=<id>` (exhibitionsApi.ts → exQuery). Refreshes when the list changes (window event
+ * 'museum-admin:exhibitions'). Switching while a form has unsaved edits asks first; on Cancel the
+ * selection stays where it was (the Select is controlled, so nothing needs reverting).
  */
 import { useEffect, useState } from 'react'
-import { type AdminExhibition, exApi, setSelectedExhibition, useSelectedExhibition } from './exhibitionsApi'
+import { type AdminExhibition, exApi, getSelectedExhibition, setSelectedExhibition, useSelectedExhibition } from './exhibitionsApi'
+import { Icon, Select, StatusBadge, useConfirmLeave } from './ui'
+import './exhibitions.css'
 
 export const EXHIBITIONS_CHANGED = 'museum-admin:exhibitions'
 
@@ -23,31 +26,61 @@ export function useExhibitionList() {
   return list
 }
 
+/** The exhibition the content pages currently edit (the selection, else the default). */
+export function currentExhibition(list: AdminExhibition[] | null, selected: string) {
+  if (!list || !list.length) return null
+  return list.find((e) => e.id === selected) ?? list.find((e) => e.isDefault) ?? list[0]
+}
+
+/** Switch exhibition after the unsaved-changes check; resolves false when the user stayed. */
+export function useSwitchExhibition() {
+  const leave = useConfirmLeave()
+  return async (id: string, list: AdminExhibition[] | null) => {
+    const def = list?.find((e) => e.isDefault)
+    const next = id === def?.id ? '' : id
+    if (next === getSelectedExhibition()) return true
+    if (!(await leave('Switching exhibition discards the edits you have not saved.'))) return false
+    setSelectedExhibition(next)
+    return true
+  }
+}
+
 export function ExhibitionSwitcher() {
   const list = useExhibitionList()
   const selected = useSelectedExhibition()
+  const switchTo = useSwitchExhibition()
 
   // a stale selection (deleted exhibition) falls back to the default one
   useEffect(() => {
     if (list && list.length && selected && !list.some((e) => e.id === selected)) setSelectedExhibition('')
   }, [list, selected])
 
-  if (!list || list.length === 0) return null
-  const def = list.find((e) => e.isDefault)
-  const current = list.find((e) => e.id === selected) ?? def ?? list[0]
+  if (!list) return <span className="skel input" aria-hidden="true" style={{ height: 88, borderRadius: 16 }} />
+  if (list.length === 0) return null
+  const current = currentExhibition(list, selected)!
   return (
-    <label className="ex-switch" title="Content pages edit this exhibition">
-      <span className="kicker">Exhibition</span>
-      <select value={current.id} onChange={(e) => setSelectedExhibition(e.target.value === def?.id ? '' : e.target.value)} aria-label="Exhibition being edited">
-        {list.map((e) => (
-          <option key={e.id} value={e.id}>
-            {e.title}
-            {e.isDefault ? ' (default)' : ''}
-            {e.status === 'draft' ? ' — draft' : ''}
-          </option>
-        ))}
-      </select>
-      <a className="small" href={current.path} target="_blank" rel="noreferrer">Preview ↗</a>
-    </label>
+    <div className="ex-switch" role="group" aria-labelledby="ex-switch-label">
+      <span className="ex-switch-label" id="ex-switch-label">Editing exhibition</span>
+      <Select
+        size="sm"
+        value={current.id}
+        aria-labelledby="ex-switch-label"
+        onChange={(v) => void switchTo(v, list)}
+        options={list.map((e) => ({
+          value: e.id,
+          label: e.title,
+          description: [e.isDefault ? 'Default' : '', e.status === 'draft' ? 'Draft' : 'Published', `${e.items} items`].filter(Boolean).join(' · '),
+        }))}
+      />
+      <span className="ex-switch-meta">
+        <StatusBadge status={current.status} />
+        {current.isDefault ? <StatusBadge status="default" /> : null}
+        <span className="spacer" />
+        <a href={current.path} target="_blank" rel="noreferrer">
+          Preview <Icon name="external" width={12} height={12} style={{ verticalAlign: '-1px' }} />
+          <span className="sr-only"> (opens in a new tab)</span>
+        </a>
+      </span>
+    </div>
   )
 }

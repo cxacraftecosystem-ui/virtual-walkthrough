@@ -5,7 +5,7 @@
  * `credentials: 'include'` so the HTTP-only `museum_session` cookie travels along.
  *
  * STATIC MODE: the museum must work as a plain static site. `checkBackend()` probes
- * GET /api/health once (short timeout); when it fails, `isOnline()` stays false and every
+ * GET /api/health once (short timeout, retried with longer ones only when it times out); when it fails, `isOnline()` stays false and every
  * social feature hides itself. `?static` in the URL forces static mode.
  */
 import type { ContentCollection, ExhibitionText, MuseumContent } from '../content/types'
@@ -163,14 +163,19 @@ let probe: Promise<boolean> | null = null
 export function checkBackend(timeoutMs = 2500): Promise<boolean> {
   if (probe) return probe
   probe = (async () => {
-    try {
-      if (new URLSearchParams(window.location.search).has('static')) return false
-      const h = await request<{ ok: boolean; version: string }>('GET', '/health', undefined, timeoutMs)
-      online = !!h && h.ok === true
-    } catch {
-      online = false
+    if (new URLSearchParams(window.location.search).has('static')) return false
+    // A static host answers at once (404 or HTML), so only a timeout is worth another try: while the
+    // galleries stream in, the probe can wait behind dozens of textures on a slow connection (a
+    // timeout can also land while the body is read, which leaves no body rather than an error).
+    for (const ms of [timeoutMs, timeoutMs * 4, timeoutMs * 8]) {
+      try {
+        const h = await request<{ ok: boolean; version: string } | null>('GET', '/health', undefined, ms)
+        if (h) return (online = h.ok === true)
+      } catch (e) {
+        if (!(e instanceof ApiError) || e.status !== 0) return (online = false)
+      }
     }
-    return online
+    return (online = false)
   })()
   return probe
 }

@@ -1,10 +1,18 @@
 # Museum Backend API (v1)
 
 Base: same origin. Implemented as Next.js Route Handlers (`app/api/**/route.ts`, logic in `src/server/**`); `next dev` serves the API and the app on one port.
-All bodies are JSON unless noted. Errors: `{ "error": string }` with a 4xx/5xx status.
+All bodies are JSON unless noted. Errors: `{ "error": string }` with a 4xx/5xx status; a few add fields — a stale content
+save answers **409** `{ error: 'conflict', message, current, updatedAt, updatedBy }`, an invalid tour **400** `{ error, field }`.
 Auth: HTTP-only cookie `museum_session` (set by login/register/Google; SameSite=Lax, Secure in production, 30 days). `role` is `'visitor' | 'curator' | 'admin' | 'master'` (see **Roles**).
 Admin routes answer **401** when signed out and **403** `{ error: "<Role> role required" }` when the role is too low.
 CSRF: state-changing requests (POST/PUT/PATCH/DELETE) carrying an `Origin` header that is not the API's own host (or listed in `ALLOWED_ORIGINS`) are rejected with 403 (except `/api/analytics/events`). Unknown `/api/*` paths return a JSON 404.
+
+**Sites.** Two apps share one database: this one (`site = 'hand-block'`) and the clay pavilion (`'clay'`), each a build
+of its own repo (`src/site.ts`). Every endpoint below answers for **its own site only**: exhibitions, content, makers,
+media, prints, comments, favourites, analytics, errors and the activity log of the other site are invisible to it
+(by-id routes answer 404 for the other site's rows). Users, sessions and the access list are shared, so staff keep one
+login and one role across both. Exhibition slugs and maker ids are still unique across both sites: one the other site
+uses is refused with 409.
 
 ## Roles (RBAC)
 
@@ -34,19 +42,55 @@ env-seeded admin — because password self-registration has no email check. When
 | Method | Path | Body / Response |
 |---|---|---|
 | GET | `/api/admin/content/:collection` | list of items (`collection` ∈ artworks, exhibits, infographics, videos, objects) |
-| PUT | `/api/admin/content/:collection/:id` | full item → saved item (create or replace) |
-| DELETE | `/api/admin/content/:collection/:id` | `{ ok: true }` |
+| PUT | `/api/admin/content/:collection/:id` | full item → saved item (create or replace) **plus** `updatedAt`, `updatedBy` (never stored inside the item). Optional header `X-Expected-Updated-At` (see *Concurrency*). |
+| DELETE | `/api/admin/content/:collection/:id` | `{ ok: true }`; the item goes to the trash. Optional `X-Expected-Updated-At`. |
+| GET | `/api/admin/content/stamps` | `{ stamps: { "<collection>/<id>": { updatedAt, updatedBy } } }` — the last change of every item of the exhibition (`updatedBy` = email, null for seeded items) |
+| GET | `/api/admin/content/:collection/:id/history` | `{ revisions: [{ rev, at, actorEmail, op: 'create' \| 'update' \| 'delete' \| 'restore', item }] }`, newest first (the last 100 are kept per item). `item` is the item after the change; for a delete, as it was just before. |
+| POST | `/api/admin/content/:collection/:id/restore` | `{ rev }` → `{ item, updatedAt }` — puts the item back as it was at that revision, **deleted items too** (restore the `rev` of their delete). Recorded as a `restore` revision. 404 for an unknown revision. |
+| GET | `/api/admin/content/trash` | `{ items: [{ collection, id, title, deletedAt, deletedBy, rev }] }` — items whose last revision is a delete and that were not made again, newest first (max 500). Restore with `rev`. |
 | PUT | `/api/admin/content/exhibition` | `ExhibitionText` |
 | PUT | `/api/admin/content/welcome` | `{ title, body }` |
-| PUT | `/api/admin/content/tour` | `{ stops: TourStop[] \| null }` — per-exhibition tour override (null / [] = the bundled tour in `src/museum/config/tour.ts`). Stop: `{ id, place, title, text, view: { x, z, yawDeg, pitchDeg? }, item?: { kind, id }, dwellSec? }` (max 80) |
-| POST | `/api/admin/content/reset` | **admin**; re-seed the selected exhibition from bundled config → `{ ok: true }` |
+| PUT | `/api/admin/content/tour` | `{ stops: TourStop[] \| null }` — per-exhibition tour override (null / [] = the bundled tour in `src/museum/config/tour.ts`). Stop: `{ id, place, title, text, view: { x, z, yawDeg, pitchDeg? }, item?: { kind, id }, dwellSec?, i18n?, narrationAudio? }` (max 80). Validated server-side: ids unique, `view` numbers (pitch ±90, x/z within ±200 m), `item.kind` ∈ artwork, exhibit, infographic, video, object, `dwellSec` 1–600; unknown keys are dropped. An invalid stop → **400** `{ error, field }` with the path, e.g. `field: "stops[2].view.x"`. |
+| POST | `/api/admin/content/reset` | **admin**; re-seed the selected exhibition from bundled config → `{ ok: true }`. The replaced items are kept as revisions, so the ones the seed does not bring back are in the trash. |
 
-All routes above take `?exhibition=<id|slug>` (omitted = the default exhibition). Curators may edit the content of **any** exhibition, drafts included.
+All routes above take `?exhibition=<id|slug>` (omitted = the site's default exhibition). Curators may edit the content of **any** of the site's exhibitions, drafts included.
 
-Every content write increments `MuseumContent.version`.
+Every content write increments `MuseumContent.version` (one counter for both sites; it only goes up), and every write
+above is recorded in the activity log.
+
+**Concurrency.** An editor loads `GET /api/admin/content/stamps` and sends the item's `updatedAt` back as
+`X-Expected-Updated-At` with its `PUT` or `DELETE` (or the literal `new` when creating an item that must not exist yet).
+When the item changed (or was deleted, or created) in the meantime the write is refused:
+**409** `{ error: 'conflict', message, current: Item | null, updatedAt: string | null, updatedBy: string | null }` —
+`current` is the item as it is now, so the editor can show both versions. A value that is neither a timestamp nor
+`new` → 400. Without the header the last write wins, as before. Every save moves `updatedAt`, even two saves in the
+same millisecond. The check and the write are one step: two editors saving the same item at once are served one after
+the other (on Postgres each write of an item takes a transaction lock on it), so the second gets the 409 — and a
+create-only (`new`) save never replaces an item, even one created a moment earlier.
 
 ## Exhibitions (multi-exhibition platform)
 The building is shared; each exhibition has its own content set (artworks, exhibits, infographics, videos, objects), reveal-wall text, welcome, tour stops and theme. The default exhibition is served at `/gallery`, the others at `/gallery/<slug>` (legacy `/e/<slug>` redirects). Existing content was migrated into `hand-block-printing`.
+
+Exhibitions belong to a site: each site lists, edits and deletes only its own, and has its own default (making one the
+default never touches the other site's). On first start each app creates its own default exhibition
+(`SITE.defaultExhibitionId`: `hand-block-printing` here, `clay-traditions` in the clay app) and seeds its bundled content
+into it — never into the other site's. A slug (or id) the other site already uses → **409** "…already used by the other
+museum that shares this database". Create, duplicate, edit, publish, default and delete are recorded in the activity log.
+
+Deleting an exhibition also deletes everything kept under its id: its items' history and trash, and its visitor
+analytics (events and heatmap). A new exhibition at the same address starts empty. The site's own default exhibition
+(`SITE.defaultExhibitionId`) can only be deleted with `?force`; that deletion is remembered (meta
+`default_exhibition_deleted_at`, per site), and the app does not recreate it on its next start. Nor does it once the
+site has seeded and still has exhibitions of its own: the default exhibition is created on the site's first start only.
+
+**Deploy order (the sites migration).** `supabase/migrations/20261101000000_sites.sql` is additive for the schema, so
+older code keeps running against it — but not for the data: hand-block code from before sites reads `is_default = 1`
+with no site, lists every exhibition and cleans up every site's analytics, so it would serve the clay app's rows as its
+own once they exist. (The file's header says the code deployed in either app "keeps working while the other deploys";
+that holds for the schema only. The file is pinned by its sha256 in `_museum_migrations` and stays as applied.) The
+order is enforced in code: each app's bootstrap records `sites_aware:<site>` in the shared `meta` table, and the clay
+app refuses to start (it does not create its default exhibition) while hand-block has served the database (meta `seeded_at`) and
+`sites_aware:hand-block` is missing. Deploy hand-block first; clay starts on its next request after that.
 
 | Method | Path | Notes |
 |---|---|---|
@@ -55,16 +99,17 @@ The building is shared; each exhibition has its own content set (artworks, exhib
 | POST | `/api/admin/exhibitions/:id/duplicate` | **admin**; `{ slug, title? }` → **201** draft copy of all content, texts, tour and theme |
 | PATCH | `/api/admin/exhibitions/:id` | **admin**; `{ title?, subtitle?, slug?, theme?, status?: 'draft' \| 'published', sort? }` (publish / unpublish; the default cannot be unpublished → 409) |
 | POST | `/api/admin/exhibitions/:id/default` | **admin**; must be published (409 otherwise) |
-| DELETE | `/api/admin/exhibitions/:id` | **admin**; not the default (409); deletes its content items |
+| DELETE | `/api/admin/exhibitions/:id` | **admin**; not the default (409); deletes its content items, their history and trash, and its visitor analytics |
 
 `Exhibition = { id, slug, title, subtitle, status: 'draft' | 'published', isDefault, theme: { accent? }, sort, createdAt, updatedAt }`. `slug`: 2–60 of `a-z 0-9 -`; `id` is fixed at creation.
 
 ## Makers ("Meet the maker", role ≥ curator)
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/api/admin/artisans` | `Artisan[]` |
-| PUT | `/api/admin/artisans/:id` | full profile → saved `Artisan` (create or replace). URLs must be http(s). |
+| GET | `/api/admin/artisans` | `Artisan[]` (this site's) |
+| PUT | `/api/admin/artisans/:id` | full profile → saved `Artisan` (create or replace). URLs must be http(s). An id the other site's maker uses → **409**. |
 | DELETE | `/api/admin/artisans/:id` | `{ ok: true }` |
+| GET | `/api/admin/artisans/:id/usage` | `{ usage: [{ exhibitionId, collection, id, title }] }` — the items of this site's exhibitions whose `artisanId` names the maker (show it before deleting) |
 
 `Artisan = { id, name, cluster, craft, bio, portrait, contact, website, shopUrl, commissionUrl, verified, placeholder, sort }`. Artworks / exhibits link a profile with `artisanId`; the info panel shows a "Meet the maker" card with *Visit the maker* / *Commission* / *Buy (fair trade)* buttons for the URLs present, and `/makers/<id>` is the accessible, server-rendered profile page. The seed profiles are empty stand-ins (`placeholder: true`); visitors never see a stand-in profile (no card, no link, `/makers/<id>` is a 404 except for curators). Never enter details that the workshop has not supplied.
 
@@ -75,9 +120,12 @@ The building is shared; each exhibition has its own content set (artworks, exhib
 | POST | `/api/admin/media` | `multipart/form-data`, field `file` (+ optional `folder`: artworks, models, videos, audio, textures — send it **before** `file`, or as `?folder=`). **201** → `MediaRecord`. Streams to storage. Use for local disk; on Vercel bodies are capped at ~4.5 MB, so use presign/complete. |
 | POST | `/api/admin/media/presign` | `{ filename, size, folder? }` → `{ uploadUrl, method: 'PUT', headers, expiresIn, key, publicUrl, mime }`. S3 driver only (**501** with local disk). The client then `PUT`s the file body to `uploadUrl` sending exactly `headers` (Content-Type, Cache-Control). |
 | POST | `/api/admin/media/complete` | `{ key, filename }` after the PUT succeeded → verifies the object (HEAD, size ≤ 500 MB) → **201** `MediaRecord` |
-| GET | `/api/admin/media` | list of media records |
+| GET | `/api/admin/media` | this site's media records, newest first. Without `limit`: all of them, as an array (as before). With `?limit=` (1–200) and optionally `cursor`, `q` (file name contains, any case) and `kind` (`image` — incl. deep zoom — `model`, `video`, `audio`, `other`): `{ items: MediaRecord[], nextCursor: string \| null }`; pass `nextCursor` back as `cursor` for the next page (null = last page; an invalid cursor → 400). |
+| GET | `/api/admin/media/:id/usage` | `{ usage: [{ exhibitionId, exhibitionTitle, collection, id, title, field }], artisans: [{ id, name }] }` — every item field (nested too, e.g. `gallery[2].src`) of this site's exhibitions and every maker portrait whose value contains the file's key, so local `/media/…` and S3 / CDN addresses both match |
 | DELETE | `/api/admin/media/:id` | removes file + record |
 | GET | `/media/<folder>/<file>` | local-disk files (`.data/media`) with Range/ETag support. In S3 mode it 308-redirects to the bucket/CDN URL. |
+
+Uploads and deletes are recorded in the activity log.
 
 `MediaRecord = { id, url, filename, folder, mime, size, createdAt }`. `url` is `/media/<folder>/<file>` for local disk and an **absolute** S3/CloudFront URL (`S3_PUBLIC_BASE_URL`) for S3 — store it as-is in content (`image`, `src`, `model`, …). The bucket CORS config (`infra/s3-cors.json`) allows GET/HEAD from any origin so WebGL textures/video load with `crossOrigin`.
 
@@ -94,6 +142,28 @@ A DZI pyramid is many tiles under one prefix, so it has its own flow (used by ad
 | POST | `/api/admin/media/deepzoom/complete` | `{ set, filename, width, height, tileSize, overlap, format, bytes }` → checks the corner tiles, **writes `image.dzi` server-side**, records one media row (`folder: 'deepzoom'`, `mime: application/xml`) → **201** `MediaRecord` whose `url` is the `.dzi` (store it in an artwork's `deepZoom`) |
 
 Keys: `deepzoom/<set>/image.dzi` + `deepzoom/<set>/image_files/<level>/<col>_<row>.<ext>`. `DELETE /api/admin/media/:id` on a `deepzoom` record removes the whole pyramid (local: the directory; S3: every tile key derived from the descriptor, no ListBucket needed). `GET /api/admin/media/config` reports `deepZoom: true`.
+
+## Dashboard & activity log (role ≥ curator)
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/admin/overview[?exhibition=]` | `{ role, site, counts: { pendingPrints, comments7d, hiddenComments, openErrors, errors24h, users, placeholders, items }, exhibition: { id, title, status }, recent: AuditEntry[] }`. `openErrors`, `errors24h` and `users` are **null below admin**; `placeholders` / `items` count the items of the exhibition (`?exhibition=`, default the site's default) and how many are still `placeholder: true`; `recent` = the latest 12 activity entries the caller may read (below). |
+| GET | `/api/admin/activity?limit=50&before=&target=&exhibition=` | `{ entries: AuditEntry[], nextBefore: number \| null }`, newest first. `limit` 1–200; `before` = the previous page's `nextBefore`; `target` = `<kind>:<id>` (one thing's history, e.g. `artworks:hero-01`, `exhibition:textile-traditions`, `print:<uuid>`) or `<kind>` alone; `exhibition` = id or slug. |
+
+`AuditEntry = { id, at, actorEmail: string | null, actorRole: string | null, action, targetKind, targetId, exhibitionId: string | null, summary }`.
+Every admin change writes one, inside the change's own transaction where it has one: `content.create | update | delete |
+restore | reset | exhibitionText | welcome | tour`, `exhibition.create | duplicate | update | default | delete`,
+`artisan.create | update | delete`, `media.upload | delete`, `prints.status | delete | bulk`, `comments.hide | unhide |
+delete | bulk`, `errors.resolve | reopen | delete | bulk`, `users.role`, `access.put | update | delete`,
+`analytics.retention | cleanup` (a scheduled cleanup has no actor). Content items use the collection as `targetKind`
+and the item id as `targetId`. `summary` is one plain sentence (“Saved artwork “Ajrakh yardage””). Entries are per site,
+except changes to what both sites share (`users.role`, `access.*`): those are kept once, under site `'shared'`, and
+listed by both sites.
+
+Each reader sees only the entries about areas their role can open: **curators** the changes to content, exhibitions,
+makers, media and prints (`targetKind` one of the collections, `exhibition`, `artisan`, `media`, `print`);
+**admins** everything except the access list; **master admins** everything. A `target` filter outside that returns no
+entries. Comment moderation entries never quote the comment: they keep its length and a SHA-256 of its text, so the
+words are gone from the database once the comment is deleted.
 
 ## Auth
 | Method | Path | Body → Response |
@@ -115,7 +185,7 @@ Keys: `deepzoom/<set>/image.dzi` + `deepzoom/<set>/image_files/<level>/<col>_<ro
 | PUT | `/api/me/favorites/:itemKind/:itemId` | `{ ok: true }` |
 | DELETE | `/api/me/favorites/:itemKind/:itemId` | `{ ok: true }` |
 
-`itemKind` ∈ artwork, exhibit, infographic, video, object.
+`itemKind` ∈ artwork, exhibit, infographic, video, object. Favourites are kept per site (item ids of the two museums may coincide).
 
 ## Guestbook & comments
 | Method | Path | Notes |
@@ -125,6 +195,7 @@ Keys: `deepzoom/<set>/image.dzi` + `deepzoom/<set>/image_files/<level>/<col>_<ro
 | GET | `/api/admin/comments` | admin; all incl. hidden: comment + `{ hidden, userId, userEmail }` (curators: 403) |
 | PATCH | `/api/admin/comments/:id` | admin; `{ hidden: boolean }` |
 | DELETE | `/api/admin/comments/:id` | admin |
+| POST | `/api/admin/comments/bulk` | admin; `{ ids: string[] (1–200), action: 'hide' \| 'unhide' \| 'delete' }` → `{ updated }` (ids of the other site are ignored) |
 
 ## Visitor prints ("Print it yourself" → Visitors' Wall)
 | Method | Path | Notes |
@@ -134,6 +205,9 @@ Keys: `deepzoom/<set>/image.dzi` + `deepzoom/<set>/image_files/<level>/<col>_<ro
 | GET | `/api/admin/prints?status=pending|approved|rejected|all` | curator+; moderation queue (max 1000, newest first): `PublicPrint` + `{ status, size, sessionId, userId, reviewedAt, reviewedBy }` |
 | PATCH | `/api/admin/prints/:id` | curator+; `{ status: 'approved' | 'rejected' | 'pending' }` → the admin print |
 | DELETE | `/api/admin/prints/:id` | curator+; removes the stored image and the row |
+| POST | `/api/admin/prints/bulk` | curator+; `{ ids: string[] (1–200), action: 'approve' \| 'reject' \| 'pending' \| 'delete' }` → `{ updated }` (ids of the other site are ignored; delete also removes the images) |
+
+Every moderation change (single or bulk) is recorded in the activity log.
 
 ## Analytics
 | Method | Path | Notes |
@@ -149,12 +223,12 @@ Curator analytics (role ≥ admin; all take `exhibition` (id|slug, default when 
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/api/admin/analytics/summary?days=7&exhibition=` | (above) + optional exhibition filter (omitted = all exhibitions) |
+| GET | `/api/admin/analytics/summary?days=7&exhibition=` | (above) + optional exhibition filter (omitted = all of this site's exhibitions) |
 | GET | `/api/admin/analytics/heatmap?zone=` | `{ cellSize: 0.5, sampleSec: 2, cells: [cx, cz, samples][], totalSamples, maxSamples, zones: { zone, samples, seconds }[] }` — cell covers x ∈ [cx·0.5, cx·0.5+0.5) |
 | GET | `/api/admin/analytics/curator?kind=` | `{ funnel: { starts, completes, steps: { stopId, index, sessions }[] }, attention: { itemKind, itemId, views, viewers, dwellSec, avgDwellSec }[] }` |
 | GET | `/api/admin/analytics/export?dataset=heatmap\|zones\|attention\|funnel` | `text/csv` download (UTF-8 BOM; formula-injection safe) |
-| GET / PUT | `/api/admin/analytics/retention` | `{ days, defaultDays: 180, lastCleanup }` / PUT `{ days: 7–1825 }` |
-| POST | `/api/admin/analytics/cleanup` | deletes events / heatmap rows older than the retention, and batch markers (`analytics_batches`) older than 31 days → `{ retentionDays, cutoff, deletedEvents, deletedHeatRows, deletedBatchMarkers, ranAt }`. Admin session, **or** `Authorization: Bearer $CRON_SECRET` (GET accepted too, for a Vercel Cron Job). Also runs automatically at most once a day from event ingestion. |
+| GET / PUT | `/api/admin/analytics/retention` | `{ days, defaultDays: 180, lastCleanup }` / PUT `{ days: 7–1825 }` — per site |
+| POST | `/api/admin/analytics/cleanup` | deletes **this site's** events / heatmap rows older than its retention (the other site follows its own), and batch markers (`analytics_batches`) older than 31 days → `{ retentionDays, cutoff, deletedEvents, deletedHeatRows, deletedBatchMarkers, ranAt }`. Admin session, **or** `Authorization: Bearer $CRON_SECRET` (GET accepted too, for a Vercel Cron Job). Also runs automatically at most once a day from event ingestion. |
 
 ## Errors / monitoring
 Built-in client error reporting (no SDK). The browser side (`src/museum/utils/errorReporter.ts`, installed by `app/MuseumClient.tsx`)
@@ -169,9 +243,12 @@ It samples (`NEXT_PUBLIC_ERROR_SAMPLE_RATE`, 0–1, default 1), dedupes (same ki
 | GET | `/api/admin/errors/:fingerprint` | admin → `{ group: ErrorGroup, occurrences: { id, url, ua, tier, gpu, release, stack, createdAt }[] }` (last 20) |
 | PATCH | `/api/admin/errors/:fingerprint` | admin, `{ resolved: boolean }` → `{ ok: true }` |
 | DELETE | `/api/admin/errors/:fingerprint` | admin; removes the group and its occurrences |
+| POST | `/api/admin/errors/bulk` | admin; `{ fingerprints: string[] (1–200), action: 'resolve' \| 'reopen' \| 'delete' }` → `{ updated }` |
 
 `ErrorGroup = { fingerprint, kind, message, count, last24h, firstSeen, lastSeen, resolvedAt: string | null, lastStack, lastUrl, lastUa, lastTier, lastGpu, lastRelease }`.
-The fingerprint is `sha1(kind + message with digits normalised + first stack frame without query/line)`. A resolved group that
+The fingerprint is `sha1(kind + message with digits normalised + first stack frame without query/line)`, with the site
+in front for every site but hand-block (whose fingerprints stay as they were before sites existed) — so the same error in
+both museums is two groups, each listed only by its own app. A resolved group that
 receives a new report is **reopened** (regression). Tables: `client_error_groups` (one row per fingerprint) and `client_errors`
 (raw occurrences, kept 30 days / last 50 per group) — `supabase/migrations/20260923040000_client_errors.sql`, SQLite migration #4.
 Admin UI: **/admin#/errors** (admin+).
@@ -191,6 +268,9 @@ Sentry's own inbound filters / rate limits apply; add the site origin to the pro
 
 `AdminUser = { id, email, displayName, role, manualRole: ManualRole | null, accessRole: 'curator' | 'admin' | null, emailVerified, google: boolean, hasPassword: boolean, isMaster, createdAt, lastLoginAt: string | null }`
 
+Users and the access list are shared by both sites; role and access-list changes are recorded once in the activity log,
+as shared entries that both sites' admins see (access-list entries: master admins only).
+
 ## Access list (role = master)
 Allowlist of emails / whole domains that receive an elevated role on sign-in; everyone else is a visitor.
 
@@ -207,13 +287,13 @@ Every change immediately re-evaluates the role of the matching accounts.
 
 ## Live guided tours & presence
 Realtime transport is **Supabase Realtime** (public broadcast + presence channel `live:<room>`, room = `NEXT_PUBLIC_LIVE_ROOM`,
-default `hand-block-printing`; no tables, no service key). Without `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+default the site's own `SITE.liveRoom` — `hand-block-printing` here, `clay-pavilion` in the clay app; no tables, no service key). Without `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
 with `?static` / `?nolive`, or when the channel can't subscribe within ~15 s, every live feature hides itself.
 Client: `src/museum/live/*`.
 
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/api/live/token` | **curator+** (session role, checked server-side). `{ room, pub }` — `pub` = the docent tab's ECDSA P-256 public key (raw uncompressed point, base64url, 65 bytes) → `{ token, claims }`. `token = base64url(claims) + "." + base64url(HMAC-SHA256(LIVE_TOKEN_SECRET))`, `claims = { v: 1, sub, name, role, room, pub, iat, exp }` (30 min; the docent refreshes with a new key pair before expiry). 20/min/user; **503** when `LIVE_TOKEN_SECRET` (≥ 32 chars) is unset. |
+| POST | `/api/live/token` | **curator+** (session role, checked server-side). `{ room, pub }` — `pub` = the docent tab's ECDSA P-256 public key (raw uncompressed point, base64url, 65 bytes) → `{ token, claims }`. `token = base64url(claims) + "." + base64url(HMAC-SHA256(LIVE_TOKEN_SECRET))`, `claims = { v: 1, sub, name, role, room, pub, iat, exp }` (30 min; the docent refreshes with a new key pair before expiry). `room` must be this site's room (400 otherwise). 20/min/user; **503** when `LIVE_TOKEN_SECRET` (≥ 32 chars) is unset. |
 | GET | `/api/live/verify?token=` | public → `{ ok: true, claims }` or `{ ok: false }` (bad MAC, expired, malformed). 240/min/IP. |
 
 **Why this design (and not client roles or RLS broadcast):** anyone holding the public anon key can publish on a public

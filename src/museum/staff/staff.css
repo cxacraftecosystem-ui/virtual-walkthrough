@@ -1,0 +1,427 @@
+/* Staff tools in the museum — see src/museum/staff/StaffMode.tsx (loaded only for staff accounts) */
+
+/* ---- dock (left, below the exhibition title) ------------------------ */
+.staff-dock {
+  position: fixed;
+  top: calc(var(--edge) + var(--safe-t) + 72px);
+  left: calc(var(--edge) + var(--safe-l));
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  max-height: calc(100vh - var(--edge) * 2 - var(--safe-t) - var(--safe-b) - 72px - 200px);
+  min-height: 200px;
+  font-size: 12.5px;
+  user-select: text;
+  -webkit-user-select: text;
+  animation: staff-in 0.3s var(--ease);
+}
+
+/* With the floor plan open, end above it (its width rule is .ui-map__svg in src/styles.css;
+   the plan is a little taller than that ratio; its head, padding and a gap make up the rest). */
+@media (min-width: 641px) {
+  body:has(.ui-map__card) .staff-dock {
+    max-height: calc(100vh - var(--edge) * 2 - var(--safe-t) - var(--safe-b) - 72px - min(380px, 30vw, calc((46vh - 40px) * 1.32)) / 1.32 - 100px);
+  }
+}
+
+@keyframes staff-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.staff-dock__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 6px 8px 14px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.staff-dock__title {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.staff-dock__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 14px 8px;
+}
+
+.staff-sec {
+  padding: 10px 0;
+}
+
+.staff-sec + .staff-sec {
+  border-top: 1px solid var(--hairline);
+}
+
+.staff-sec__title {
+  margin: 0 0 8px;
+}
+
+/* ---- readouts -------------------------------------------------------- */
+.staff-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.staff-grid--pos {
+  grid-template-columns: auto 1fr auto 1fr;
+}
+
+.staff-grid dt {
+  color: var(--muted);
+}
+
+.staff-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.staff-grid small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.staff-surface {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.staff-surface__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.staff-surface__label {
+  font-weight: 600;
+}
+
+.staff-surface__name {
+  margin: 1px 0 6px;
+  color: var(--muted);
+}
+
+.staff-code {
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.staff-muted {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.staff-count {
+  display: inline-block;
+  min-width: 20px;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- controls -------------------------------------------------------- */
+.staff-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.staff-sec > .staff-btn {
+  margin-top: 10px;
+}
+
+.staff-btn {
+  min-height: 32px;
+  padding: 0 12px;
+  letter-spacing: 0.08em;
+}
+
+.staff-form {
+  margin-top: 10px;
+}
+
+.staff-form .staff-muted {
+  margin-top: 0;
+}
+
+.staff-field {
+  display: grid;
+  gap: 3px;
+  margin-top: 8px;
+}
+
+.staff-field > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.staff-field input,
+.staff-field textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+  pointer-events: auto;
+}
+
+.staff-field input:focus-visible,
+.staff-field textarea:focus-visible {
+  outline: 1.5px solid var(--accent);
+  outline-offset: 0;
+}
+
+.staff-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.staff-check input {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
+
+/* ---- list of items needing content ---------------------------------- */
+.staff-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.staff-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-top: 1px solid var(--hairline);
+}
+
+.staff-list__item {
+  appearance: none;
+  flex: 1 1 auto;
+  display: grid;
+  min-width: 0;
+  padding: 6px 4px;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.staff-list__item:hover .staff-list__title {
+  color: var(--accent);
+}
+
+.staff-list__kind {
+  color: var(--muted);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.staff-list__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-list__edit {
+  flex: none;
+  padding: 4px 6px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ---- status line ----------------------------------------------------- */
+.staff-note {
+  margin: 0;
+  padding: 0 14px;
+  min-height: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.staff-note.is-ok,
+.staff-note.is-error {
+  padding: 8px 14px 10px;
+  border-top: 1px solid var(--hairline);
+}
+
+.staff-note.is-error {
+  color: #9a3324;
+}
+
+/* ---- chips over placeholder items ------------------------------------ */
+.staff-chips {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  overflow: hidden;
+}
+
+.staff-chip {
+  appearance: none;
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 4px 9px 4px 7px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--panel-solid);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  font: 500 11.5px/1.3 var(--font-ui);
+  cursor: pointer;
+  will-change: transform;
+  transition: opacity 0.2s var(--ease);
+}
+
+.staff-chip:hover,
+.staff-chip:focus-visible {
+  background: var(--paper);
+}
+
+.staff-chip.is-behind {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.staff-chip__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: staff-dot 2.4s var(--ease) infinite;
+}
+
+.staff-chip__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes staff-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.staff-chips.is-still .staff-chip__dot {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .staff-dock,
+  .staff-chip__dot {
+    animation: none;
+  }
+}
+
+html.a11y-contrast .staff-chip,
+html.a11y-contrast .staff-surface {
+  background: var(--paper);
+  border-color: var(--ink);
+}
+
+/* ---- phones: full width under the title, map stays reachable ----------- */
+@media (max-width: 640px) {
+  .staff-dock {
+    left: calc(var(--edge) + var(--safe-l));
+    right: calc(var(--edge) + var(--safe-r));
+    width: auto;
+    max-height: 52vh;
+    min-height: 0;
+  }
+  .staff-grid--pos {
+    grid-template-columns: auto 1fr;
+  }
+}
+
+/* ---- "Edit in admin" at the top of the item panel ---------------------- */
+.staff-edit {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin: 0 0 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--hairline-strong);
+}
+
+.staff-edit .ui-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.staff-edit .staff-code {
+  color: var(--muted);
+}
+
+/* ---- centre mark: the point the placement readout measures ------------- */
+.staff-reticle {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(251, 247, 240, 0.7);
+}
+
+.staff-reticle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  margin: -1px 0 0 -1px;
+  border-radius: 50%;
+  background: var(--accent);
+}

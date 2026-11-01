@@ -1,8 +1,11 @@
 /**
  * User & role management (admin) and the access list (master admin). See auth.ts for how the
  * effective role is derived: master email → master; else max(access list, manual role).
+ * Users and the access list are shared by both sites (one login, one role); the audit row of a change
+ * goes to the site whose admin made it.
  */
 import 'server-only'
+import { audit } from '../audit'
 import {
   ACCESS_ROLES,
   type AccessList,
@@ -90,6 +93,14 @@ export const patchUser = route<{ id: string }>(async (c) => {
   if (target.role === 'master' || isMasterEmail(target.email)) return fail(403, 'Master admins are set by whoever hosts the site and can’t be changed here.')
   await c.db.run('UPDATE users SET manual_role = $1 WHERE id = $2', [b.role === 'visitor' ? null : b.role, target.id])
   await syncRole(c.db, target.id)
+  await audit(c.db, me, {
+    action: 'users.role',
+    targetKind: 'user',
+    targetId: target.id,
+    summary: `Set ${target.email}’s role to ${b.role}`,
+    detail: { email: target.email, role: b.role, before: target.manual_role ?? 'visitor' },
+    shared: true, // accounts are shared: the role applies in both museums
+  })
   return toAdminUser(await loadAccessList(c.db), (await getUserRow(c.db, target.id))!)
 })
 
@@ -174,13 +185,14 @@ export const putAccess = route(async (c) => {
     [pattern, b.role, noteOf(b.note), me.email, now],
   )
   await syncRolesForPattern(c.db, pattern)
+  await audit(c.db, me, { action: 'access.put', targetKind: 'access', targetId: pattern, summary: `Gave ${pattern} the ${b.role} role on the access list`, detail: { role: b.role }, shared: true })
   c.status = 201
   return toEntry(c.db, (await c.db.one<AccessRow>('SELECT * FROM access_list WHERE pattern = $1', [pattern]))!)
 })
 
 /** PATCH /api/admin/access/:pattern `{ role?, note? }` */
 export const patchAccess = route<{ pattern: string }>(async (c) => {
-  await c.requireMaster()
+  const me = await c.requireMaster()
   const pattern = parsePattern(decodeURIComponent(c.params.pattern))
   const b = await c.json()
   if (!isRecord(b) || (b.role === undefined && b.note === undefined)) return fail(400, 'Body must be { role?, note? }')
@@ -194,15 +206,24 @@ export const patchAccess = route<{ pattern: string }>(async (c) => {
     pattern,
   ])
   await syncRolesForPattern(c.db, pattern)
+  await audit(c.db, me, {
+    action: 'access.update',
+    targetKind: 'access',
+    targetId: pattern,
+    summary: b.role !== undefined && b.role !== row.role ? `Changed ${pattern} from ${row.role} to ${String(b.role)} on the access list` : `Edited the access-list note for ${pattern}`,
+    detail: { role: b.role ?? row.role, before: row.role },
+    shared: true,
+  })
   return toEntry(c.db, (await c.db.one<AccessRow>('SELECT * FROM access_list WHERE pattern = $1', [pattern]))!)
 })
 
 /** DELETE /api/admin/access/:pattern — affected users drop back to their manual role / visitor. */
 export const deleteAccess = route<{ pattern: string }>(async (c) => {
-  await c.requireMaster()
+  const me = await c.requireMaster()
   const pattern = parsePattern(decodeURIComponent(c.params.pattern))
   const n = await c.db.run("DELETE FROM access_list WHERE pattern = $1 AND role <> 'master'", [pattern])
   if (n === 0) return fail(404, 'No access-list entry for this pattern')
   await syncRolesForPattern(c.db, pattern)
+  await audit(c.db, me, { action: 'access.delete', targetKind: 'access', targetId: pattern, summary: `Removed ${pattern} from the access list`, shared: true })
   return { ok: true }
 })

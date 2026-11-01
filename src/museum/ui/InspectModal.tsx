@@ -261,7 +261,8 @@ export function InspectModal() {
       <div className="inspect-stage">
         <Canvas
           className="inspect-canvas"
-          shadows
+          // PCF ('percentage'): three r186 removed PCFSoftShadowMap, which a bare `shadows` asks for.
+          shadows="percentage"
           dpr={[1, 2]}
           gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
           camera={{ fov: FOV, near: 0.005, far: 20, position: [0.25, 0.3, 0.45] }}

@@ -26,8 +26,10 @@ import type { ReadableStream as NodeWebReadableStream } from 'node:stream/web'
 import { DeleteObjectsCommand } from '@aws-sdk/client-s3'
 import { dziLevelTiles, dziMaxLevel, dziTileCount, dziTilePath, dziXml, parseDzi, type DziInfo } from '../../museum/deepzoom/dzi'
 import { config } from '../config'
+import { audit } from '../audit'
 import { nowIso } from '../db'
 import { route } from '../http'
+import { siteId } from '../site'
 import type { LocalDiskStorage, S3Storage, StorageDriver } from '../storage'
 import { fail, HttpError, isRecord } from '../util'
 
@@ -155,7 +157,7 @@ export const presignDeepZoom = route(async (c) => {
 
 /** POST /api/admin/media/deepzoom/complete — write image.dzi + record the pyramid. */
 export const completeDeepZoom = route(async (c) => {
-  await c.requireCurator()
+  const user = await c.requireCurator()
   const b = await c.json()
   if (!isRecord(b)) return fail(400, 'Body must be { set, filename, width, height, tileSize, overlap, format, bytes }')
   const set = readSet(b.set)
@@ -175,15 +177,19 @@ export const completeDeepZoom = route(async (c) => {
   const size = Number.isFinite(bytes) && bytes > 0 ? Math.round(bytes) : xml.length
   const filename = (typeof b.filename === 'string' && b.filename ? b.filename : `${set}.dzi`).slice(0, 255)
   const row = { id: randomUUID(), folder: DEEPZOOM_FOLDER, stored_name: storedName, filename, mime: DZI_MIME, size, created_at: nowIso() }
-  await c.db.run('INSERT INTO media (id, folder, stored_name, filename, mime, size, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
-    row.id,
-    row.folder,
-    row.stored_name,
-    row.filename,
-    row.mime,
-    row.size,
-    row.created_at,
-  ])
+  await c.db.tx(async (q) => {
+    await q.run('INSERT INTO media (id, folder, stored_name, filename, mime, size, created_at, site) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [
+      row.id,
+      row.folder,
+      row.stored_name,
+      row.filename,
+      row.mime,
+      row.size,
+      row.created_at,
+      siteId(),
+    ])
+    await audit(q, user, { action: 'media.upload', targetKind: 'media', targetId: row.id, summary: `Uploaded deep zoom image “${row.filename}”` })
+  })
   c.status = 201
   return { id: row.id, url: c.storage.urlFor(deepZoomDziKey(set)), filename: row.filename, folder: row.folder, mime: row.mime, size: row.size, createdAt: row.created_at }
 })

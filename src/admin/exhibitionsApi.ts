@@ -4,6 +4,7 @@
  * Content calls in api.ts append `exQuery()` so every content page is scoped to the selection.
  */
 import { useSyncExternalStore } from 'react'
+import { request } from './api'
 
 export interface AdminExhibition {
   id: string
@@ -37,6 +38,13 @@ export interface AdminArtisan {
   sort: number
   createdAt?: string
   updatedAt?: string
+}
+
+export interface ArtisanUsage {
+  exhibitionId: string
+  collection: string
+  id: string
+  title: string
 }
 
 export interface HeatmapData {
@@ -109,18 +117,8 @@ export const exQuery = (sep: '?' | '&' = '?') => (selected ? `${sep}exhibition=$
 /* Requests                                                            */
 /* ------------------------------------------------------------------ */
 
-async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method,
-    credentials: 'same-origin',
-    headers: body !== undefined ? { 'content-type': 'application/json' } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
-  const isJson = (res.headers.get('content-type') ?? '').includes('json')
-  const data = isJson ? await res.json() : null
-  if (!res.ok) throw new Error((data as { error?: string } | null)?.error ?? res.statusText)
-  return data as T
-}
+// The shared wrapper (api.ts): every admin error is an ApiError with the server's message and status.
+const req = <T>(method: string, url: string, body?: unknown) => request<T>(method, url, body)
 const enc = encodeURIComponent
 
 export const exApi = {
@@ -138,6 +136,8 @@ export const exApi = {
   artisans: () => req<AdminArtisan[]>('GET', '/api/admin/artisans'),
   putArtisan: (a: AdminArtisan) => req<AdminArtisan>('PUT', `/api/admin/artisans/${enc(a.id)}`, a),
   deleteArtisan: (id: string) => req<{ ok: true }>('DELETE', `/api/admin/artisans/${enc(id)}`),
+  /** Content items (any exhibition of this site) that name this maker. */
+  artisanUsage: (id: string) => req<{ usage: ArtisanUsage[] }>('GET', `/api/admin/artisans/${enc(id)}/usage`),
 
   heatmap: (p: { exhibition: string; from: string; to: string; zone?: string }) =>
     req<HeatmapData>('GET', `/api/admin/analytics/heatmap?${new URLSearchParams(clean(p))}`),
