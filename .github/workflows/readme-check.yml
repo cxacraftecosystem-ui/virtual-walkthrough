@@ -5,13 +5,15 @@ on:
     paths:
       - "README.md"
       - "docs/readme-kit/**"
-      - "docs/*.md"
+      - "docs/**/*.md"
+      - ".claude/skills/**"
       - ".github/workflows/readme-check.yml"
   push:
     paths:
       - "README.md"
       - "docs/readme-kit/**"
-      - "docs/*.md"
+      - "docs/**/*.md"
+      - ".claude/skills/**"
       - ".github/workflows/readme-check.yml"
   workflow_dispatch:
 
@@ -50,7 +52,7 @@ jobs:
           fi
 
       - name: SVG rules
-        run: node docs/readme-kit/tools/check.mjs svg --list "$RUNNER_TEMP/svgs.txt" docs/*.md
+        run: node docs/readme-kit/tools/check.mjs svg --list "$RUNNER_TEMP/svgs.txt"
 
       - name: SVGs are well-formed XML
         run: |
@@ -59,7 +61,7 @@ jobs:
           echo "$(wc -l < "$RUNNER_TEMP/svgs.txt") SVG file(s) parsed by xmllint"
 
       - name: Image references and budgets
-        run: node docs/readme-kit/tools/check.mjs refs docs/*.md
+        run: node docs/readme-kit/tools/check.mjs refs
 
       - name: Install mermaid-cli
         run: npm install --global "@mermaid-js/mermaid-cli@${MERMAID_CLI_VERSION}"
@@ -67,12 +69,12 @@ jobs:
       - name: Every mermaid block renders
         run: |
           out="$RUNNER_TEMP/mermaid"
-          node docs/readme-kit/tools/check.mjs mermaid --out "$out" docs/*.md
+          node docs/readme-kit/tools/check.mjs mermaid --out "$out"
           printf '{"args":["--no-sandbox"]}' > "$RUNNER_TEMP/puppeteer.json"
           status=0
           while IFS=$'\t' read -r name origin; do
             [ -n "$name" ] || continue
-            if mmdc -q -p "$RUNNER_TEMP/puppeteer.json" -i "$out/$name" -o "$out/${name%.mmd}.svg"; then
+            if mmdc -q -b transparent -p "$RUNNER_TEMP/puppeteer.json" -i "$out/$name" -o "$out/${name%.mmd}.svg"; then
               echo "ok    $origin"
             else
               echo "::error::$origin: the mermaid block does not render"
@@ -87,9 +89,17 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/rendered"
           status=0
-          for md in $(node docs/readme-kit/tools/check.mjs files docs/*.md); do
+          for md in $(node docs/readme-kit/tools/check.mjs files); do
             html="$RUNNER_TEMP/rendered/${md//\//_}.html"
-            jq -Rs --arg ctx "$GITHUB_REPOSITORY" '{text: ., mode: "gfm", context: $ctx}' "$md" | gh api markdown --input - > "$html"
+            if [ "$(wc -c < "$md")" -gt 400000 ]; then
+              echo "::warning file=$md::larger than the 400 KB the Markdown API renders; its mermaid blocks are still checked above"
+              continue
+            fi
+            if ! jq -Rs --arg ctx "$GITHUB_REPOSITORY" '{text: ., mode: "gfm", context: $ctx}' "$md" | gh api markdown --input - > "$html"; then
+              echo "::error file=$md::gh api markdown refused this file"
+              status=1
+              continue
+            fi
             node docs/readme-kit/tools/check.mjs rendered "$html" "$md" || status=1
           done
           exit "$status"
@@ -98,7 +108,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           npm install --prefix "$RUNNER_TEMP/pp" --no-save "puppeteer@${PUPPETEER_VERSION}"
-          PUPPETEER_DIR="$RUNNER_TEMP/pp/node_modules" node docs/readme-kit/tools/preview.mjs "$RUNNER_TEMP/preview" "$RUNNER_TEMP/mermaid"
+          PUPPETEER_DIR="$RUNNER_TEMP/pp/node_modules" node docs/readme-kit/tools/preview.mjs "$RUNNER_TEMP/preview" "$RUNNER_TEMP/mermaid" "$RUNNER_TEMP/rendered"
 
       - name: Upload the preview
         if: ${{ !cancelled() }}
