@@ -1,543 +1,326 @@
-# Hand Block Printing — Virtual Museum
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-kit/assets/hero-dark.svg">
+  <img src="docs/readme-kit/assets/hero-light.svg" width="100%" alt="Hand Block Printing Virtual Museum: walk a real-time 3D museum of hand block printing in the browser, curated live from one admin">
+</picture>
 
-A web-based, real-time 3D museum built with **Next.js 16**, React 19, TypeScript, Three.js (r186),
-React Three Fiber and drei, with a Postgres/S3-ready backend and admin (Next.js Route Handlers).
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://readme-typing-svg.demolab.com?font=Plus+Jakarta+Sans&weight=600&size=20&duration=2800&pause=900&color=C090F5&center=true&vCenter=true&width=760&lines=Walk+a+museum+of+hand+block+printing;Deep+zoom+to+the+thread%2C+blocks+in+3D+and+AR;Print+a+cloth+and+hang+it+on+the+wall;Follow+a+live+docent%2C+or+step+in+with+VR">
+    <img src="https://readme-typing-svg.demolab.com?font=Plus+Jakarta+Sans&weight=600&size=20&duration=2800&pause=900&color=762CB1&center=true&vCenter=true&width=760&lines=Walk+a+museum+of+hand+block+printing;Deep+zoom+to+the+thread%2C+blocks+in+3D+and+AR;Print+a+cloth+and+hang+it+on+the+wall;Follow+a+live+docent%2C+or+step+in+with+VR" alt="Walk a museum of hand block printing. Deep zoom to the thread, blocks in 3D and AR. Print a cloth and hang it on the wall. Follow a live docent, or step in with VR.">
+  </picture>
+</p>
 
-The core is the **Main Gallery Space (drawing GA-101)** from *"3D Virtual Walkthrough — Design Concept
-Note, Rev 03"* — reception → narrow central passage → **reveal wall** → Galleries A / B / C → craft product
-wall, under a central glass skylight. v2 widens the gallery to 36' (client request) and wraps it in new
-wings: **Grand Atrium** (arrival), **Immersive Theatre** (curved screen, 5.1/7.1 surround),
-**Craft Workshop Hall** and the open-air **Dye Garden Courtyard**.
+<p align="center">
+  <img src="https://img.shields.io/badge/Web-Next.js_16-1E1B2E?style=for-the-badge&labelColor=762CB1" alt="Web: Next.js 16">
+  <img src="https://img.shields.io/badge/3D-Three.js_r186-1E1B2E?style=for-the-badge&labelColor=762CB1" alt="3D: Three.js r186">
+  <img src="https://img.shields.io/badge/Data-Postgres_17_+_S3-1E1B2E?style=for-the-badge&labelColor=762CB1" alt="Data: Postgres 17 and S3">
+  <img src="https://img.shields.io/badge/Host-Vercel_bom1-1E1B2E?style=for-the-badge&labelColor=762CB1" alt="Host: Vercel, Mumbai">
+  <a href="https://hand-block-museum.vercel.app"><img src="https://img.shields.io/badge/Visit-hand--block--museum-1E1B2E?style=for-the-badge&labelColor=CD9200" alt="Visit the museum"></a>
+  <a href="https://github.com/cxacraftecosystem-ui/virtual-walkthrough/actions/workflows/deploy.yml"><img src="https://github.com/cxacraftecosystem-ui/virtual-walkthrough/actions/workflows/deploy.yml/badge.svg?branch=main" alt="deploy workflow status"></a>
+</p>
 
----
+A real-time 3D museum of India's hand block printing that runs in any modern browser, with no install and
+no plug-in. Visitors walk thirteen rooms built around drawing GA-101 of the *3D Virtual Walkthrough Design
+Concept Note, Rev 03*, examine textiles down to the thread, print their own cloth and join live docent
+tours. Curators run every exhibition, maker, film and tour stop from one admin, and the same database
+serves a second museum, the clay pavilion.
 
-## How to run
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-kit/assets/stats-dark.svg">
+  <img src="docs/readme-kit/assets/stats-light.svg" width="100%" alt="At a glance: thirteen rooms, four quality tiers, three languages, two museums on one database">
+</picture>
 
-```bash
-npm install
-npm run dev          # http://localhost:3000   (museum at /, admin at /admin)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-kit/assets/divider-dark.svg">
+  <img src="docs/readme-kit/assets/divider-light.svg" width="100%" alt="">
+</picture>
+
+## <img src="docs/readme-kit/assets/icons/sparkles.svg" width="32" align="top" alt="">&nbsp; What it does
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-kit/assets/cards-dark.svg">
+  <img src="docs/readme-kit/assets/cards-light.svg" width="100%" alt="What the museum does: walk, light, examine, print, tour live and curate">
+</picture>
+
+| Feature | For | Where it lives | Read more |
+|---|---|---|---|
+| Walk, minimap, guided tour, click-to-walk | visitors | `src/museum/navigation`, `src/museum/tour` | [Museum guide](docs/MUSEUM.md#controls-and-url-parameters) |
+| Time of day, path-traced photos, WebGPU, quality tiers | visitors | `src/museum/lighting`, `src/museum/effects` | [Graphics](docs/MUSEUM.md#graphics) |
+| Deep zoom and 3D scan import | curators | `src/admin/pipeline`, `src/server/handlers/deepzoom.ts` | [Capture guide](docs/CONTENT_CAPTURE.md) |
+| Print studio and Visitors' Wall | visitors, curators | `src/museum/studio`, `/api/prints` | [Backend](docs/BACKEND.md#print-it-yourself-and-the-visitors-wall) |
+| Presence, live docent tours, VR and AR | visitors, staff | `src/museum/live`, `src/museum/xr` | [Live and XR](docs/MUSEUM.md#live-tours-presence-vr-and-ar) |
+| Exhibitions, makers, history, trash, activity log | curators | `src/admin`, `src/server/contentStore.ts` | [API](docs/API.md) |
+| Heatmaps, tour funnel, attention, CSV | admins | `src/server/handlers/curatorAnalytics.ts` | [Analytics](docs/API.md#analytics) |
+| Client error reporting, optional Sentry | admins | `src/museum/utils/errorReporter.ts` | [Errors](docs/API.md#errors--monitoring) |
+| Printable guide, QR labels, maker pages | visitors | `app/guide`, `app/qr`, `app/makers` | [Museum guide](docs/MUSEUM.md#pages-outside-the-3d-view) |
+
+## <img src="docs/readme-kit/assets/icons/workflow.svg" width="32" align="top" alt="">&nbsp; How it works
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-kit/assets/pipeline-dark.svg">
+  <img src="docs/readme-kit/assets/pipeline-light.svg" width="100%" alt="How workshop material reaches a visitor: capture, process, curate, store, visit">
+</picture>
+
+One Next.js 16 app serves the landing page, the 3D museum, the admin and the API. The museum renders with
+Three.js r186 through React Three Fiber, loads its content from `/api/content` and falls back to the
+bundled `src/museum/config` when the API cannot be reached. Media goes from the browser straight to S3 with
+presigned URLs, so a large film never passes through a function.
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif","fontSize":"15px","primaryColor":"#F2E9FE","primaryTextColor":"#1E1B2E","primaryBorderColor":"#9148D2","secondaryColor":"#FAEECD","secondaryTextColor":"#1E1B2E","secondaryBorderColor":"#CD9200","tertiaryColor":"#F3F1FA","tertiaryTextColor":"#1E1B2E","tertiaryBorderColor":"#A7A3BC","mainBkg":"#F2E9FE","nodeBorder":"#9148D2","nodeTextColor":"#1E1B2E","lineColor":"#AA69E9","textColor":"#857F9E","edgeLabelBackground":"#F9F5FF","clusterBkg":"#F9F5FF","clusterBorder":"#D6B6FB","titleColor":"#762CB1","noteBkgColor":"#FAEECD","noteTextColor":"#1E1B2E","noteBorderColor":"#CD9200","actorBkg":"#F2E9FE","actorBorder":"#9148D2","actorTextColor":"#1E1B2E","actorLineColor":"#AA69E9","signalColor":"#AA69E9","signalTextColor":"#857F9E","labelBoxBkgColor":"#F2E9FE","labelBoxBorderColor":"#9148D2","labelTextColor":"#1E1B2E","loopTextColor":"#857F9E","activationBkgColor":"#E7D5FE","activationBorderColor":"#9148D2","sequenceNumberColor":"#FFFFFF","transitionColor":"#AA69E9","transitionLabelColor":"#857F9E","stateLabelColor":"#1E1B2E","stateBkg":"#F2E9FE","compositeBackground":"#F9F5FF","compositeTitleBackground":"#F2E9FE","attributeBackgroundColorOdd":"#FFFFFF","attributeBackgroundColorEven":"#F9F5FF","relationColor":"#AA69E9","relationLabelBackground":"#F9F5FF","relationLabelColor":"#1E1B2E"}}}%%
+flowchart LR
+  subgraph Visitors
+    B["Browser<br/>3D museum"]
+    H["Headset<br/>WebXR"]
+    C["Curator<br/>/admin"]
+  end
+  subgraph Vercel["Vercel · bom1"]
+    N["Next.js 16<br/>pages + Route Handlers"]
+  end
+  PG[("Supabase<br/>Postgres 17")]
+  S3[("S3 bucket<br/>media")]
+  RT["Supabase<br/>Realtime"]
+  CP["Clay pavilion<br/>second app"]
+  B --> N
+  H --> N
+  C --> N
+  N -->|site = hand-block| PG
+  N -->|presigned URLs| S3
+  C -->|direct upload| S3
+  B -->|textures, films| S3
+  B <-->|presence, docent| RT
+  CP -->|site = clay| PG
+  CP --> S3
+  classDef accent fill:#762CB1,stroke:#5F1C93,color:#FFFFFF
+  classDef gold fill:#FAEECD,stroke:#CD9200,color:#1E1B2E
+  class N accent
+  class PG,S3,RT,CP gold
 ```
 
-Locally there is nothing to configure: SQLite (`.data/museum.sqlite`) and disk media (`.data/media`) are used
-automatically. Dev admin login: `admin@museum.local` / `admin12345` (set `ADMIN_EMAIL`/`ADMIN_PASSWORD` to change).
+### Inside the building
 
-Useful URL parameters:
+The whole compound is one 62 m × 53 m × 10 m footprint on a three-by-two grid around the GA-101 spine. Visitors
+arrive in the Grand Atrium, pass through reception and the narrow central passage, and meet the reveal wall
+before the galleries open out.
 
-| Parameter | Effect |
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif","fontSize":"15px","primaryColor":"#F2E9FE","primaryTextColor":"#1E1B2E","primaryBorderColor":"#9148D2","secondaryColor":"#FAEECD","secondaryTextColor":"#1E1B2E","secondaryBorderColor":"#CD9200","tertiaryColor":"#F3F1FA","tertiaryTextColor":"#1E1B2E","tertiaryBorderColor":"#A7A3BC","mainBkg":"#F2E9FE","nodeBorder":"#9148D2","nodeTextColor":"#1E1B2E","lineColor":"#AA69E9","textColor":"#857F9E","edgeLabelBackground":"#F9F5FF","clusterBkg":"#F9F5FF","clusterBorder":"#D6B6FB","titleColor":"#762CB1","noteBkgColor":"#FAEECD","noteTextColor":"#1E1B2E","noteBorderColor":"#CD9200","actorBkg":"#F2E9FE","actorBorder":"#9148D2","actorTextColor":"#1E1B2E","actorLineColor":"#AA69E9","signalColor":"#AA69E9","signalTextColor":"#857F9E","labelBoxBkgColor":"#F2E9FE","labelBoxBorderColor":"#9148D2","labelTextColor":"#1E1B2E","loopTextColor":"#857F9E","activationBkgColor":"#E7D5FE","activationBorderColor":"#9148D2","sequenceNumberColor":"#FFFFFF","transitionColor":"#AA69E9","transitionLabelColor":"#857F9E","stateLabelColor":"#1E1B2E","stateBkg":"#F2E9FE","compositeBackground":"#F9F5FF","compositeTitleBackground":"#F2E9FE","attributeBackgroundColorOdd":"#FFFFFF","attributeBackgroundColorEven":"#F9F5FF","relationColor":"#AA69E9","relationLabelBackground":"#F9F5FF","relationLabelColor":"#1E1B2E"}}}%%
+flowchart TD
+  E([Entrance]) --> AT["Grand Atrium"]
+  subgraph West["West wing"]
+    TH["Immersive Theatre"]
+    GD["Gallery D<br/>regional"]
+  end
+  subgraph Core["GA-101 core"]
+    RC["Reception"]
+    SH["Museum Shop"]
+    LB["Reading Room"]
+    PS["Central Passage"]
+    RV["Craft Court<br/>reveal wall"]
+    GA["Gallery A"]
+    GB["Gallery B"]
+    GC["Gallery C"]
+  end
+  subgraph East["East wing"]
+    WS["Craft Workshop Hall"]
+    CY["Dye Garden<br/>Courtyard"]
+  end
+  AT --- RC
+  AT --- TH
+  AT --- WS
+  RC --- SH
+  RC --- LB
+  RC --> PS --> RV
+  RV --- GA
+  RV --- GB
+  GB --- GC
+  GA --- GD
+  GB --- CY
+  TH --- GD
+  WS --- CY
+  classDef accent fill:#762CB1,stroke:#5F1C93,color:#FFFFFF
+  class RV accent
+```
+
+| Graphics tier | Starts on | Shadows | Post-processing | Spotlights | Extras |
+|---|---|---|---|---:|---|
+| Low | small touch screens | · | · | 6 | 512 px textures |
+| Medium | tablets, 4 GB devices, integrated GPUs | 2048 px, soft | native MSAA, no composer | 10 | area lights, probes with `?probes` |
+| High | discrete GPUs | 4096 px, soft | AO, bloom, SMAA | 12 | |
+| Ultra | flagship GPUs | 4096 px, soft | high AO, bloom, SMAA | 14 | floor reflections, 2048 px textures |
+
+The starting tier comes from `detectInitialTier()` (pointer, screen, memory and the WebGL renderer string), and
+the museum steps down a tier when it cannot hold about 32 fps. Visitors can switch tiers from the HUD at any time.
+
+## <img src="docs/readme-kit/assets/icons/layers.svg" width="32" align="top" alt="">&nbsp; Built with
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://skillicons.dev/icons?i=nextjs,react,ts,threejs,nodejs,postgres,supabase,sqlite,aws,vercel,githubactions&theme=dark&perline=11">
+    <img src="https://skillicons.dev/icons?i=nextjs,react,ts,threejs,nodejs,postgres,supabase,sqlite,aws,vercel,githubactions&theme=light&perline=11" alt="Next.js, React, TypeScript, Three.js, Node.js, Postgres, Supabase, SQLite, AWS, Vercel, GitHub Actions">
+  </picture>
+</p>
+
+| Layer | Stack |
 |---|---|
-| `?quality=low\|medium\|high\|ultra\|auto` | force a graphics tier (also selectable in the UI) |
-| `?autostart` | skip the "Enter Exhibition" button once loading completes (`&tour` starts the guided tour) |
-| `?static` | ignore the backend (bundled content, social features hidden) |
-| `?debug` | **dev only** — FPS/GPU stats, collision boxes, coordinates |
-| `?quality=high&fx=0&shadows=0&area=0&ao=0&dpr=1` | **dev only** — profiling overrides |
-| `?renderer=webgpu` | **experimental** — three's WebGPURenderer when `navigator.gpu` exists (falls back to WebGL); see *Graphics features* |
-| `?probes` | **experimental** — per-zone irradiance probes (Medium and up) |
-| `?noarrival` | skip the cinematic arrival flight (also skipped with `?autostart`, reduced motion, or after the first visit of the session) |
+| Scene | Three.js r186, React Three Fiber 9, drei 10, postprocessing, three-gpu-pathtracer, three-mesh-bvh, `@react-three/xr` 6 |
+| App | Next.js 16 (App Router, Route Handlers), React 19.3, zustand 5, OpenSeadragon 6 |
+| Data | `pg` against Supabase Postgres 17, or `node:sqlite` locally; AWS SDK v3 for S3 |
+| Capture | glTF Transform 4 and meshoptimizer in Web Workers, DZI tiling in the browser |
+| Tooling | Node.js 24, TypeScript 7 for `typecheck` and TypeScript 6 for ESLint and `next build`, ESLint 10, `node:test` via `tsx` |
 
-Controls: drag to look (or **L** for mouse-look with a crosshair), **WASD**/arrows to walk, click the floor to
-walk there, click artworks/objects for details, **E** for the nearby item, **M** map, **H** help.
+Two TypeScripts are installed side by side, as the TypeScript 7 release recommends: `@typescript/native` is
+TypeScript 7, which `npm run typecheck` runs, and `typescript` is TypeScript 6 (`@typescript/typescript6`),
+because typescript-eslint still needs the JavaScript API that TypeScript 7 lacks. `next build` type-checks with
+TypeScript 6. The typecheck script calls TypeScript 7 by its path, since both packages bring a `tsc` command and
+npm links only one of them.
 
-## How to build
+## <img src="docs/readme-kit/assets/icons/rocket.svg" width="32" align="top" alt="">&nbsp; Quick start
 
-```bash
-npm run build        # next build (type-checks)
-npm run start        # production server on http://localhost:3000
-npm run typecheck    # TypeScript 7, the native compiler
-npm run lint
-npm test             # unit tests (tests/unit), no database needed
+1. Install Node.js 24 and the dependencies.
+
+   ```bash
+   npm install
+   ```
+
+2. Start the dev server. Nothing needs configuring: SQLite (`.data/museum.sqlite`) and disk media
+   (`.data/media`) are created on the first request.
+
+   ```bash
+   npm run dev
+   ```
+
+3. Open the pages.
+
+   | Address | What |
+   |---|---|
+   | `http://localhost:3000/` | landing page, exhibition list |
+   | `http://localhost:3000/gallery` | the 3D museum (default exhibition) |
+   | `http://localhost:3000/admin` | the admin; dev login `admin@museum.local` / `admin12345` |
+
+4. Check a change the way CI will.
+
+   ```bash
+   npm run typecheck
+   npm run lint
+   npm test
+   npm run build
+   ```
+
+Controls: drag to look (**L** for mouse-look), **WASD** or arrows to walk, click the floor to walk there,
+click a work for its details, **E** for the nearest item, **M** map, **T** time of day, **H** help.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-kit/assets/divider-dark.svg">
+  <img src="docs/readme-kit/assets/divider-light.svg" width="100%" alt="">
+</picture>
+
+## <img src="docs/readme-kit/assets/icons/building-2.svg" width="32" align="top" alt="">&nbsp; Two museums, one database
+
+This app and [`virtual-walkthrough-clay`](https://github.com/cxacraftecosystem-ui/virtual-walkthrough-clay)
+are two Vercel projects on one Supabase database and one S3 bucket. `src/site.ts` is the only file that
+differs between the repositories by design.
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif","fontSize":"15px","primaryColor":"#F2E9FE","primaryTextColor":"#1E1B2E","primaryBorderColor":"#9148D2","secondaryColor":"#FAEECD","secondaryTextColor":"#1E1B2E","secondaryBorderColor":"#CD9200","tertiaryColor":"#F3F1FA","tertiaryTextColor":"#1E1B2E","tertiaryBorderColor":"#A7A3BC","mainBkg":"#F2E9FE","nodeBorder":"#9148D2","nodeTextColor":"#1E1B2E","lineColor":"#AA69E9","textColor":"#857F9E","edgeLabelBackground":"#F9F5FF","clusterBkg":"#F9F5FF","clusterBorder":"#D6B6FB","titleColor":"#762CB1","noteBkgColor":"#FAEECD","noteTextColor":"#1E1B2E","noteBorderColor":"#CD9200","actorBkg":"#F2E9FE","actorBorder":"#9148D2","actorTextColor":"#1E1B2E","actorLineColor":"#AA69E9","signalColor":"#AA69E9","signalTextColor":"#857F9E","labelBoxBkgColor":"#F2E9FE","labelBoxBorderColor":"#9148D2","labelTextColor":"#1E1B2E","loopTextColor":"#857F9E","activationBkgColor":"#E7D5FE","activationBorderColor":"#9148D2","sequenceNumberColor":"#FFFFFF","transitionColor":"#AA69E9","transitionLabelColor":"#857F9E","stateLabelColor":"#1E1B2E","stateBkg":"#F2E9FE","compositeBackground":"#F9F5FF","compositeTitleBackground":"#F2E9FE","attributeBackgroundColorOdd":"#FFFFFF","attributeBackgroundColorEven":"#F9F5FF","relationColor":"#AA69E9","relationLabelBackground":"#F9F5FF","relationLabelColor":"#1E1B2E"}}}%%
+flowchart LR
+  HB["Hand block museum<br/>SITE.id = hand-block"]
+  CL["Clay pavilion<br/>SITE.id = clay"]
+  subgraph PG["One Postgres database"]
+    direction TB
+    PS["Per site<br/>exhibitions, makers, media,<br/>prints, comments, analytics,<br/>errors, activity log"]
+    SH["Shared<br/>users, sessions,<br/>access list, migrations"]
+  end
+  HB -->|own rows only| PS
+  CL -->|own rows only| PS
+  HB --> SH
+  CL --> SH
+  classDef accent fill:#762CB1,stroke:#5F1C93,color:#FFFFFF
+  classDef gold fill:#FAEECD,stroke:#CD9200,color:#1E1B2E
+  class HB accent
+  class CL gold
 ```
 
-Node.js 24 (the current LTS; `engines` in `package.json`, CI and Vercel agree). Two TypeScripts are installed side
-by side, as the TypeScript 7 release recommends: `@typescript/native` is TypeScript 7, which `npm run typecheck`
-runs, and `typescript` is TypeScript 6 (`@typescript/typescript6`), because typescript-eslint needs the JavaScript
-API that TypeScript 7 does not have yet. `next build` type-checks with the package named `typescript`, so with
-TypeScript 6. The typecheck script calls TypeScript 7 by its path, since both bring a `tsc` command and npm links
-only one of them.
-
-## How to deploy
-
-Vercel (native Next.js). Production uses Supabase Postgres (`DATABASE_URL`) and an S3 bucket (`S3_BUCKET`,
-`AWS_REGION`, optional CloudFront `S3_PUBLIC_BASE_URL`). See `infra/deploy-vercel.md`, `infra/setup-supabase.md`,
-`infra/setup-s3.sh` and `.env.example`. Without those env vars the app still runs (SQLite + local disk), which
-is fine for demos on a single machine but not on Vercel (ephemeral filesystem).
-
-**Error monitoring:** browser errors, unhandled rejections, contained React errors and WebGL context loss are reported
-(sampled, PII-scrubbed) to `POST /api/errors` and grouped on the admin **Errors** page (`/admin#/errors`, admin+), where they
-can be resolved (a recurrence reopens them). Set `NEXT_PUBLIC_SENTRY_DSN` to also forward them to Sentry (no SDK) — see
-`docs/API.md` → *Errors / monitoring*.
-
-## Validation scripts (optional, need Chrome installed)
-
-```bash
-node scripts/screenshots.mjs http://localhost:3000 auto   # demo-path + wing screenshots + fps → scripts/out/
-node scripts/interaction-test.mjs http://localhost:3000    # walking, collision, click → panel, 3D inspect
-node scripts/load-profile.mjs http://localhost:3000 medium --json=scripts/out/load.json  # load time, long tasks, transfer MB by type
-npm run optimize:assets                                     # meshopt+WebP GLBs → public/models/opt, artwork WebP variants (+ render check)
-npm run test:visual -- http://localhost:3000                # visual regression vs tests/visual/baseline (see tests/visual/README.md)
-node scripts/live-presence-test.mjs http://localhost:3000  # presence + live docent tour (two browsers)
-```
-
----
-
-## Project structure
-
-```
-src/museum/
-  config/          ← ALL content and constants (edit these, not the rendering code)
-    museum.ts        dimensions (ft → m), wall heights, passage, reveal wall, skylight, visitor
-    layout.ts        derived walls, display surfaces, zones, benches, reception desk
-    artworks.ts      artworks (images, placement, frames, spotlights, metadata)
-    exhibits.ts      hand-block display tables + 3D models
-    infographics.ts  product-wall craft panels, reveal-wall title, reception welcome
-    frames.ts        frame style presets
-    lighting.ts      sun, sky, 3000K track, cove, fill intensities
-    quality.ts       Low / Medium / High / Ultra presets and auto-detection
-  architecture/    Wall, Floor, CeilingAndSkylight (slat ceiling, coves, lantern), Reception
-  exhibits/        Artwork (+frame math), Exhibit (tables), Artifact3D, hand-block placeholder, wall graphics
-  lighting/        Lighting rig, SkyAndSun, TrackLight fixtures, SpotPool, environment
-  materials/       procedural PBR textures (oak, plaster, timber, stone, linen), canvas typography
-  navigation/      VisitorController (walk/look), collision, focus/click-to-walk
-  effects/         PostFX (AO, bloom, SMAA, tone mapping), async shader Precompile
-  ui/              entry screen, HUD, info panel, minimap, help, joystick, 3D inspection modal, social UI
-  media/           video screens, speakers, spatial/surround audio engine
-  models/          procedural craft models + SceneObjects (GLB / CC0 with procedural fallback)
-  tour/            guided tour engine + pathing        api/ analytics/  backend client + tracker
-  content/         content types + runtime loader (API → bundled config fallback)
-app/               Next.js: page (museum), admin/, api/**/route.ts, media/[...path]
-src/server/        backend logic (Postgres/SQLite, S3/disk storage, auth, analytics)
-public/
-  artworks/  models/ (cc0/)  videos/  textures/  audio/
-```
-
-Scale: **1 unit = 1 metre**. Axes: +x east, +y up, **−z north** (entrance is at +z).
-
----
-
-## How to add an artwork
-
-1. Put the image in `public/artworks/` (JPG/PNG/WebP, any aspect ratio; ~2048 px long edge is plenty).
-2. Add an entry to `ARTWORKS` in `src/museum/config/artworks.ts`:
-
-```ts
-{
-  id: 'hero-06',
-  title: 'Title',
-  tradition: 'Hand Block Printing',
-  artisan: 'Name',            // optional — only shown if present
-  region: '…', material: '…', technique: '…', description: '…', context: '…',
-  image: '/artworks/my-textile.jpg',
-  placement: { surface: 'gallery-a-outer', at: -3.4 },  // see "positions" below
-  maxWidth: 1.4, maxHeight: 1.7,                          // outer framed size limit (m)
-  // physicalWidth: 1.12,     // optional: true 1:1 width in metres (overrides fitting)
-  frame: 'natural-wood',      // or { style: 'natural-wood', matWidth: 0.12 }
-  exhibitId: 'block-06',      // optional hand-block table beside it
-}
-```
-
-No geometry needs editing. The info panel shows only the fields you provide.
-
-## How to replace an artwork (e.g. the five hero works)
-
-The five hero works are `hero-01 … hero-05` in `config/artworks.ts` (PDF §4: exactly 5 per tradition).
-Either overwrite `public/artworks/hero-0N.jpg` with the final photograph, **or** change `image:`.
-Then fill in the real metadata and set `placeholder: false` (admin: untick *Needs content from the workshop*). Visitors see no badge either way.
-
-> ⚠ `scripts/generate-placeholders.mjs` regenerates the placeholder JPGs and would overwrite files with the same names.
-
-## How automatic frames work
-
-`exhibits/Artwork.tsx` + `exhibits/frameMath.ts`:
-
-1. the image loads and its **intrinsic pixel width/height** are read;
-2. aspect = w / h; the image is fitted inside `maxWidth × maxHeight` **minus the frame and mat borders**
-   (or sized from `physicalWidth` for 1:1 accuracy) — the aspect ratio is never changed;
-3. mat = image + 2 × matWidth, outer = mat + 2 × frameWidth;
-4. four moulding bars, the mat/backing board and the image plane are generated at those sizes; the image sits
-   at the recessed mat plane with polygon offset (no z-fighting);
-5. the accent spotlight cone is computed to cover the framed size; the wall label goes to the right.
-
-Portrait, landscape, square, runner (1:2.4) and panoramic (2.5:1) placeholders are included to exercise this.
-A missing or broken image renders an intentional "Image unavailable" card instead of breaking the scene.
-
-Frame styles (`config/frames.ts`): `frameless`, `textile-panel`, `thin-black`, `white`, `natural-wood`,
-`dark-wood` — each with frameWidth, frameDepth, matWidth, recess, material, colour, mat colour.
-
-## How to change an artwork position
-
-`placement.surface` is a display-surface id (from `config/layout.ts → SURFACES`):
-
-| surface | wall |
+| Rule | Why |
 |---|---|
-| `gallery-a-outer`, `gallery-a-partition` | Gallery A perimeter / passage partition (west side) |
-| `gallery-b-outer`, `gallery-b-partition` | Gallery B (east, north bay) |
-| `gallery-c-outer`, `gallery-c-partition` | Gallery C (east, south bay) |
-| `reveal-south`, `reveal-north` | reveal wall faces |
-| `product-wall` | north wall (craft infographics) |
-| `reception-west`, `reception-east`, `passage-west`, `passage-east` | … |
+| `supabase/migrations/` and the SQLite mirror stay byte-identical in both repos | the runner pins each applied file by sha256 and refuses to start on a changed file |
+| Every migration is additive, with constant defaults | the other app's deployed code keeps running against the new schema |
+| `ADMIN_*`, `MASTER_ADMIN_EMAILS`, `LIVE_TOKEN_SECRET`, `S3_PREFIX` match in both deployments | otherwise each cold start re-syncs masters and revokes the other app's admin sessions |
+| `NEXT_PUBLIC_LIVE_ROOM` differs, or is left unset | docent tokens are minted for one room only |
+| Deploy hand-block first | the clay app refuses to start until `sites_aware:hand-block` is recorded |
 
-`placement.at` is the world coordinate **along** that wall (z for side walls, x for the reveal/product walls).
-Bay centres are available as `BAY.southZ` (−3.43) and `BAY.northZ` (−10.29).
-`placement.centerHeight` defaults to **1.6 m** (PDF mounting height).
-The accent light snaps to the nearest ceiling track automatically.
+The full contract, deploy order and env vars are in [docs/BACKEND.md](docs/BACKEND.md#two-museums-one-database).
 
-## Real content: deep zoom & 3D scans
+## <img src="docs/readme-kit/assets/icons/shield-check.svg" width="32" align="top" alt="">&nbsp; Roles and security
 
-Field guide for photographing textiles, scanning blocks and writing text: **`docs/CONTENT_CAPTURE.md`**.
-Admin → **Capture tools**: *Deep zoom* tiles a large photo into a DZI pyramid in the browser and assigns it
-to an artwork's `deepZoom` (visitors: **Examine closely** in the info panel, or double-click the artwork —
-OpenSeadragon viewer with zoom/pan/fullscreen/keyboard and a cm scale bar when `physicalWidth` is set);
-*3D scan import* optimises a Polycam/RealityScan glTF (weld, meshopt simplify, WebP textures ≤ 2048, metres)
-and assigns it to an exhibit or object `model`. Demo pyramids for the hero placeholders:
-`node scripts/generate-deepzoom.mjs` → `public/deepzoom/`.
-
-## How to add / replace a hand-block 3D model
-
-1. Export the block as **GLB** (metres, Y-up; Draco not required) into `public/models/`, e.g. `block-01.glb`.
-2. In `config/exhibits.ts` set `model: '/models/block-01.glb'` (and `modelScale` if not authored in metres).
-3. Fill in `title`, `material`, `technique`, `artisan`, `region`, `description`; set `placeholder: false`.
-
-The model is centred and placed on the table automatically, casts shadows, and is inspectable (rotate / zoom /
-reset) in the 3D viewer. If the file is missing or fails to parse, the procedural placeholder block is shown.
-Tables are positioned with `placement: { surface, at }` exactly like artworks.
-
-## How to change the reveal wall
-
-`src/museum/config/museum.ts → MUSEUM.revealWall`:
-
-```ts
-revealWall: { width: 4.2, height: 3.7, thickness: 0.4, gapFromPassage: 1.3, offsetX: 0 }
-```
-
-Collision, minimap, surfaces (`reveal-south`/`reveal-north`), title placement and its wash lights all derive
-from these values. The title / intro text lives in `config/infographics.ts → EXHIBITION_TITLE`.
-Keep `width` ≤ ~5 m so ≥ 2 m clear circulation remains on both sides of the 30' gallery.
-
-## How to change the skylight
-
-`MUSEUM.skylight` in `config/museum.ts`: `width` (opening), `startZ` / `endZ` (extent), `wellHeight`
-(plaster light-well), `ridgeRise` (glazed gable), `mullionSpacing`, `beamSpacing`, `glassTint`, `glassOpacity`.
-Sky and sun: `config/lighting.ts → LIGHTING.sun` (elevation / azimuth / intensity / colour temperature) and
-`LIGHTING.sky` (turbidity, Rayleigh, Mie, exposure, clouds on/off, coverage, speed).
-Direct sun enters only through the glass (the roof and lantern cast shadows).
-
-## How to change lighting
-
-`config/lighting.ts`:
-
-- `track.colorK` (3000K), `track.chromaticAdaptation`, `track.artworkIntensity`, `track.tableIntensity`,
-  `track.penumbra`, `track.aimAngleDeg`
-- per artwork: `spotlight: { enabled, intensity, spread }` in `artworks.ts`
-- `cove` (perimeter cove wash + LED strip emissive), `skylightFill` (diffuse daylight), `ambient` (hemisphere +
-  environment fill), `exposure`
-
-Real `SpotLight`s come from a shared pool (`lighting/SpotPool.tsx`, size per quality tier) that assigns them to
-the fixtures nearest the visitor with soft cross-fades; every fixture keeps its visible track head.
-
-## Graphics features (time of day, probes, ray tracing, arrival, WebGPU)
-
-- **Time of day** (HUD sun icon, **T** cycles): Morning · Midday · Golden hour · **Dusk** · **Night**
-  (`LIGHTING.timeOfDay` + `LIGHTING.ambience`). Dusk/night extend the Preetham sky with a blue-hour gradient,
-  moon disc and a procedural starfield (`lighting/nightSky.ts`); the sun becomes a faint sky light / moonlight
-  (same directional light), daylight fills fade, exposure adapts, courtyard wall lanterns light up
-  (`lighting/NightLights.tsx` — their downlights are SpotPool *requests*, so no light is ever added) and the
-  glazing glows warm when seen from outside. Only intensities/uniforms change — no shader recompiles.
-- **Per-zone irradiance probes** (*experimental*, Medium+ with `?probes`, `lighting/ZoneProbes.tsx`): after the shaders compile, each zone is
-  captured once into a small cube map (one face per frame, only the zones visible from there), prefiltered
-  with PMREM into the same CubeUV layout as the light-former environment, and `scene.environment` cross-fades
-  per room (warm oak galleries, dark theatre, indigo Gallery D, sunlit courtyard). Re-captured after a
-  time-of-day change and once per room after the visitor arrives (second bounce + the room's spots). Chosen over
-  in-browser lightmap baking: no second UV set, no stale IndexedDB cache, no shader variants, ~0 ms per frame.
-- **Ray-traced view** (photo mode, `effects/PathTracer.tsx`, three-gpu-pathtracer): hold still in photo mode and
-  the view is progressively path-traced (sample counter in the photo bar; the raster frame cross-fades to the
-  converging image; any movement cancels). The BVH is built lazily — on a worker when possible — from the zones
-  zone-culling currently shows, and rebuilt only when that set changes. *Experimental*: off by default on
-  every tier — the photo-bar **Ray-trace** toggle opts in (remembered); scene builds time out (25 s worker →
-  main-thread retry, 60 s → disabled); Capture waits for convergence so
-  the PNG is the path-traced image. Needs float render targets; any failure falls back to raster silently.
-- **Cinematic arrival** (`navigation/ArrivalFlight.tsx`, `ui/ArrivalOverlay.tsx`): ~11 s drone flight over the
-  lawns and roof lights, down to the facade and through the entrance, with letterbox + title card. First visit
-  per session only; skipped on any key/click/Skip, with `?autostart`/`?tour`/`?noarrival` and reduced motion.
-- **WebGPU** (`?renderer=webgpu`, `utils/renderer.ts`) — *experimental*. Uses `three/webgpu` WebGPURenderer
-  with the TSL `SkyMesh` and WebGPU PMREM; the postprocessing composer, zone probes, path tracer and GLSL
-  patches (dusk/night sky terms, foliage sway) are WebGL-only and are skipped. Falls back to WebGL on any error.
-
-## Live tours, presence, VR & AR
-
-- **Presence** (`live/`, Supabase Realtime — set `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`): other
-  visitors appear as soft translucent silhouettes with a glowing head orb and name tag ("Visitor 12" or the signed-in
-  name). Positions are sent at ~5 Hz while moving and smoothed; at most 40 are drawn (nearest, in zones visible from
-  you); beyond 14 m only the orb, beyond 32 m nothing. Hidden entirely when Realtime isn't configured/reachable.
-- **Live docent tours**: curators/admins get **Start live tour** (HUD). Visitors see "Live tour by *name* — Join";
-  joined visitors auto-follow the docent (walk target nearby, faded teleport when far / in another room; walking
-  yourself pauses it → "Rejoin docent"), see a pulsing ring on what the docent is showing, chat (rate-limited,
-  filtered; the docent can mute) and can raise a hand. Docent messages are cryptographically verified — see
-  `docs/API.md → Live guided tours` (`POST /api/live/token`, `GET /api/live/verify`, `LIVE_TOKEN_SECRET`).
-- **VR** (HUD **Enter VR**, only when `navigator.xr` supports `immersive-vr`; `xr/`): the museum at 1:1. Thumbstick
-  forward → teleport arc (walls block it, landing is collision-checked), left/right → 30° snap turn, trigger → select
-  an artwork/object (world-space info card; trigger on the card or B/Y closes), comfort vignette on teleport/turn,
-  zone culling follows the headset, post-processing is paused while presenting.
-- **AR** (inspection viewer → **View in your space**): Android/Chrome WebXR `immersive-ar` with hit-test placement at
-  real scale; iOS/iPadOS AR Quick Look with a USDZ generated at runtime (`USDZExporter`); otherwise the button is
-  hidden and the 3D viewer is the experience.
-- Test: `node scripts/live-presence-test.mjs http://localhost:3000` (two browser contexts: docent + visitor).
-
-## How to change quality settings
-
-`config/quality.ts → QUALITY_PRESETS` (dpr, shadows + map size, post-processing, AO quality, bloom, SMAA,
-floor reflections, spot-pool size, area lights, texture size, MSAA). `detectInitialTier()` chooses the
-"Auto" starting tier (integrated GPUs → Medium, phones → Low) and `AdaptiveQuality` in `App.tsx` steps down
-if the frame rate stays below ~32 fps. The visitor can switch tiers from the HUD.
-
----
-
-## Design assumptions (not specified in the PDF)
-
-- Gallery clear height 4.6 m, reception 3.0 m (compression → release); partitions 3.7 m so daylight spills over.
-- Interior dimensions are exact (30' × 60' gallery + 10' × 15' reception); the 0.2 m dividing wall is additional.
-- Passage clear width 2.0 m (GA-101 shows ~6–7'), running 45' up the axis as drawn.
-- The reveal wall is the intentional modification requested for this delivery (not in GA-101).
-- Benches: 4 in the side bays (drawn as ovals in GA-101) + 1 in the craft court = 5.
-- Hand-block tables are placed beside the five hero works.
-
----
-
-## Backend & Admin
-
-The museum works as a pure static experience (bundled content from `src/museum/config`), and the
-same Next.js app also hosts a backend: editable content, a media library, visitor accounts
-(favourites, guestbook/comments) and anonymous analytics. The API contract is `docs/API.md`.
-
-### Run it
-
-```bash
-npm install
-npm run dev            # http://localhost:3000        museum
-                       # http://localhost:3000/admin  admin (content, media, analytics, comments, users/access)
-```
-
-No configuration is needed locally: on the first API request the server creates
-`.data/museum.sqlite`, seeds it from the bundled config and creates the admin account.
-
-**Admin credentials** come from `ADMIN_EMAIL` / `ADMIN_PASSWORD`. When they are not set (dev only)
-the default `admin@museum.local` / `admin12345` is created and a warning is logged. When both are
-set, the account is created on first start and its password is re-synchronised from the env var on
-every (cold) start. In production (`NODE_ENV=production`) no default admin is ever created.
-
-### Roles & access list
-
-| Role | Admin sections | Can |
+| Role | Admin pages | Can |
 |---|---|---|
-| visitor | — | favourites, guestbook/comments |
-| curator | Content, Media | create/edit/delete artworks, exhibits, infographics, videos, objects, exhibition & welcome text; upload/delete images, video, GLB |
-| admin | + Analytics, Comments, Users | + comment moderation, analytics, manual roles, reset content to bundled defaults |
-| master | + Access | + the access list. The emails in `MASTER_ADMIN_EMAILS` (comma-separated; fallback `MASTER_ADMIN_EMAIL`, then `ADMIN_EMAIL`) |
+| visitor | none | favourites, guestbook and comments |
+| curator | Home, Checklist, Activity, Content, Exhibitions, Makers, Media, Capture tools, Visitor prints | edit content, makers and the tour; upload media; moderate prints |
+| admin | + Comments, Analytics, Errors, Users | + reset content, moderate comments, manual roles, analytics retention |
+| master | Users & access | + the access list; set by `MASTER_ADMIN_EMAILS` |
 
-Every admin Route Handler enforces the minimum role server-side (`c.requireCurator()` /
-`requireAdmin()` / `requireMaster()` in `src/server/http.ts`; 401 signed out, 403 too low); the admin UI
-only hides what the role cannot use.
+| Control | How |
+|---|---|
+| Passwords and sessions | scrypt; 32-byte tokens stored as SHA-256 hashes; 30-day `HttpOnly`, `SameSite=Lax` cookie |
+| Google sign-in | ID token checked against Google's JWKS with `jose`, `aud` pinned to `GOOGLE_CLIENT_ID` |
+| Access list | elevates verified (Google) addresses only; recomputed on every sign-in and change |
+| Requests | every admin route checks its role server-side; foreign `Origin` refused on writes |
+| Database | TLS verified against the bundled Supabase root; RLS on with no policies, so the anon key reads nothing |
+| Uploads | extension allow-list, 500 MB cap, random names, `nosniff`, no HTML or SVG; admin media URLs checked before rendering |
+| Live tours | every docent message signed with ECDSA P-256 and bound to an HMAC token from the server |
+| Analytics | a random session id from Web Crypto; no IP, user agent or account stored |
 
-**Access list** (admin → *Access*, master only): emails (`person@iitkgp.ac.in`) or whole domains
-(`@iitkgp.ac.in`) with the role they grant (curator / admin). Unlisted people are visitors.
-The effective role is recomputed on every sign-in and whenever the list changes:
-`master` for a `MASTER_ADMIN_EMAILS` address, else **max(access-list role, manual role set on the Users page)**.
-The master addresses are mirrored into the access list (role `master`, read-only in the UI) on every
-start / `db:migrate`; removing an address from the env var removes its master row and rights.
-Production masters: `ankits1802@gmail.com`, `priyadarshi1@yahoo.com`, `priyadarshi.p@gmail.com` — they get
-master rights by signing in with Google (`ADMIN_EMAIL` = the first one also has a password login).
-Access-list roles only apply to **verified** addresses — people who signed in with Google (or the
-env-seeded admin) — because password sign-up does not verify email ownership. Staff should
-therefore sign in with Google at least once; afterwards password sign-in keeps the role too.
+## <img src="docs/readme-kit/assets/icons/git-branch.svg" width="32" align="top" alt="">&nbsp; CI and deploy
 
-### Google sign-in
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif","fontSize":"15px","primaryColor":"#F2E9FE","primaryTextColor":"#1E1B2E","primaryBorderColor":"#9148D2","secondaryColor":"#FAEECD","secondaryTextColor":"#1E1B2E","secondaryBorderColor":"#CD9200","tertiaryColor":"#F3F1FA","tertiaryTextColor":"#1E1B2E","tertiaryBorderColor":"#A7A3BC","mainBkg":"#F2E9FE","nodeBorder":"#9148D2","nodeTextColor":"#1E1B2E","lineColor":"#AA69E9","textColor":"#857F9E","edgeLabelBackground":"#F9F5FF","clusterBkg":"#F9F5FF","clusterBorder":"#D6B6FB","titleColor":"#762CB1","noteBkgColor":"#FAEECD","noteTextColor":"#1E1B2E","noteBorderColor":"#CD9200","actorBkg":"#F2E9FE","actorBorder":"#9148D2","actorTextColor":"#1E1B2E","actorLineColor":"#AA69E9","signalColor":"#AA69E9","signalTextColor":"#857F9E","labelBoxBkgColor":"#F2E9FE","labelBoxBorderColor":"#9148D2","labelTextColor":"#1E1B2E","loopTextColor":"#857F9E","activationBkgColor":"#E7D5FE","activationBorderColor":"#9148D2","sequenceNumberColor":"#FFFFFF","transitionColor":"#AA69E9","transitionLabelColor":"#857F9E","stateLabelColor":"#1E1B2E","stateBkg":"#F2E9FE","compositeBackground":"#F9F5FF","compositeTitleBackground":"#F2E9FE","attributeBackgroundColorOdd":"#FFFFFF","attributeBackgroundColorEven":"#F9F5FF","relationColor":"#AA69E9","relationLabelBackground":"#F9F5FF","relationLabelColor":"#1E1B2E"}}}%%
+flowchart LR
+  P([Push to main]) --> V["Verify<br/>typecheck, lint, unit tests"]
+  V --> M["Migrate<br/>schema only"]
+  M --> D["Deploy<br/>prebuilt, production"]
+  D --> S{"Smoke test<br/>db = postgres?"}
+  S -->|yes| L([Live])
+  S -->|no| F["Fail the run"]
+  PR([Pull request]) --> V
+  V --> PV["Preview deploy<br/>URL commented"]
+  classDef accent fill:#762CB1,stroke:#5F1C93,color:#FFFFFF
+  class D accent
+```
 
-"Sign in with Google" (Google Identity Services) appears on `/admin` and in the museum's sign-in
-dialog when `GOOGLE_CLIENT_ID` is set (`GET /api/auth/providers`). The browser receives an ID token and
-posts it to `POST /api/auth/google`; the server verifies it against Google's JWKS with `jose`
-(signature, issuer, audience = client id, expiry, `email_verified`), finds or creates the user, sets
-the session cookie and applies the access list.
-
-Creating the OAuth client (manual — cannot be scripted without gcloud):
-1. Google Cloud Console → *APIs & Services* → *OAuth consent screen*: app name, support email,
-   audience *External* (or *Internal* for a Workspace org); scopes `openid`, `email`, `profile`.
-2. *Credentials* → *Create credentials* → *OAuth client ID* → type **Web application**.
-3. *Authorised JavaScript origins*: `http://localhost:3000` and every production origin, e.g.
-   `https://hand-block-museum.vercel.app` (+ custom domains). Redirect URIs are not needed (popup flow).
-4. Put the client id in `GOOGLE_CLIENT_ID` (`.env.local` and Vercel). Origins take a few minutes to apply.
-
-### Two modes
-
-| | Local (default) | Production |
+| Workflow | Runs on | Does |
 |---|---|---|
-| Database | SQLite via Node's built-in `node:sqlite` → `.data/museum.sqlite` (`DB_PATH`) | Postgres (Supabase) via `DATABASE_URL` |
-| Media | disk → `.data/media/<folder>/…` (`MEDIA_DIR`), served at `/media/…` with Range support | AWS S3 / S3-compatible (`S3_BUCKET`, `AWS_REGION`, `S3_PUBLIC_BASE_URL`, `S3_ENDPOINT`) with presigned direct uploads |
-| Hosting | `npm run dev` / `npm run build && npm start` (one Node process) | Vercel (pages + Route Handlers as Node functions) |
+| `deploy.yml` | push to `main`, pull requests, dispatch | typecheck, lint and unit tests; production migrations, a prebuilt Vercel deploy and a smoke test on `main`; a preview deploy per pull request. Pushes that change only Markdown or `docs/` skip it. |
+| `ci.yml` | pull requests, dispatch | unit tests again with a Postgres 17 service, so the query-count tests check real SQL; visual regression once baselines are committed in `tests/visual/baseline` |
+| `readme-check.yml` | README, `docs/` or kit changes | kit assets match `kit.json`, SVG safety rules, xmllint, image budgets, every mermaid block renders, GitHub renders the Markdown, preview PNGs |
+| CodeQL | default setup | code scanning on every push |
 
-The mode is picked per concern: `DATABASE_URL` switches the database, `S3_BUCKET` switches storage.
-All variables are documented in `.env.example` (copy to `.env.local`).
+## <img src="docs/readme-kit/assets/icons/book-open.svg" width="32" align="top" alt="">&nbsp; Documentation
 
-Production credentials can live in `.env.local` as `REMOTE_DATABASE_URL`, `REMOTE_S3_BUCKET`,
-`REMOTE_ADMIN_PASSWORD`, … — they are ignored unless `USE_REMOTE=1`, so `npm run dev` keeps using
-SQLite + local disk (important when several people share one dev server). Do **not** run
-`vercel env pull .env.local`: it would overwrite the file with plain `DATABASE_URL` etc. and switch
-local dev to the production database.
+| Question | Read |
+|---|---|
+| How do I add an artwork, move a wall or change the light? | [docs/MUSEUM.md](docs/MUSEUM.md) |
+| How do the backend, admin, sign-in and deploy work? | [docs/BACKEND.md](docs/BACKEND.md) |
+| What does each endpoint take and return? | [docs/API.md](docs/API.md) |
+| How do we photograph textiles and scan blocks? | [docs/CONTENT_CAPTURE.md](docs/CONTENT_CAPTURE.md) |
+| What material is the workshop still to send? | [docs/CONTENT_STILL_NEEDED.md](docs/CONTENT_STILL_NEEDED.md) |
+| How is Vercel, Supabase or S3 set up? | [infra/deploy-vercel.md](infra/deploy-vercel.md), [infra/setup-supabase.md](infra/setup-supabase.md), [infra/setup-s3.sh](infra/setup-s3.sh) |
+| How do visual baselines work? | [tests/visual/README.md](tests/visual/README.md) |
+| How is this README built? | [docs/readme-kit/README_STYLE.md](docs/readme-kit/README_STYLE.md) |
 
-```bash
-npm run db:migrate     # apply supabase/migrations/*.sql to DATABASE_URL (or create the SQLite DB),
-                       # then seed content + admin if empty and re-sync staff roles
-USE_REMOTE=1 npm run db:migrate          # same, against the REMOTE_* (production) settings
-npm run db:migrate -- --schema-only      # migrations only (CI)
-USE_REMOTE=1 npm run db:tls-check        # read-only: the connection's certificate is verified (infra/setup-supabase.md §3)
-```
+## <img src="docs/readme-kit/assets/icons/activity.svg" width="32" align="top" alt="">&nbsp; Status
 
-Setup guides (review before running — they create cloud resources):
-`infra/setup-supabase.md`, `infra/setup-s3.sh` (+ `infra/s3-cors.json`), `infra/deploy-vercel.md`.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-kit/assets/timeline-dark.svg">
+  <img src="docs/readme-kit/assets/timeline-light.svg" width="100%" alt="The museum so far: opened 23 September, hardened in October, sharing its database with the clay pavilion since 1 November">
+</picture>
 
-### Where things live
+Production is [hand-block-museum.vercel.app](https://hand-block-museum.vercel.app), deployed from `main` by
+`deploy.yml`. The workshop's own photographs, scans, films and texts are still to arrive; until they do,
+items show neutral stand-ins that visitors never see labelled as missing. The list is in
+[docs/CONTENT_STILL_NEEDED.md](docs/CONTENT_STILL_NEEDED.md).
 
-```
-app/api/**/route.ts     thin Route Handlers (one per endpoint in docs/API.md)
-app/media/[...path]     local media files (Range / ETag); redirects to S3 in S3 mode
-app/admin/              admin page (client app in src/admin/)
-src/server/
-  db/                   Db interface + PostgresDb (pg) + SqliteDb (node:sqlite) + migrations runner
-  storage.ts            StorageDriver: LocalDiskStorage, S3Storage (presigned PUT)
-  auth.ts               scrypt passwords, DB-backed sessions (SHA-256 token hash), cookie helpers,
-                        roles (visitor < curator < admin < master), access-list role resolution
-  contentStore.ts       content rows (JSON/jsonb) + version, revisions, seeding from bundledContent()
-  site.ts               the site every query is scoped to (src/site.ts), metaKey(), runAsSite() for tests
-  audit.ts              the activity log (audit_log)
-  handlers/             content, auth (+ Google), favorites, comments, analytics, media, users (+ access list),
-                        overview (dashboard + activity)
-  http.ts               route() wrapper: JSON errors, same-origin check, auth helpers
-supabase/migrations/    Postgres schema (used by `supabase db push` and `npm run db:migrate`)
-.data/                  local SQLite DB + uploaded media (git-ignored)
-```
-
-Content editing: every save bumps `MuseumContent.version`; the museum loads `/api/content` at
-start-up (falling back to bundled content when the API is unreachable). **Reset to bundled
-defaults** in the admin re-seeds from `src/museum/config`; what it replaces stays in the trash.
-
-Every save, delete and restore of an item is kept as a revision (admin: history, restore, trash), and
-every admin change — content, texts, tour, exhibitions, makers, media, moderation, roles, access list,
-analytics retention — writes one line to the activity log (`GET /api/admin/activity`, the dashboard's
-*Recent activity*). An editor can send the stamp it loaded (`X-Expected-Updated-At`), so a save that
-would overwrite a colleague's newer change is refused with a 409 that carries their version.
-
-### Two apps, one database
-
-This app (the hand block printing museum) and `virtual-walkthrough-clay` (the clay pavilion) are two
-Vercel projects that share **one Supabase database and one S3 bucket**. Which museum a build is comes
-from `src/site.ts` (`SITE.id`: `hand-block` here, `clay` there) — the only file that differs between the
-two repos by design.
-
-- **Site scoping.** Exhibitions, makers, media, visitor prints, comments, favourites, analytics events and
-  heatmap rows, client errors, content revisions and the activity log carry a `site` column
-  (`supabase/migrations/20261101000000_sites.sql`); every query filters by it (`siteId()` in
-  `src/server/site.ts`), and every by-id admin route answers 404 for the other site's rows. Content items
-  are scoped through their exhibition. Meta keys this app owns are prefixed (`metaKey()`: none for
-  hand-block, `clay:` for the clay app); the content `version` stays shared. Rows written before sites
-  existed belong to `hand-block`.
-- **Shared on purpose.** Users, sessions and the access list: staff keep one login and one role in both
-  admins. Analytics batch markers and the migration ledger are shared too.
-- **Seeding.** On first start each app creates its own default exhibition (`SITE.defaultExhibitionId`,
-  published, its site's default) and seeds its bundled content into it when *its* `seeded_at` is missing.
-  It never seeds into, resets or deletes the other site's exhibitions. Slugs and maker ids are still
-  unique across both sites; one the other site uses is refused with a clear 409.
-- **Env vars that must be identical in both deployments:** `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
-  `MASTER_ADMIN_EMAILS` (otherwise each cold start re-syncs the access list's master rows and re-hashes
-  the admin password, revoking the other app's admin sessions), `LIVE_TOKEN_SECRET`, `S3_PREFIX` (media
-  rows store keys without it; each app rebuilds addresses with its own), and of course `DATABASE_URL`,
-  `S3_BUCKET`, `S3_PUBLIC_BASE_URL`. `NEXT_PUBLIC_LIVE_ROOM` must **differ** — leave it unset and each app
-  uses its own room (`SITE.liveRoom`); docent tokens are only minted for that room.
-- **Migrations.** `supabase/migrations/` must be byte-identical in both repos, and the SQLite mirror in
-  `src/server/db/sqlite.ts` too. The runner records each applied file's sha256 and **refuses to start**
-  when a file differs from what was applied; it warns loudly when the database has a migration this build
-  lacks (the other app deployed first). Runners serialise on a Postgres advisory lock. Every migration must
-  be additive, with constant defaults, and must not change a constraint an `ON CONFLICT` names, because
-  the other app's deployed code keeps running against the new schema.
-- **Deploy order.** 1) Merge the identical migration into both repos; one app's CI applies it, the other
-  then records nothing new. 2) Deploy hand-block. 3) Deploy the clay pavilion. (Between steps old
-  hand-block code keeps working: everything it writes defaults to `hand-block`.) The S3 CORS rule allows
-  the clay origins for direct uploads (`infra/s3-cors.json`).
-  Details: `infra/deploy-vercel.md` → *The second app*.
-
-### Deploy
-
-- **Vercel** (recommended): set the env vars from `infra/deploy-vercel.md`, `vercel deploy --prod`.
-  Uploads go browser → S3 via presigned URLs, so large videos never pass through a function.
-- **GitHub Actions** (`.github/workflows/deploy.yml`): every push to `main` runs typecheck + lint,
-  applies migrations (`npm run db:migrate -- --schema-only` with the `DATABASE_URL` secret) and deploys a
-  prebuilt production build; pull requests get a preview deployment (note: previews use the same
-  database). Repo secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `DATABASE_URL`.
-
-Provisioned resources (no secrets here; values live in Vercel env vars and the git-ignored `.env.local`):
-Supabase project `hand-block-museum` (ref `pnawtnmgvsvfxtkdbott`, ap-south-1), S3 bucket
-`hand-block-museum-media-626159998512` (ap-south-1, public-read objects, CORS for uploads) with the
-least-privilege IAM user `hand-block-museum-app`, Vercel project `hand-block-museum` (functions in `bom1`).
-- **Single Node process** (VM / container): `npm run build && npm start` with `DATABASE_URL`
-  (or leave it unset to keep SQLite on a persistent disk) and optionally `S3_BUCKET`. Put it behind
-  HTTPS (the session cookie is `Secure` when `NODE_ENV=production`; set `COOKIE_SECURE=0` only for
-  plain-HTTP testing).
-
-### Exhibitions, makers & curator analytics
-
-- **Multi-exhibition**: one building, several exhibitions (table `exhibitions`; `content_items.exhibition_id`).
-  The default exhibition opens at `/gallery`, others at `/gallery/<slug>`; each has its own artworks, exhibits,
-  panels, films, objects, reveal-wall / welcome text, optional tour-stop override and accent colour. Admin → header
-  *Exhibition* switcher scopes every content page; admin → *Exhibitions* creates / duplicates / publishes / sets the
-  default (admin role) and edits the tour (curators). The entry screen lists exhibitions when more than one is
-  published. Demo: `textile-traditions` ("Textile Traditions — coming soon", draft) was made with *Duplicate*.
-- **Meet the maker**: profiles in table `artisans` (admin → *Makers*, curators); artworks / exhibits reference one
-  with `artisanId`. The info panel shows a maker card with *Visit the maker* / *Commission* / *Buy (fair trade)*
-  when those URLs exist; `/makers/<id>` is the accessible profile page. The seed profiles are empty stand-ins
-  (`placeholder`, "Hidden from visitors" in the admin): visitors get no card, link or page for them until the flag is
-  cleared — enter only what the workshop supplies.
-- **Curator analytics** (admin → *Analytics*): the tracker samples the visitor position every 2 s (`pos`) and tour
-  arrivals (`tour_step`). Positions are aggregated on arrival into `analytics_heat` (0.5 m cells per exhibition /
-  day / zone) and never stored raw. Floor-plan heatmap (walls from `config/layout.ts`), zone filter, date range,
-  tour funnel, attention ranking, CSV export. Each batch the tracker sends carries an id made in the browser, and
-  a batch that fails is sent again unchanged under that id; the server stores an id once per session
-  (`analytics_batches`), so a batch whose reply was lost is not counted twice.
-- **Retention**: analytics older than the retention setting (default **180 days**, admin → Analytics → *Privacy &
-  retention*) are deleted automatically at most once a day (batch ids after 31 days), and by
-  `POST /api/admin/analytics/cleanup` (admin) or `GET|POST` with `Authorization: Bearer $CRON_SECRET` for a
-  scheduled job, e.g. a Vercel Cron Job
-  (`"crons": [{ "path": "/api/admin/analytics/cleanup", "schedule": "0 3 * * *" }]` + `CRON_SECRET` env var).
-
-### Print it yourself, Visitors' Wall & artisan presence
-
-- **Studio** (`src/museum/studio/`): the small printing table in front of the Craft Workshop's west wall
-  (scene object kind `print-studio`) shows the visitor's current cloth live; selecting it opens a full-screen studio
-  (blocks from the placeholder motif library + a border block with corner blocks, outline / filler / both faces,
-  colour-named dyes, ground cloths, colourways, grid / half-drop guides with snapping, hold-to-press pressure, ink that
-  runs dry and is re-inked, undo / redo / clear, PNG download). Designs are deterministic op lists (per-stamp seeds),
-  kept in `localStorage`. The museum canvas pauses while the studio is open.
-- **Visitors' Wall** (kind `visitors-wall`, props `cols`, `rows`, `width`, `bottom`): the 24 latest approved prints
-  (`GET /api/prints`) as box-framed textiles (one atlas texture). *Hang it on the Visitors' Wall* posts to
-  `POST /api/prints` (pending); curators approve / reject in admin → *Visitor prints*. Offline / `?static`: the
-  studio still works (download only) and the wall shows empty frames. Table `visitor_prints`
-  (`supabase/migrations/20260923110000_visitor_prints.sql`).
-- **Meet the maker screens**: `VIDEOS` entries with `kind: 'portrait'`, `stand: { x, z, rotationDeg }` and
-  `cropAspect` (default 9 / 16) render a small vertical screen on a free-standing stand with spatial audio. The two
-  stand-ins beside printing tables II and IV centre-crop the generated process films — replace `src` with the
-  portrait films.
-- **Artisan captures** (kind `splat`): set `model` to a Gaussian-splat `.splat` file (drei `<Splat>`; `.ksplat` /
-  `.ply` must be converted first) with optional props `splatScale`, `splatY`, `splatRotDeg`. Without a capture a
-  translucent seated figure with a "The printer's place" card is shown.
-
-### Security notes
-
-- Passwords: scrypt (N=16384, r=8, p=1, 16-byte salt). Sessions: 32-byte random tokens; only
-  their SHA-256 hash is stored; 30-day `HttpOnly; SameSite=Lax` cookie. Login is rate-limited
-  (10/min/IP), comments 5/min/user (in-memory, per instance).
-- State-changing API calls with a foreign `Origin` are rejected (CSRF defence on top of SameSite).
-- Uploads: extension allow-list (jpg, png, webp, glb, gltf, mp4, webm, mp3, ogg, wav, m4a), 500 MB
-  limit, random file names, `nosniff`; no HTML/SVG can be uploaded.
-- Supabase: RLS is enabled with no policies on every table, so the public anon key cannot read
-  users, sessions or analytics — only the server (database owner connection) can.
-- Roles are enforced server-side on every admin route. Access-list elevation requires a verified
-  email (Google); linking Google to an unverified password account with the same email clears that
-  password and revokes its sessions (pre-registration takeover defence). Google ID tokens are
-  verified locally against Google's rotating JWKS (`jose`), `aud` pinned to `GOOGLE_CLIENT_ID`.
-- Analytics store a random session id only — no IPs, user agents or accounts.
-- Always set `ADMIN_EMAIL` / `ADMIN_PASSWORD` for any shared deployment; never commit `.env*` files.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-kit/assets/footer-dark.svg">
+  <img src="docs/readme-kit/assets/footer-light.svg" width="100%" alt="Made for the people who make things by hand. AI CoE, IIT Kharagpur, Hand Block Printing.">
+</picture>

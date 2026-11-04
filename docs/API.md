@@ -1,4 +1,49 @@
-# Museum Backend API (v1)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="readme-kit/assets/divider-dark.svg">
+  <img src="readme-kit/assets/divider-light.svg" width="100%" alt="">
+</picture>
+
+# <img src="readme-kit/assets/icons/code.svg" width="32" align="top" alt="">&nbsp; Museum Backend API (v1)
+
+Every endpoint the museum, the admin and the live layer call, grouped by area. The server code map, roles in
+practice and deploy are in [BACKEND.md](BACKEND.md).
+
+| Area | Who | Endpoints |
+|---|---|---|
+| [Roles](#roles-rbac) | everyone | how `visitor`, `curator`, `admin` and `master` are decided |
+| [Content](#content-public) | public | `/api/content`, `/api/exhibitions`, `/api/artisans`, `/api/health` |
+| [Content admin](#content-admin-role--curator) | curator+ | items, stamps, history, restore, trash, texts, tour, reset |
+| [Exhibitions](#exhibitions-multi-exhibition-platform) | curator+, admin for changes | create, duplicate, publish, default, delete |
+| [Makers](#makers-meet-the-maker-role--curator) | curator+ | profiles and their usage |
+| [Media](#media-role--curator) and [deep zoom](#deep-zoom-pyramids-role--curator--srcserverhandlersdeepzoomts) | curator+ | uploads, presign, complete, usage, DZI pyramids |
+| [Dashboard and activity](#dashboard--activity-log-role--curator) | curator+ | overview counts and the activity log |
+| [Auth](#auth) | everyone | register, login, Google, session |
+| [Favourites](#favourites-logged-in), [comments](#guestbook--comments) | signed in | favourites, guestbook, comments, moderation |
+| [Visitor prints](#visitor-prints-print-it-yourself--visitors-wall) | public, curator+ | hang a print, the wall, moderation |
+| [Analytics](#analytics) | public, admin | events, summary, heatmap, funnel, CSV, retention |
+| [Errors](#errors--monitoring) | public, admin | client error reports and groups |
+| [Users](#users-role--admin), [access list](#access-list-role--master) | admin, master | manual roles, allowlist |
+| [Live tours](#live-guided-tours--presence) | curator+, public | docent tokens and verification |
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif","fontSize":"15px","primaryColor":"#F2E9FE","primaryTextColor":"#1E1B2E","primaryBorderColor":"#9148D2","secondaryColor":"#FAEECD","secondaryTextColor":"#1E1B2E","secondaryBorderColor":"#CD9200","tertiaryColor":"#F3F1FA","tertiaryTextColor":"#1E1B2E","tertiaryBorderColor":"#A7A3BC","mainBkg":"#F2E9FE","nodeBorder":"#9148D2","nodeTextColor":"#1E1B2E","lineColor":"#AA69E9","textColor":"#857F9E","edgeLabelBackground":"#F9F5FF","clusterBkg":"#F9F5FF","clusterBorder":"#D6B6FB","titleColor":"#762CB1","noteBkgColor":"#FAEECD","noteTextColor":"#1E1B2E","noteBorderColor":"#CD9200","actorBkg":"#F2E9FE","actorBorder":"#9148D2","actorTextColor":"#1E1B2E","actorLineColor":"#AA69E9","signalColor":"#AA69E9","signalTextColor":"#857F9E","labelBoxBkgColor":"#F2E9FE","labelBoxBorderColor":"#9148D2","labelTextColor":"#1E1B2E","loopTextColor":"#857F9E","activationBkgColor":"#E7D5FE","activationBorderColor":"#9148D2","sequenceNumberColor":"#FFFFFF","transitionColor":"#AA69E9","transitionLabelColor":"#857F9E","stateLabelColor":"#1E1B2E","stateBkg":"#F2E9FE","compositeBackground":"#F9F5FF","compositeTitleBackground":"#F2E9FE","attributeBackgroundColorOdd":"#FFFFFF","attributeBackgroundColorEven":"#F9F5FF","relationColor":"#AA69E9","relationLabelBackground":"#F9F5FF","relationLabelColor":"#1E1B2E"}}}%%
+sequenceDiagram
+  autonumber
+  participant B as Admin in the browser
+  participant API
+  participant S3
+  B->>API: GET /api/admin/media/config
+  API-->>B: driver s3, directUpload true
+  B->>API: POST /api/admin/media/presign
+  API-->>B: uploadUrl, headers, key
+  B->>S3: PUT the file with exactly those headers
+  S3-->>B: 200
+  B->>API: POST /api/admin/media/complete
+  API->>S3: HEAD, size at most 500 MB
+  API-->>B: 201 MediaRecord, url to store in content
+  Note over B,API: With local disk the browser posts multipart to /api/admin/media instead
+```
+
 
 Base: same origin. Implemented as Next.js Route Handlers (`app/api/**/route.ts`, logic in `src/server/**`); `next dev` serves the API and the app on one port.
 All bodies are JSON unless noted. Errors: `{ "error": string }` with a 4xx/5xx status; a few add fields — a stale content
@@ -218,6 +263,21 @@ Every moderation change (single or bulk) is recorded in the activity log.
 `AnalyticsEvent = { t: number (epoch ms), type: 'session_start' | 'zone_enter' | 'zone_dwell' | 'item_view' | 'item_dwell' | 'panel_open' | 'inspect_open' | 'video_play' | 'tour_start' | 'tour_complete' | 'tour_step' | 'pos', zone?, itemKind?, itemId?, seconds?, tier?, meta?, x?, z? }`. The batch body may carry `exhibition` (slug; default when absent/unknown).
 `tour_step`: `itemId` = stop id, `meta.index` = stop index. `pos` (sampled every 2 s by the tracker, `x`/`z` in metres): **never stored raw** — aggregated on insert into `analytics_heat` (0.5 m cells per exhibition / UTC day / zone).
 No personal data is stored for anonymous visitors (random session id only).
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif","fontSize":"15px","primaryColor":"#F2E9FE","primaryTextColor":"#1E1B2E","primaryBorderColor":"#9148D2","secondaryColor":"#FAEECD","secondaryTextColor":"#1E1B2E","secondaryBorderColor":"#CD9200","tertiaryColor":"#F3F1FA","tertiaryTextColor":"#1E1B2E","tertiaryBorderColor":"#A7A3BC","mainBkg":"#F2E9FE","nodeBorder":"#9148D2","nodeTextColor":"#1E1B2E","lineColor":"#AA69E9","textColor":"#857F9E","edgeLabelBackground":"#F9F5FF","clusterBkg":"#F9F5FF","clusterBorder":"#D6B6FB","titleColor":"#762CB1","noteBkgColor":"#FAEECD","noteTextColor":"#1E1B2E","noteBorderColor":"#CD9200","actorBkg":"#F2E9FE","actorBorder":"#9148D2","actorTextColor":"#1E1B2E","actorLineColor":"#AA69E9","signalColor":"#AA69E9","signalTextColor":"#857F9E","labelBoxBkgColor":"#F2E9FE","labelBoxBorderColor":"#9148D2","labelTextColor":"#1E1B2E","loopTextColor":"#857F9E","activationBkgColor":"#E7D5FE","activationBorderColor":"#9148D2","sequenceNumberColor":"#FFFFFF","transitionColor":"#AA69E9","transitionLabelColor":"#857F9E","stateLabelColor":"#1E1B2E","stateBkg":"#F2E9FE","compositeBackground":"#F9F5FF","compositeTitleBackground":"#F2E9FE","attributeBackgroundColorOdd":"#FFFFFF","attributeBackgroundColorEven":"#F9F5FF","relationColor":"#AA69E9","relationLabelBackground":"#F9F5FF","relationLabelColor":"#1E1B2E"}}}%%
+flowchart LR
+  T["Tracker<br/>random session id"] -->|batch with batchId| E["POST<br/>/api/analytics/events"]
+  E --> Q{"sessionId + batchId<br/>seen before?"}
+  Q -->|yes| D["202, duplicate<br/>nothing stored"]
+  Q -->|no| K{"Event type"}
+  K -->|pos| H[("analytics_heat<br/>0.5 m cells")]
+  K -->|other| V[("analytics_events")]
+  H --> C["Daily cleanup<br/>after retention"]
+  V --> C
+  classDef accent fill:#762CB1,stroke:#5F1C93,color:#FFFFFF
+  class Q accent
+```
 
 Curator analytics (role ≥ admin; all take `exhibition` (id|slug, default when absent), `from` / `to` (YYYY-MM-DD, UTC, default the last 30 days, max 400 days)):
 

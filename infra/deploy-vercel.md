@@ -94,8 +94,8 @@ matches the file and a deployment that ignores it cannot fall back to `iad1`.
 
 ## The second app: the clay pavilion
 
-`virtual-walkthrough-clay` is a second Vercel project on the **same** Supabase database and S3 bucket (README →
-*Two apps, one database*). Set its env vars like this project's, with these rules:
+`virtual-walkthrough-clay` is a second Vercel project on the **same** Supabase database and S3 bucket (`docs/BACKEND.md` →
+*Two museums, one database*). Set its env vars like this project's, with these rules:
 
 - **Identical in both projects:** `DATABASE_URL` (and the CI `DATABASE_URL` / `DIRECT_DATABASE_URL` secrets),
   `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `MASTER_ADMIN_EMAILS`, `LIVE_TOKEN_SECRET`, `S3_BUCKET`, `S3_PREFIX`,
