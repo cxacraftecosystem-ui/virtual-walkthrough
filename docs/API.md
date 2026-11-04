@@ -41,7 +41,7 @@ sequenceDiagram
   B->>API: POST /api/admin/media/complete
   API->>S3: HEAD, size at most 500 MB
   API-->>B: 201 MediaRecord, url to store in content
-  Note over B,API: With local disk the browser posts multipart to /api/admin/media instead
+  Note over B,API: With local disk the browser posts multipart to<br/>/api/admin/media instead
 ```
 
 
