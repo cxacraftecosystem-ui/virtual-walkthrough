@@ -14,6 +14,8 @@ on:
     paths-ignore:
       - "**.md"
       - "docs/**"
+      - "docs/readme-kit/**"
+      - ".github/workflows/readme-check.yml"
   pull_request:
   workflow_dispatch:
 
