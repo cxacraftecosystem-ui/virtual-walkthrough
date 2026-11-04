@@ -1,4 +1,9 @@
-# Content capture guide — textiles, hand blocks, text
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="readme-kit/assets/divider-dark.svg">
+  <img src="readme-kit/assets/divider-light.svg" width="100%" alt="">
+</picture>
+
+# <img src="readme-kit/assets/icons/camera.svg" width="32" align="top" alt="">&nbsp; Content capture guide: textiles, hand blocks, text
 
 A practical field guide for the workshop team: how to photograph printed textiles for the
 **"Examine closely"** deep-zoom viewer, how to scan wooden hand blocks with a phone, how to write
@@ -8,6 +13,37 @@ the curatorial text, and how to load everything through the admin (`/admin` → 
 > empty rather than guess — the museum only shows the fields you fill in. Visitors never see a
 > "placeholder" label: items still ticked *Needs content from the workshop* simply show what they
 > have (see `docs/CONTENT_STILL_NEEDED.md` for what is outstanding).
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif","fontSize":"15px","primaryColor":"#F2E9FE","primaryTextColor":"#1E1B2E","primaryBorderColor":"#9148D2","secondaryColor":"#FAEECD","secondaryTextColor":"#1E1B2E","secondaryBorderColor":"#CD9200","tertiaryColor":"#F3F1FA","tertiaryTextColor":"#1E1B2E","tertiaryBorderColor":"#A7A3BC","mainBkg":"#F2E9FE","nodeBorder":"#9148D2","nodeTextColor":"#1E1B2E","lineColor":"#AA69E9","textColor":"#857F9E","edgeLabelBackground":"#F9F5FF","clusterBkg":"#F9F5FF","clusterBorder":"#D6B6FB","titleColor":"#762CB1","noteBkgColor":"#FAEECD","noteTextColor":"#1E1B2E","noteBorderColor":"#CD9200","actorBkg":"#F2E9FE","actorBorder":"#9148D2","actorTextColor":"#1E1B2E","actorLineColor":"#AA69E9","signalColor":"#AA69E9","signalTextColor":"#857F9E","labelBoxBkgColor":"#F2E9FE","labelBoxBorderColor":"#9148D2","labelTextColor":"#1E1B2E","loopTextColor":"#857F9E","activationBkgColor":"#E7D5FE","activationBorderColor":"#9148D2","sequenceNumberColor":"#FFFFFF","transitionColor":"#AA69E9","transitionLabelColor":"#857F9E","stateLabelColor":"#1E1B2E","stateBkg":"#F2E9FE","compositeBackground":"#F9F5FF","compositeTitleBackground":"#F2E9FE","attributeBackgroundColorOdd":"#FFFFFF","attributeBackgroundColorEven":"#F9F5FF","relationColor":"#AA69E9","relationLabelBackground":"#F9F5FF","relationLabelColor":"#1E1B2E"}}}%%
+flowchart LR
+  subgraph Field["In the field"]
+    P["Textile photo<br/>4000 px and up"]
+    K["Block scan<br/>Polycam or RealityScan"]
+    W["Curatorial text<br/>with the artisan"]
+  end
+  subgraph Browser["Admin, in the browser"]
+    DZ["Deep zoom<br/>254 px tiles"]
+    OP["3D scan import<br/>weld, simplify, WebP"]
+    ED["Content editor"]
+  end
+  subgraph Museum["In the museum"]
+    EX["Examine closely"]
+    IN["3D inspection, AR"]
+    PN["Info panel"]
+  end
+  P --> DZ --> EX
+  K --> OP --> IN
+  W --> ED --> PN
+  classDef accent fill:#762CB1,stroke:#5F1C93,color:#FFFFFF
+  class DZ,OP,ED accent
+```
+
+| Material | Minimum | Tool in the admin | Visitors see |
+|---|---|---|---|
+| Textile photograph | 4 000 px long side, 100 px/cm | *Capture tools → Deep zoom* | **Examine closely**, with a cm scale bar |
+| Hand-block scan | 60 to 150 photos, glTF or GLB | *Capture tools → 3D scan import* | the block on its table, 3D inspection, AR |
+| Text | title; the rest only if the workshop vouches for it | *Content* | the info panel, the guide, translations |
 
 ---
 

@@ -1,0 +1,61 @@
+{
+  "hero": {
+    "eyebrow": "AI CoE · IIT Kharagpur",
+    "name": "Hand Block Printing Virtual Museum",
+    "titleWrap": 19,
+    "tagline": "Walk a real-time 3D museum of India's hand block printing in the browser, from the Grand Atrium to the Dye Garden, curated live from one admin.",
+    "chips": ["Next.js 16", "Three.js + R3F", "WebXR", "Postgres + S3", "Vercel"],
+    "motifCaption": "carve · print · dye",
+    "label": "Hand Block Printing Virtual Museum: walk a real-time 3D museum of hand block printing in the browser, curated live from one admin"
+  },
+  "cards": {
+    "label": "What the museum does: walk, light, examine, print, tour live and curate",
+    "columns": 3,
+    "items": [
+      { "icon": "map", "tag": "Walk", "title": "Thirteen rooms, one building", "body": "Atrium, reception, passage, reveal wall, Galleries A to D, theatre, workshop, dye garden, shop, library." },
+      { "icon": "sparkles", "tag": "Light", "title": "Daylight to night", "body": "Five times of day, 3000 K track light, a path-traced photo mode and four quality tiers that adapt to the device." },
+      { "icon": "search", "tag": "Examine", "title": "Down to the thread", "body": "Deep-zoom textiles with a centimetre scale bar, and scanned hand blocks to turn in 3D or place in your room in AR." },
+      { "icon": "palette", "tag": "Print", "title": "Print it yourself", "body": "Stamp blocks, dyes and borders in the studio, then hang the cloth on the Visitors' Wall after review." },
+      { "icon": "radio-tower", "tag": "Live", "title": "Docent-led tours", "body": "Visitors see each other, follow a signed docent tour, chat and raise a hand, or walk the museum in VR." },
+      { "icon": "notebook-pen", "tag": "Curate", "title": "An admin for curators", "body": "Exhibitions, makers, media, tour editor, history with restore, trash, activity log and conflict-safe saves." }
+    ]
+  },
+  "pipeline": {
+    "label": "How workshop material reaches a visitor: capture, process, curate, store, visit",
+    "stages": [
+      { "icon": "camera", "title": "Capture", "sub": "Textile photos, block scans, text" },
+      { "icon": "cpu", "title": "Process", "sub": "Deep zoom and glTF, in the browser" },
+      { "icon": "notebook-pen", "title": "Curate", "sub": "Exhibitions, makers and the tour" },
+      { "icon": "database", "title": "Store", "sub": "Postgres and S3, scoped by site" },
+      { "icon": "globe", "title": "Visit", "sub": "A 3D walk on any device" }
+    ]
+  },
+  "stats": {
+    "label": "At a glance: thirteen rooms, four quality tiers, three languages, two museums on one database",
+    "tiles": [
+      { "icon": "building-2", "kicker": "Rooms", "value": "13", "label": "Zones you can walk" },
+      { "icon": "gauge", "kicker": "Quality", "value": "4", "label": "Low to Ultra, chosen for you" },
+      { "icon": "languages", "kicker": "Languages", "value": "3", "label": "English, Hindi and Bengali" },
+      { "icon": "database", "kicker": "Museums", "value": "2", "label": "One database, one bucket" }
+    ]
+  },
+  "timeline": {
+    "label": "The museum so far: opened 23 September, hardened in October, sharing its database with the clay pavilion since 1 November",
+    "items": [
+      { "date": "23 Sep", "title": "Opening", "sub": "Museum, admin, live tours, XR" },
+      { "date": "9 Oct", "title": "Hardened", "sub": "Verified TLS, analytics once" },
+      { "date": "10 Oct", "title": "Museum voice", "sub": "Stand-ins, never gaps" },
+      { "date": "17 Oct", "title": "Safe media", "sub": "Checked URLs, latest deps" },
+      { "date": "21 Oct", "title": "Faster", "sub": "Access list once per request" },
+      { "date": "1 Nov", "title": "Two museums", "sub": "Shared database, new admin", "now": true },
+      { "date": "Next", "title": "Real content", "sub": "Workshop material replaces stand-ins" }
+    ]
+  },
+  "divider": { "label": "Section divider" },
+  "footer": {
+    "title": "Made for the people who make things by hand.",
+    "sub": "AI CoE · IIT Kharagpur · Hand Block Printing",
+    "label": "Made for the people who make things by hand. AI CoE, IIT Kharagpur, Hand Block Printing."
+  },
+  "icons": "all"
+}

@@ -6,7 +6,7 @@ alternative), no PostgREST access — Row Level Security is enabled with
 **no policies** on every table, so the public `anon`/`authenticated` keys cannot read anything; the
 server connects as the database owner.
 
-> The production project exists: `hand-block-museum`, ap-south-1 (README → Deploy). The commands
+> The production project exists: `hand-block-museum`, ap-south-1 (`docs/BACKEND.md` → Deploy). The commands
 > below are for setting one up from scratch, and each creates or changes cloud resources — review first.
 
 ## What `@supabase/supabase-js` is used for
