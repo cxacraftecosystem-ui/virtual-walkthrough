@@ -1,13 +1,13 @@
 /**
  * Team models: the workshop team's binary STL models → small museum GLBs.
- *   node scripts/import-team-models.mjs <stl dir> [--verify] [--target 18000]
+ *   node scripts/import-team-models.mjs <stl dir> [--verify] [--target <triangles>]
  *
  * Each STL in <stl dir> whose name matches a row of PIECES (Z-up, any unit, no colour/UVs) goes through:
  *   parse → weld (shared corners → one indexed vertex, degenerate triangles dropped) → Z-up to Y-up
  *   (STL front −Y faces glTF +Z) → scaled to its nominal height in metres, centred on x/z, base at y = 0 →
- *   meshopt simplify to ~--target triangles (error capped at 0.5 % of the piece's size) → crease-aware
+ *   meshopt simplify to ~--target triangles only when asked (error capped at 0.5 % of the piece's size; default: full detail) → crease-aware
  *   smooth normals (faces meeting at more than CREASE_DEG keep a hard edge) → one PBR material (no
- *   textures) → reorder + KHR_mesh_quantization + EXT_meshopt_compression (@gltf-transform meshopt 'high').
+ *   textures) → reorder + KHR_mesh_quantization (16-bit positions, 12-bit normals) + EXT_meshopt_compression (@gltf-transform meshopt 'medium').
  * GLTFModel.tsx loads them with drei useGLTF (meshopt decoder on), de-quantises and fits them by `height`.
  *
  * Every GLB is read back with NodeIO (one primitive with normals, one material). --verify renders every
@@ -34,7 +34,8 @@ const args = process.argv.slice(2)
 const stlDir = args.find((a) => !a.startsWith('--') && !/^\d+$/.test(a))
 const verify = args.includes('--verify')
 const targetIdx = args.indexOf('--target')
-const TARGET_TRIS = targetIdx >= 0 ? Number(args[targetIdx + 1]) : 18000
+/** Full detail unless --target asks for fewer triangles: the scans are small enough to ship whole. */
+const TARGET_TRIS = targetIdx >= 0 ? Number(args[targetIdx + 1]) : Infinity
 /** Simplifier error cap, relative to the piece's extent: 0.5 % ≈ 1.5 mm on a 0.3 m piece. */
 const MAX_ERROR = 0.005
 /** Faces meeting at more than this keep a hard edge (cut bamboo ends, plinth edges); gentler folds of the scan stay smooth. Env CREASE_DEG overrides. */
@@ -224,7 +225,7 @@ function buildDocument(piece, mesh) {
 /* ------------------------------------------------------------------ main */
 
 if (!stlDir || !fs.existsSync(stlDir)) {
-  console.error('usage: node scripts/import-team-models.mjs <stl dir> [--verify] [--target 18000]')
+  console.error('usage: node scripts/import-team-models.mjs <stl dir> [--verify] [--target <triangles>]')
   process.exit(2)
 }
 await Promise.all([MeshoptSimplifier.ready, MeshoptEncoder.ready, MeshoptDecoder.ready])
@@ -243,11 +244,12 @@ for (const piece of PIECES) {
   const welded = weldStl(stl.positions)
   const positions = toYUp(welded.positions, piece.height)
   const target = Math.min(welded.indices.length, TARGET_TRIS * 3)
-  const [simplified, relError] = MeshoptSimplifier.simplify(welded.indices, positions, 3, target, MAX_ERROR)
+  const [simplified, relError] = target < welded.indices.length ? MeshoptSimplifier.simplify(welded.indices, positions, 3, target, MAX_ERROR) : [welded.indices, 0]
   const small = compact(positions, simplified)
   const mesh = creaseNormals(small.positions, small.indices)
   const doc = buildDocument(piece, mesh)
-  await doc.transform(meshopt({ encoder: MeshoptEncoder, level: 'high' }))
+  // 'medium' keeps normals at 12 bits ('high' filters them to 8, which bands carved surfaces); positions at 16 bits ≈ 0.006 mm on a 0.42 m piece
+  await doc.transform(meshopt({ encoder: MeshoptEncoder, level: 'medium', quantizePosition: 16, quantizeNormal: 12 }))
   const out = path.join(OUT, `${piece.slug}.glb`)
   await io.write(out, doc)
 

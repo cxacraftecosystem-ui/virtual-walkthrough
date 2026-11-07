@@ -85,7 +85,8 @@ variant, High/Ultra the 2048 one, and the original file is the fallback (`exhibi
 node scripts/import-team-models.mjs <dir with the STLs> --verify
 ```
 
-(weld → Z-up to Y-up → metres → meshopt simplify to ~18k triangles → crease-aware normals → one stand-in
-PBR material → `KHR_mesh_quantization` + `EXT_meshopt_compression`; `--verify` compares STL and GLB
+(weld → Z-up to Y-up → metres → every triangle kept (`--target <n>` simplifies, if ever needed) → crease-aware
+normals → one stand-in PBR material → `KHR_mesh_quantization` at 16-bit positions and 12-bit normals +
+`EXT_meshopt_compression`, about 350 KB a piece; `--verify` compares STL and GLB
 silhouettes). They are already optimised, so `optimize-assets.mjs` skips `team/`. A database seeded before
 they existed gets the Gallery D items with `node scripts/add-team-models.mjs` (see its header).
