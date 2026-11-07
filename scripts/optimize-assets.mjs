@@ -1,7 +1,8 @@
 /**
  * Asset optimiser (models + artwork images).  node scripts/optimize-assets.mjs [--models] [--artworks] [--force]
  *
- * MODELS — every .glb/.gltf under public/models (incl. cc0/<id>/) except public/models/opt/ is written to
+ * MODELS — every .glb/.gltf under public/models (incl. cc0/<id>/) except public/models/opt/ and public/models/team/
+ *   (already optimised by scripts/import-team-models.mjs) is written to
  *   public/models/opt/<same relative dir>/<basename>.glb  (e.g. cc0/brass_pot_01/brass_pot_01_1k.gltf →
  *   opt/cc0/brass_pot_01.glb): dedup → prune → weld → textures (≤ 1024 px, re-encoded to WebP with
  *   EXT_texture_webp when smaller) → meshopt (reorder + KHR_mesh_quantization + EXT_meshopt_compression).
@@ -212,7 +213,8 @@ try {
     await MeshoptEncoder.ready
     await MeshoptDecoder.ready
     const io = new NodeIO().setLogger(new Logger(Logger.Verbosity.WARN)).registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder })
-    const files = walk(MODELS, (n) => /\.(gltf|glb)$/i.test(n), [OPT])
+    // team/ is written already optimised by scripts/import-team-models.mjs
+    const files = walk(MODELS, (n) => /\.(gltf|glb)$/i.test(n), [OPT, path.join(MODELS, 'team')])
     console.log(`models: ${files.length}`)
     for (const f of files) {
       const r = await optimiseModel(io, f)

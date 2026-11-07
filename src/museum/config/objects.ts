@@ -184,6 +184,126 @@ const THEATRE_ROWS = [0, 1, 2, 3, 4, 5].flatMap((r) =>
   })),
 )
 
+/**
+ * Gallery D — pieces from the workshop's team: a shallow crescent of six mini pedestals in the open
+ * north-east of the gallery, between the drape avenue and Regional Feature III, east of the block under
+ * glass. Each pedestal is 0.4 m square and ~1 m high with the 0.52 m glass hood, so the piece sits near
+ * eye level; models from scripts/import-team-models.mjs (public/models/team/).
+ * The crescent is an arc of TEAM_ARC.radius about TEAM_ARC.focus, a point on the drape avenue, and every
+ * piece faces that point — toward the middle of the room, which is also the side the museum walks a
+ * visitor to when the piece is clicked. Pedestals are TEAM_ARC.pitch apart along the arc; the crescent
+ * keeps ≥ 0.6 m walking room to everything, stays clear of the Gallery A door → block-under-glass
+ * sightline and of Regional Feature III's viewing area (tests/unit/team-pieces.test.ts).
+ * Placeholder: makers, places, dates and materials are for the curators to add.
+ */
+export const TEAM_ARC = { focus: { x: -17.72, z: -16.83 }, radius: 7, pitch: 1.25, centreDeg: 142 }
+const TEAM_SHARED =
+  'It comes from the workshop’s team. The 3D model carries no colour of its own, so the finish shown here is a stand-in; its maker, materials and story are still to be recorded.'
+export const TEAM_PIECES: SceneObjectConfig[] = (
+  [
+    // north-west → south-east: wood and bamboo, then the two figures nearest the Gallery A door
+    // slug, pedestal height, piece height, square, title, hi, bn, description, alt
+    // square: reads alike from all four sides and nearly fills its hood, so it stays square to the hood
+    [
+      'wooden-spoon',
+      1.05,
+      0.28,
+      false,
+      'Wooden Spoon',
+      'लकड़ी का चम्मच',
+      'কাঠের চামচ',
+      'A wooden spoon, displayed upright, with a deep oval bowl and a handle worked in openwork.',
+      'A wooden spoon standing upright, its handle worked into an open pattern.',
+    ],
+    [
+      'bamboo-frame-on-table',
+      1.05,
+      0.27,
+      true,
+      'Bamboo Frame on Table',
+      'मेज़ पर बाँस का ढाँचा',
+      'টেবিলের উপর বাঁশের কাঠামো',
+      'An open, box-like bamboo frame on four legs, braced on every side with an octagonal ring of bamboo.',
+      'An open bamboo frame on four legs, each side braced with an octagonal bamboo ring.',
+    ],
+    [
+      'bamboo-sentinel',
+      0.95,
+      0.42,
+      false,
+      'Bamboo Sentinel',
+      'बाँस का प्रहरी',
+      'বাঁশের প্রহরী',
+      'Two upright bamboo poles rise from a length of bamboo laid on split-bamboo feet; a pierced bamboo cylinder hangs from a short arm near the top.',
+      'A bamboo piece: two upright poles on a bamboo base, with a pierced bamboo cylinder hung near the top.',
+    ],
+    [
+      'bamboo-stand',
+      0.95,
+      0.38,
+      false,
+      'Bamboo Stand',
+      'बाँस का स्टैंड',
+      'বাঁশের স্ট্যান্ড',
+      'A length of bamboo with a surface in low relief, raised on a central post and slender curved legs.',
+      'A bamboo cylinder raised on a central post and slender curved legs.',
+    ],
+    [
+      'ganesha',
+      1.0,
+      0.32,
+      false,
+      'Ganesha',
+      'गणेश',
+      'গণেশ',
+      'A figure of Ganesha in relief on an upright panel, above a stepped base.',
+      'A relief panel showing Ganesha, the elephant-headed deity, above a stepped base.',
+    ],
+    [
+      'ganesha-statue',
+      1.0,
+      0.36,
+      false,
+      'Ganesha Statue',
+      'गणेश प्रतिमा',
+      'গণেশ মূর্তি',
+      'A seated, four-armed figure of Ganesha on a lotus base, framed by a halo behind the head.',
+      'A small statue of Ganesha, seated with four arms, on a lotus base with a halo behind.',
+    ],
+  ] as const
+).flatMap<SceneObjectConfig>(([slug, h, ph, square, title, hi, bn, text, alt], i, all) => {
+  const { focus, radius, pitch, centreDeg } = TEAM_ARC
+  // bearing from the focus (degrees, 0 = +z/south, 90 = +x/east, 180 = −z/north), spread evenly about centreDeg, first = north-west end
+  const a = ((centreDeg + (((all.length - 1) / 2 - i) * pitch * 180) / (Math.PI * radius)) * Math.PI) / 180
+  const cm = (v: number) => Math.round(v * 100) / 100
+  const x = cm(focus.x + radius * Math.sin(a))
+  const z = cm(focus.z + radius * Math.cos(a))
+  const id = `gd-team-${slug}`
+  const facing = (Math.atan2(focus.x - x, focus.z - z) * 180) / Math.PI
+  return [
+    { id, title: 'Pedestal', kind: 'pedestal', position: [x, 0, z], footprint: [0.4, 0.4], height: h, props: { cover: true }, zone: 'gallery-d' },
+    {
+      id: `${id}-object`,
+      title,
+      kind: 'vessel',
+      model: `/models/team/${slug}.glb`,
+      position: [x, h, z],
+      // the piece's front (+z of its model) faces the focus
+      rotationDeg: square ? Math.round(facing / 90) * 90 + 0 : Math.round(facing),
+      // the glass hood's interior: the click target (inside the pedestal's collider)
+      footprint: [0.34, 0.34],
+      height: ph,
+      interactive: true,
+      inspectable: true,
+      description: `${text} ${TEAM_SHARED}`,
+      alt,
+      zone: 'gallery-d',
+      placeholder: true,
+      i18n: { hi: { title: hi }, bn: { title: bn } },
+    },
+  ]
+})
+
 export const SCENE_OBJECTS: SceneObjectConfig[] = [
   // ══ Grand Atrium ═════════════════════════════════════════════════
   // five printed lengths hung high over the centre of the hall (bottom edges ≈ 4.5 m)
@@ -361,6 +481,7 @@ export const SCENE_OBJECTS: SceneObjectConfig[] = [
     { id, title: 'Pedestal', kind: 'pedestal', position: [x, 0, z], footprint: [0.55, 0.55], height: h, props: { cover: true }, zone: 'gallery-d' },
     { id: `${id}-object`, title, kind: 'vessel', model: cc0(model), modelScale: 1, position: [x, h, z], height: mh, zone: 'gallery-d', credit: PH(author, model) },
   ]),
+  ...TEAM_PIECES,
 
   // ══ Craft Workshop Hall ══════════════════════════════════════════
   // four printing tables either side of the east–west aisle from the atrium door (z ≈ 14.3)

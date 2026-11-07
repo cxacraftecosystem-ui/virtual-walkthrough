@@ -207,7 +207,9 @@ for (const dialect of DIALECTS) {
       const insertsOf = (s: string[]) => s.filter((sql) => /INSERT INTO content_items/.test(sql)).length
       assert.equal(insertsOf(original.statements), Math.ceil(items(seed) / 200), original.statements.join('\n'))
       assert.equal(insertsOf(big.statements), Math.ceil(items(grown) / 200))
-      assert.ok(big.statements.length <= original.statements.length + 2, `${big.statements.length} vs ${original.statements.length}`)
+      // only the chunked content INSERTs grow with the item count; every other statement stays the same
+      const others = (s: string[]) => s.length - insertsOf(s)
+      assert.equal(others(big.statements), others(original.statements), `${big.statements.length} vs ${original.statements.length}`)
 
       // The stored content is the seed, in order.
       for (const k of ['artworks', 'exhibits', 'infographics', 'videos', 'objects'] as const) {

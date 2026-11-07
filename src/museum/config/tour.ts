@@ -384,6 +384,8 @@ export const NAV_WAYPOINTS: [number, number][] = [
   [-16.0, DR.galleryToGalleryD.z],
   [GD.minX + 7.6, DR.galleryToGalleryD.z],
   [GDX, -22.8],
+  // inside the crescent of the team's pieces (objects.ts TEAM_PIECES), west of the first drape
+  [-15.7, -20.9],
   [-14.5, -10.5],
   [-22.0, -10.5],
   [DR.theatreToGalleryD.x, GD.maxZ - 1.1],

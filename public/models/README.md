@@ -75,3 +75,17 @@ bake/merge path, and fails if more than 1 % of the pixels differ. Sizes are reco
 model, re-run `npm run optimize:assets`. It skips outputs that are up to date; use `--force` to rebuild all.
 The same script writes `public/artworks/<name>.1024.webp` / `.2048.webp`. Low/Medium tiers use the 1024
 variant, High/Ultra the 2048 one, and the original file is the fallback (`exhibits/artworkTexture.ts`).
+
+## 5. The workshop team's pieces (`team/`)
+
+`team/<slug>.glb` are the six pieces from the workshop's team shown on mini pedestals in Gallery D
+(`TEAM_PIECES` in `src/museum/config/objects.ts`). They are made from the team's STL files by
+
+```sh
+node scripts/import-team-models.mjs <dir with the STLs> --verify
+```
+
+(weld → Z-up to Y-up → metres → meshopt simplify to ~18k triangles → crease-aware normals → one stand-in
+PBR material → `KHR_mesh_quantization` + `EXT_meshopt_compression`; `--verify` compares STL and GLB
+silhouettes). They are already optimised, so `optimize-assets.mjs` skips `team/`. A database seeded before
+they existed gets the Gallery D items with `node scripts/add-team-models.mjs` (see its header).
