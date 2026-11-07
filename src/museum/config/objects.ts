@@ -185,28 +185,39 @@ const THEATRE_ROWS = [0, 1, 2, 3, 4, 5].flatMap((r) =>
 )
 
 /**
- * Gallery D — pieces from the workshop's team: a shallow crescent of six mini pedestals in the open
- * north-east of the gallery, between the drape avenue and Regional Feature III, east of the block under
- * glass. Each pedestal is 0.4 m square and ~1 m high with the 0.52 m glass hood, so the piece sits near
- * eye level; models from scripts/import-team-models.mjs (public/models/team/).
- * The crescent is an arc of TEAM_ARC.radius about TEAM_ARC.focus, a point on the drape avenue, and every
- * piece faces that point — toward the middle of the room, which is also the side the museum walks a
- * visitor to when the piece is clicked. Pedestals are TEAM_ARC.pitch apart along the arc; the crescent
- * keeps ≥ 0.6 m walking room to everything, stays clear of the Gallery A door → block-under-glass
- * sightline and of Regional Feature III's viewing area (tests/unit/team-pieces.test.ts).
- * Placeholder: makers, places, dates and materials are for the curators to add.
+ * Gallery D — pieces from the workshop's team on six mini pedestals (0.4 m square, all TEAM_GRID.pedestalHeight
+ * high, under the 0.52 m glass hood, so the piece sits near eye level); models from scripts/import-team-models.mjs
+ * (public/models/team/). Placeholder: makers, places, dates and materials are for the curators to add.
+ *
+ * Layout: a 2 × 3 grid — two columns running north–south (parallel to the long east and west walls),
+ * TEAM_GRID.columnGap apart and centred on the room's east–west midline, so the margins to the west and east
+ * walls are equal (8.45 m each); three rows TEAM_GRID.rowPitch apart. The two southern rows sit symmetrically
+ * either side of the Gallery A door → map wall axis, leaving it a 3.2 m aisle centred on the doorway, and the
+ * northern row stands north of the first row of drapes; with the drapes (rows 7.2 m apart, centred on the same
+ * axis) every row of pedestals is midway between drapes and aisle. That puts the grid's centre 0.35 m north of
+ * the room's centre: margins 11.2 m to the north wall and 11.9 m to the south wall — the room's exact centre
+ * would push a row into the doorway's width (or a pedestal under a drape). Chosen by searching every 2 × 3 grid
+ * (both orientations, 0.1 m steps) against the real colliders and pathing: ≥ 0.8 m walking room to every
+ * collider, the door and theatre-door approaches, the map wall and the wall works' viewing areas kept free,
+ * the tour stops' views and the door → block-under-glass sightline open, and a route to the front of every
+ * piece (tests/unit/team-pieces.test.ts). Every piece faces east, toward the Gallery A door, so a visitor
+ * coming in sees each front; the square bamboo frame stays square to its hood.
  */
-export const TEAM_ARC = { focus: { x: -17.72, z: -16.83 }, radius: 7, pitch: 1.25, centreDeg: 142 }
+export const TEAM_GRID = { centreX: GDX, axisZ: D.galleryToGalleryD.z, columnGap: 3.4, rowPitch: 3.6, pedestalHeight: 1.0, facingDeg: 90 }
+/** Pedestal centre of grid cell (column 0 = west, row 0 = north). */
+export function teamGridCell(col: number, row: number) {
+  const { centreX, axisZ, columnGap, rowPitch } = TEAM_GRID
+  return { x: Math.round((centreX + (col - 0.5) * columnGap) * 100) / 100, z: Math.round((axisZ + (row - 1.5) * rowPitch) * 100) / 100 }
+}
 const TEAM_SHARED =
   'It comes from the workshop’s team. The 3D model carries no colour of its own, so the finish shown here is a stand-in; its maker, materials and story are still to be recorded.'
 export const TEAM_PIECES: SceneObjectConfig[] = (
   [
-    // north-west → south-east: wood and bamboo, then the two figures nearest the Gallery A door
-    // slug, pedestal height, piece height, square, title, hi, bn, description, alt
+    // grid order: row by row from the north, west then east — wood and bamboo, then the two figures by the aisle
+    // slug, piece height, square, title, hi, bn, description, alt
     // square: reads alike from all four sides and nearly fills its hood, so it stays square to the hood
     [
       'wooden-spoon',
-      1.05,
       0.28,
       false,
       'Wooden Spoon',
@@ -217,7 +228,6 @@ export const TEAM_PIECES: SceneObjectConfig[] = (
     ],
     [
       'bamboo-frame-on-table',
-      1.05,
       0.27,
       true,
       'Bamboo Frame on Table',
@@ -228,7 +238,6 @@ export const TEAM_PIECES: SceneObjectConfig[] = (
     ],
     [
       'bamboo-sentinel',
-      0.95,
       0.42,
       false,
       'Bamboo Sentinel',
@@ -239,7 +248,6 @@ export const TEAM_PIECES: SceneObjectConfig[] = (
     ],
     [
       'bamboo-stand',
-      0.95,
       0.38,
       false,
       'Bamboo Stand',
@@ -250,7 +258,6 @@ export const TEAM_PIECES: SceneObjectConfig[] = (
     ],
     [
       'ganesha',
-      1.0,
       0.32,
       false,
       'Ganesha',
@@ -261,7 +268,6 @@ export const TEAM_PIECES: SceneObjectConfig[] = (
     ],
     [
       'ganesha-statue',
-      1.0,
       0.36,
       false,
       'Ganesha Statue',
@@ -271,15 +277,10 @@ export const TEAM_PIECES: SceneObjectConfig[] = (
       'A small statue of Ganesha, seated with four arms, on a lotus base with a halo behind.',
     ],
   ] as const
-).flatMap<SceneObjectConfig>(([slug, h, ph, square, title, hi, bn, text, alt], i, all) => {
-  const { focus, radius, pitch, centreDeg } = TEAM_ARC
-  // bearing from the focus (degrees, 0 = +z/south, 90 = +x/east, 180 = −z/north), spread evenly about centreDeg, first = north-west end
-  const a = ((centreDeg + (((all.length - 1) / 2 - i) * pitch * 180) / (Math.PI * radius)) * Math.PI) / 180
-  const cm = (v: number) => Math.round(v * 100) / 100
-  const x = cm(focus.x + radius * Math.sin(a))
-  const z = cm(focus.z + radius * Math.cos(a))
+).flatMap<SceneObjectConfig>(([slug, ph, square, title, hi, bn, text, alt], i) => {
+  const { x, z } = teamGridCell(i % 2, Math.floor(i / 2))
+  const h = TEAM_GRID.pedestalHeight
   const id = `gd-team-${slug}`
-  const facing = (Math.atan2(focus.x - x, focus.z - z) * 180) / Math.PI
   return [
     { id, title: 'Pedestal', kind: 'pedestal', position: [x, 0, z], footprint: [0.4, 0.4], height: h, props: { cover: true }, zone: 'gallery-d' },
     {
@@ -288,8 +289,8 @@ export const TEAM_PIECES: SceneObjectConfig[] = (
       kind: 'vessel',
       model: `/models/team/${slug}.glb`,
       position: [x, h, z],
-      // the piece's front (+z of its model) faces the focus
-      rotationDeg: square ? Math.round(facing / 90) * 90 + 0 : Math.round(facing),
+      // the piece's front (+z of its model) faces east, toward the Gallery A door; a square piece stays square to its hood
+      rotationDeg: square ? Math.round(TEAM_GRID.facingDeg / 90) * 90 : TEAM_GRID.facingDeg,
       // the glass hood's interior: the click target (inside the pedestal's collider)
       footprint: [0.34, 0.34],
       height: ph,

@@ -14,6 +14,7 @@
  *   (409, reported as "already present"). Running it again is a no-op. Then it logs out.
  * Before writing it checks that the server serves every piece's GLB (public/models/team/, scripts/import-team-models.mjs),
  * so run it after the deploy that ships them. --dry-run reports what would be added and writes nothing.
+ * To move items that are already there to a new layout in objects.ts, use scripts/place-team-models.mjs.
  *
  * Output: one line per item (id and title, never credentials or cookies) and a summary; exit 1 on any failure.
  */

@@ -1,10 +1,12 @@
 /**
- * The workshop team's pieces in Gallery D (src/museum/config/objects.ts TEAM_PIECES): every mini pedestal
- * leaves walking room to the walls and every other collider, a visitor can walk from the entrance to stand
- * in front of each piece (tour/pathing), the crescent keeps clear of the Gallery A door → block-under-glass
- * sightline and of the gallery's wall artworks, and each GLB (public/models/team/) fits under its glass hood.
- *
- * npm test
+ * The workshop team's pieces in Gallery D (src/museum/config/objects.ts TEAM_PIECES / TEAM_GRID): six mini
+ * pedestals in a regular 2 × 3 grid — two north–south columns, three evenly spaced rows — centred east–west in
+ * the room (equal margins to the west and east walls) and within 0.35 m of its centre north–south, all the same
+ * height and every piece facing the Gallery A door; every pedestal leaves 0.8 m walking room to every wall or
+ * other collider, keeps the doorway's width open along the door → map wall axis, a visitor can walk from the
+ * entrance to stand in front of each piece (tour/pathing), the grid keeps clear of the door → block-under-glass
+ * sightline, the tour stops' views and the gallery's wall works, and each GLB (public/models/team/) fits under
+ * its glass hood.
  */
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
@@ -13,13 +15,16 @@ import { describe, it } from 'node:test'
 import { ARTWORKS } from '../../src/museum/config/artworks'
 import { SURFACES, ZONES, zoneAt } from '../../src/museum/config/layout'
 import { MUSEUM } from '../../src/museum/config/museum'
-import { SCENE_OBJECTS, TEAM_PIECES, type SceneObjectConfig } from '../../src/museum/config/objects'
-import { COLLIDERS, type Collider } from '../../src/museum/navigation/collision'
+import { TOUR_STOPS } from '../../src/museum/config/tour'
+import { SCENE_OBJECTS, TEAM_GRID, TEAM_PIECES, type SceneObjectConfig } from '../../src/museum/config/objects'
+import { COLLIDERS, segmentBlocked, type Collider } from '../../src/museum/navigation/collision'
 import { planPath, type P2 } from '../../src/museum/tour/pathing'
 
 const ROOT = path.resolve(import.meta.dirname, '../..')
-/** A visitor (0.28 m radius) passes with room to spare. */
-const WALKING_ROOM = 0.6
+/** A visitor (0.28 m radius) passes another with room to spare. */
+const WALKING_ROOM = 0.8
+const GD = MUSEUM.wings.galleryD
+const DOOR = MUSEUM.wings.doors.galleryToGalleryD
 /** Interior of the pedestal's glass hood (models/display.tsx: footprint − 0.06, 0.52 m high). */
 const HOOD_HEIGHT = 0.52
 
@@ -77,7 +82,7 @@ describe('team pieces in Gallery D', () => {
       assert.equal(p.position[0], ped.position[0])
       assert.equal(p.position[2], ped.position[2])
       assert.equal(p.position[1], ped.height, `${p.id} stands on the pedestal top`)
-      assert.ok(ped.height! >= 0.95 && ped.height! <= 1.05, `${ped.id} is a mini pedestal near eye level`)
+      assert.equal(ped.height, TEAM_GRID.pedestalHeight, `${ped.id} is as high as the others`)
       assert.deepEqual(ped.footprint, [0.4, 0.4])
       assert.equal(ped.props?.cover, true)
       assert.ok(p.height! <= HOOD_HEIGHT - 0.07, `${p.id} (${p.height} m) fits under the ${HOOD_HEIGHT} m hood`)
@@ -88,6 +93,52 @@ describe('team pieces in Gallery D', () => {
       }
       assert.ok(p.interactive && p.inspectable && p.placeholder, `${p.id}: interactive, inspectable, placeholder`)
       assert.ok(p.description && p.alt && p.i18n?.hi?.title && p.i18n?.bn?.title, `${p.id}: description, alt and hi/bn titles`)
+    }
+  })
+
+  it('stands the pedestals in a 2 × 3 grid with balanced margins to the walls', () => {
+    const round = (v: number) => Math.round(v * 100) / 100
+    const xs = [...new Set(pedestals.map((p) => round(p.position[0])))].sort((a, b) => a - b)
+    const zs = [...new Set(pedestals.map((p) => round(p.position[2])))].sort((a, b) => a - b)
+    assert.equal(xs.length, 2, `two columns: ${xs}`)
+    assert.equal(zs.length, 3, `three rows: ${zs}`)
+    for (const x of xs) assert.equal(pedestals.filter((p) => round(p.position[0]) === x).length, 3, `column x=${x} holds three`)
+    for (const z of zs) assert.equal(pedestals.filter((p) => round(p.position[2]) === z).length, 2, `row z=${z} holds two`)
+    assert.ok(Math.abs(zs[1] - zs[0] - (zs[2] - zs[1])) < 0.011, `rows evenly spaced: ${zs}`)
+    assert.ok(Math.abs(xs[1] - xs[0] - TEAM_GRID.columnGap) < 0.011 && Math.abs(zs[1] - zs[0] - TEAM_GRID.rowPitch) < 0.011)
+    // walking room between columns and between rows (pedestal edges)
+    const half = pedestals[0].footprint![0] / 2
+    assert.ok(xs[1] - xs[0] - 2 * half >= WALKING_ROOM && zs[1] - zs[0] - 2 * half >= WALKING_ROOM)
+    // margins from the grid's outer edges to the four walls
+    const west = xs[0] - half - GD.minX
+    const east = GD.maxX - (xs[1] + half)
+    const north = zs[0] - half - GD.minZ
+    const south = GD.maxZ - (zs[2] + half)
+    assert.ok(Math.abs(west - east) < 0.02, `equal margins west ${west.toFixed(2)} / east ${east.toFixed(2)} m`)
+    // north–south the two southern rows straddle the Gallery A door axis (the doorway's width stays an aisle),
+    // which puts the grid 0.35 m north of the room's centre: margins differ by 0.7 m at most
+    assert.ok(Math.abs(north - south) <= 0.72, `balanced margins north ${north.toFixed(2)} / south ${south.toFixed(2)} m`)
+    assert.ok(Math.abs((zs[1] + zs[2]) / 2 - DOOR.z) < 0.011, `the aisle rows straddle the door axis (z ${DOOR.z})`)
+  })
+
+  it('keeps the doorway’s full width open from the Gallery A door to the map wall', () => {
+    for (const ped of pedestals) {
+      const gap = Math.abs(ped.position[2] - DOOR.z) - ped.footprint![1] / 2
+      assert.ok(gap >= DOOR.width / 2, `${ped.id} is ${gap.toFixed(2)} m from the door axis`)
+    }
+  })
+
+  it('faces every piece the same way, toward the Gallery A door (east)', () => {
+    for (const p of pieces) assert.equal(p.rotationDeg, 90, `${p.id} faces east`)
+    assert.equal(TEAM_GRID.facingDeg, 90)
+  })
+
+  it('leaves every Gallery D tour stop its view of the item it describes', () => {
+    const mine = new Set(pedestals.map((p) => `object-${p.id}`))
+    for (const t of TOUR_STOPS) {
+      if (zoneAt(t.view.x, t.view.z)?.id !== 'gallery-d' || t.item?.kind !== 'object') continue
+      const o = SCENE_OBJECTS.find((s) => s.id === t.item!.id)!
+      assert.ok(!segmentBlocked(t.view.x, t.view.z, o.position[0], o.position[2], (c) => !mine.has(c.id)), `${t.id}: a team pedestal blocks the view`)
     }
   })
 
