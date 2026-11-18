@@ -55,7 +55,7 @@
     "busboy": "^1.6.0",
     "jose": "^6.2.14",
     "meshoptimizer": "^1.3.0",
-    "next": "^16.4.3",
+    "next": "^16.4.5",
     "openseadragon": "^6.1.1",
     "pg": "^8.23.1",
     "postprocessing": "^6.39.5",
