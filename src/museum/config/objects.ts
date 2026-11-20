@@ -209,12 +209,16 @@ export function teamGridCell(col: number, row: number) {
   const { centreX, axisZ, columnGap, rowPitch } = TEAM_GRID
   return { x: Math.round((centreX + (col - 0.5) * columnGap) * 100) / 100, z: Math.round((axisZ + (row - 1.5) * rowPitch) * 100) / 100 }
 }
-const TEAM_SHARED =
-  'It comes from the workshop’s team. The 3D model carries no colour of its own, so the finish shown here is a stand-in; its maker, materials and story are still to be recorded.'
+/** Closes every team piece's description: where the model comes from, and why its colour is not its own. */
+const TEAM_SHARED = {
+  en: 'From the workshop’s team; the 3D model carries no colour of its own, so the finish shown here is a stand-in.',
+  hi: 'यह कार्यशाला की टीम से आया है; 3D मॉडल का अपना कोई रंग नहीं है, इसलिए यहाँ दिखाई गई सतह अस्थायी है।',
+  bn: 'এটি কর্মশালার দল থেকে এসেছে; 3D মডেলটির নিজস্ব কোনো রং নেই, তাই এখানে দেখানো রং অস্থায়ী।',
+}
 export const TEAM_PIECES: SceneObjectConfig[] = (
   [
     // grid order: row by row from the north, west then east — wood and bamboo, then the two figures by the aisle
-    // slug, piece height, square, title, hi, bn, description, alt
+    // slug, piece height, square, title, hi, bn, description, alt, description (hi), description (bn)
     // square: reads alike from all four sides and nearly fills its hood, so it stays square to the hood
     [
       'wooden-spoon',
@@ -223,8 +227,10 @@ export const TEAM_PIECES: SceneObjectConfig[] = (
       'Wooden Spoon',
       'लकड़ी का चम्मच',
       'কাঠের চামচ',
-      'A wooden spoon, displayed upright, with a deep oval bowl and a handle worked in openwork.',
+      'A wooden spoon, displayed upright: a deep oval bowl below a long handle carved through in openwork. Spoons like this are cut and carved by hand from a single piece of wood — the same patient work with gouge and chisel that shapes a printing block.',
       'A wooden spoon standing upright, its handle worked into an open pattern.',
+      'लकड़ी का एक चम्मच, सीधा खड़ा करके प्रदर्शित: गहरा अंडाकार कटोरा, और ऊपर जालीदार नक्काशी वाला लंबा हत्था। ऐसे चम्मच हाथ से लकड़ी के एक ही टुकड़े से काटे और तराशे जाते हैं — वही धैर्य भरा छेनी-रुखानी का काम जो छपाई का ठप्पा गढ़ता है।',
+      'একটি কাঠের চামচ, খাড়া করে প্রদর্শিত: গভীর ডিম্বাকার বাটি, আর তার ওপরে জালিকাটা খোদাইয়ের লম্বা হাতল। এমন চামচ হাতে একটিমাত্র কাঠের টুকরো থেকে কেটে খোদাই করা হয় — সেই একই ধৈর্যের বাটালির কাজ, যা ছাপার ব্লক গড়ে।',
     ],
     [
       'bamboo-frame-on-table',
@@ -233,8 +239,10 @@ export const TEAM_PIECES: SceneObjectConfig[] = (
       'Bamboo Frame on Table',
       'मेज़ पर बाँस का ढाँचा',
       'টেবিলের উপর বাঁশের কাঠামো',
-      'An open, box-like bamboo frame on four legs, braced on every side with an octagonal ring of bamboo.',
+      'An open, box-like frame of bamboo standing on four legs, each side braced with an octagonal ring of bamboo. Bamboo is strong for its weight and can be bent as it is worked, so a few slender lengths make a frame that is both light and rigid — here every face repeats the same eight-sided ring.',
       'An open bamboo frame on four legs, each side braced with an octagonal bamboo ring.',
+      'बाँस का एक खुला, संदूक जैसा ढाँचा, चार पायों पर खड़ा; हर ओर बाँस के अष्टकोणीय छल्ले से कसा हुआ। बाँस अपने वज़न के हिसाब से मज़बूत होता है और गढ़ते समय मोड़ा जा सकता है, इसलिए कुछ पतली छड़ें ही हल्का पर दृढ़ ढाँचा बना देती हैं — यहाँ हर फलक वही आठ-कोना छल्ला दोहराता है।',
+      'বাঁশের একটি খোলা, বাক্সের মতো কাঠামো, চার পায়ার ওপর দাঁড়িয়ে; প্রতিটি দিক বাঁশের একটি অষ্টভুজ আংটায় বাঁধা। ওজনের তুলনায় বাঁশ মজবুত, আর কাজের সময় বাঁকানো যায়, তাই কয়েকটি সরু কাঠি দিয়েই হালকা অথচ দৃঢ় কাঠামো তৈরি হয় — এখানে প্রতিটি দিকে সেই একই আটকোনা আংটা।',
     ],
     [
       'bamboo-sentinel',
@@ -243,8 +251,10 @@ export const TEAM_PIECES: SceneObjectConfig[] = (
       'Bamboo Sentinel',
       'बाँस का प्रहरी',
       'বাঁশের প্রহরী',
-      'Two upright bamboo poles rise from a length of bamboo laid on split-bamboo feet; a pierced bamboo cylinder hangs from a short arm near the top.',
+      'Two upright bamboo poles rise from a length of bamboo laid on split-bamboo feet, and from a short arm near the top hangs a pierced bamboo cylinder, like a lantern. The one piece shows bamboo three ways: whole in the poles, split for the feet and pierced in the hanging cylinder.',
       'A bamboo piece: two upright poles on a bamboo base, with a pierced bamboo cylinder hung near the top.',
+      'बाँस के एक टुकड़े से, जो चिरे बाँस के पायों पर टिका है, दो सीधे बाँस उठते हैं; ऊपर एक छोटी भुजा से जालीदार बाँस का एक बेलन लालटेन की तरह लटका है। एक ही रचना में बाँस तीन रूपों में है: पूरा, खंभों में; चिरा हुआ, पायों में; और छेदा हुआ, लटकते बेलन में।',
+      'চেরা বাঁশের পায়ার ওপর শোয়ানো একটি বাঁশ থেকে দুটি খাড়া বাঁশ উঠেছে; ওপরে একটি ছোট বাহু থেকে লণ্ঠনের মতো ঝুলছে ছিদ্রকাটা বাঁশের একটি চোঙ। একটি রচনাতেই বাঁশ তিন রূপে: আস্ত, খুঁটিতে; চেরা, পায়ায়; আর ছিদ্র করা, ঝুলন্ত চোঙে।',
     ],
     [
       'bamboo-stand',
@@ -253,8 +263,10 @@ export const TEAM_PIECES: SceneObjectConfig[] = (
       'Bamboo Stand',
       'बाँस का स्टैंड',
       'বাঁশের স্ট্যান্ড',
-      'A length of bamboo with a surface in low relief, raised on a central post and slender curved legs.',
+      'A length of bamboo with its surface worked in low relief, raised on a central post and slender curved legs. Relief on bamboo is cut into the cane’s hard outer skin; set up on its stand, the cylinder is shown off like a precious object.',
       'A bamboo cylinder raised on a central post and slender curved legs.',
+      'बाँस का एक टुकड़ा, जिसकी सतह पर उभरी नक्काशी है, एक बीच के खंभे और पतले घुमावदार पायों पर उठा हुआ। बाँस पर उभरी नक्काशी उसकी कठोर बाहरी परत में काटी जाती है; स्टैंड पर रखा यह बेलन किसी कीमती वस्तु की तरह प्रदर्शित है।',
+      'একটি বাঁশের চোঙ, যার গায়ে উঁচু খোদাই, মাঝের একটি খুঁটি আর সরু বাঁকা পায়ার ওপর তোলা। বাঁশে উঁচু খোদাই কাটা হয় তার শক্ত বাইরের ত্বকে; স্ট্যান্ডের ওপর চোঙটি দেখানো হয়েছে কোনো মূল্যবান বস্তুর মতো।',
     ],
     [
       'ganesha',
@@ -263,8 +275,10 @@ export const TEAM_PIECES: SceneObjectConfig[] = (
       'Ganesha',
       'गणेश',
       'গণেশ',
-      'A figure of Ganesha in relief on an upright panel, above a stepped base.',
+      'Ganesha, the elephant-headed deity, in relief on an upright panel above a stepped base. Revered as the remover of obstacles and the lord of beginnings, Ganesha is invoked before any new undertaking — which is why his image so often stands at the threshold of a home, a shop or a workshop.',
       'A relief panel showing Ganesha, the elephant-headed deity, above a stepped base.',
+      'हाथी के मुख वाले देवता गणेश, एक सीधे फलक पर उभरी आकृति में, सीढ़ीदार आधार के ऊपर। विघ्नहर्ता और शुभारंभ के देवता के रूप में पूजे जाने वाले गणेश का स्मरण हर नए काम से पहले किया जाता है — इसीलिए उनकी छवि अक्सर घर, दुकान या कार्यशाला की दहलीज़ पर मिलती है।',
+      'হাতির মুখের দেবতা গণেশ, একটি খাড়া ফলকে উঁচু খোদাইয়ে, ধাপকাটা ভিতের ওপর। বিঘ্নহর্তা ও শুভ সূচনার দেবতা হিসেবে পূজিত গণেশকে যেকোনো নতুন কাজের আগে স্মরণ করা হয় — তাই তাঁর ছবি প্রায়ই দেখা যায় ঘর, দোকান বা কর্মশালার চৌকাঠে।',
     ],
     [
       'ganesha-statue',
@@ -273,11 +287,13 @@ export const TEAM_PIECES: SceneObjectConfig[] = (
       'Ganesha Statue',
       'गणेश प्रतिमा',
       'গণেশ মূর্তি',
-      'A seated, four-armed figure of Ganesha on a lotus base, framed by a halo behind the head.',
+      'A seated, four-armed Ganesha on a lotus base, framed by a halo behind his head. Enthroned on the lotus, haloed and four-armed, he appears in the form in which he is worshipped as the lord of beginnings: the deity honoured first, before any new work is begun.',
       'A small statue of Ganesha, seated with four arms, on a lotus base with a halo behind.',
+      'कमल के आधार पर बैठे चार भुजाओं वाले गणेश, सिर के पीछे प्रभामंडल। कमलासन पर, प्रभामंडल और चार भुजाओं के साथ, वे उस रूप में हैं जिसमें उन्हें शुभारंभ के देवता के रूप में पूजा जाता है — वह देवता जिनका पूजन किसी भी नए काम से पहले होता है।',
+      'পদ্মের ভিতের ওপর বসা চার হাতের গণেশ, মাথার পেছনে জ্যোতির্বলয়। পদ্মাসনে, জ্যোতির্বলয় ও চার হাত নিয়ে, তিনি সেই রূপে, যে রূপে তাঁকে শুভ সূচনার দেবতা হিসেবে পূজা করা হয় — যেকোনো নতুন কাজের আগে প্রথম পূজা পান যিনি।',
     ],
   ] as const
-).flatMap<SceneObjectConfig>(([slug, ph, square, title, hi, bn, text, alt], i) => {
+).flatMap<SceneObjectConfig>(([slug, ph, square, title, hi, bn, text, alt, textHi, textBn], i) => {
   const { x, z } = teamGridCell(i % 2, Math.floor(i / 2))
   const h = TEAM_GRID.pedestalHeight
   const id = `gd-team-${slug}`
@@ -296,11 +312,11 @@ export const TEAM_PIECES: SceneObjectConfig[] = (
       height: ph,
       interactive: true,
       inspectable: true,
-      description: `${text} ${TEAM_SHARED}`,
+      description: `${text} ${TEAM_SHARED.en}`,
       alt,
       zone: 'gallery-d',
       placeholder: true,
-      i18n: { hi: { title: hi }, bn: { title: bn } },
+      i18n: { hi: { title: hi, description: `${textHi} ${TEAM_SHARED.hi}` }, bn: { title: bn, description: `${textBn} ${TEAM_SHARED.bn}` } },
     },
   ]
 })

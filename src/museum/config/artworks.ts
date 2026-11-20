@@ -20,12 +20,17 @@
  *                  wall (the west wall centre is the India map installation — objects.ts).
  *   Atrium / reception  a monumental textile on the atrium west wall; three small studies.
  *
- * STAND-IN STATUS: every image below is a procedurally generated design (see
+ * THE WORKSHOP'S TEXTILES: twenty slots (the five heroes, the reveal wall, most of Galleries A–D) hold the
+ * textiles the workshop photographed and captioned — workshopTextiles.ts, applied by `slot` at the end of
+ * this file (real image, maker, region, the team's caption; `placeholder: false`, no stand-in deep zoom).
+ *
+ * STAND-IN STATUS: every other image below is a procedurally generated design (see
  * scripts/generate-placeholders.mjs) flagged `placeholder: true`; its description says it was made
  * for this exhibition, so nothing is passed off as a documented textile.
  */
 
 import { COURT_CENTER, BAY } from './layout'
+import { WORKSHOP_TEXTILES, type WorkshopTextile } from './workshopTextiles'
 import type { FrameConfig, FrameStyleId } from './frames'
 import type { SurfaceId } from './layout'
 import { MUSEUM } from './museum'
@@ -126,7 +131,39 @@ const GDX = (GD.minX + GD.maxX) / 2
 const SALON_WASHED = { enabled: false }
 const salon = (dz: number, cy: number): Place => ({ surface: 'gallery-a-partition', at: S + dz, centerHeight: cy })
 
-export const ARTWORKS: ArtworkConfig[] = [
+/**
+ * A workshop textile in a stand-in's slot: the slot keeps its place, frame, light, hero flag and printing-block
+ * table; everything that described the stand-in (title, design note, generated image and deep zoom, the empty
+ * maker profile) gives way to the textile's own record.
+ */
+function hang(slot: ArtworkConfig, t: WorkshopTextile): ArtworkConfig {
+  const { placement, frame, spotlight, hero, exhibitId, label, maxWidth, maxHeight, physicalWidth } = slot
+  return {
+    id: slot.id,
+    title: t.title,
+    tradition: t.tradition,
+    artisan: t.artisan,
+    region: t.region,
+    technique: t.technique,
+    ...(t.material ? { material: t.material } : {}),
+    description: t.description,
+    alt: t.alt,
+    image: `/artworks/${t.slug}.jpg`,
+    placement: t.fit?.centerHeight !== undefined ? { ...placement, centerHeight: t.fit.centerHeight } : placement,
+    maxWidth: t.fit?.maxWidth ?? maxWidth,
+    maxHeight: t.fit?.maxHeight ?? maxHeight,
+    ...(physicalWidth !== undefined ? { physicalWidth } : {}),
+    ...(frame !== undefined ? { frame } : {}),
+    ...(spotlight !== undefined ? { spotlight } : {}),
+    ...(hero ? { hero } : {}),
+    ...(exhibitId ? { exhibitId } : {}),
+    ...(label !== undefined ? { label } : {}),
+    placeholder: false,
+    i18n: t.i18n,
+  }
+}
+
+const STAND_INS: ArtworkConfig[] = [
   // ══ Gallery A — south bay ═════════════════════════════════════════
   work('hero-01', 'Hero Textile I', 'hero-01', { surface: 'gallery-a-outer', at: S, centerHeight: 1.75 }, { hero: true, maxWidth: 1.75, maxHeight: 2.3, frame: 'natural-wood', exhibitId: 'block-01' }),
   work('feature-04', 'Printed Length — Feature', 'feature-04', { surface: 'island-a-south-outer', at: S, centerHeight: 1.65 }, { maxWidth: 2.6, maxHeight: 2.2, frame: 'dark-wood' }),
@@ -184,6 +221,19 @@ export const ARTWORKS: ArtworkConfig[] = [
   work('study-16', 'Study XVI', 'study-16', { surface: 'reception-west', at: 7.05, centerHeight: 1.55 }, { maxWidth: 0.72, maxHeight: 0.95, frame: 'white', spotlight: { intensity: 14 } }),
   work('study-12', 'Study XII', 'study-12', { surface: 'reception-east', at: 1.5, centerHeight: 1.55 }, { maxWidth: 1.0, maxHeight: 0.8, frame: 'brass-slim', spotlight: { intensity: 14 } }),
 ]
+
+const TEXTILE_BY_SLOT = new Map(WORKSHOP_TEXTILES.map((t) => [t.slot, t]))
+
+/** The stand-in hang with the workshop's textiles in their slots (workshopTextiles.ts). */
+export const ARTWORKS: ArtworkConfig[] = STAND_INS.map((a) => {
+  const t = TEXTILE_BY_SLOT.get(a.id)
+  return t ? hang(a, t) : a
+})
+
+/** The stand-in a slot held before a workshop textile took it (scripts/sync-workshop-content.mjs compares against it). */
+export function standInFor(id: string) {
+  return STAND_INS.find((a) => a.id === id)
+}
 
 export function getArtwork(id: string) {
   return ARTWORKS.find((a) => a.id === id)

@@ -26,7 +26,8 @@ The admin's **Checklist** page lists, per item, what is still missing and export
 
 | What | Where in the museum | What is shown meanwhile |
 |---|---|---|
-| Photographs and details (artisan, region, material, technique, year) of the 5 hero textiles and the ~35 other works | Galleries A–D, craft court, atrium, reception | Generated designs, described as "made for this exhibition" |
+| Year and real size of the workshop's 20 textiles (their photographs, makers and captions are in — `src/museum/config/workshopTextiles.ts`, images by `scripts/import-workshop-textiles.mjs`) | The 5 heroes, the reveal wall, Galleries A–D | Each fitted to its frame; no year shown |
+| Photographs and details (artisan, region, material, technique, year) of the 21 other works | Gallery A salon and island faces, craft court, Gallery D, atrium, reception | Generated designs, described as "made for this exhibition" |
 | 3D scans of the 9 printing blocks (`block-01 … block-09`) and of the two centrepiece blocks | Hand-block tables, craft court, Gallery D | Modelled blocks |
 | Curatorial text for the 6 craft panels (Regional History, Natural Dyes, Technique, Process, the salon key panel, Gallery D introduction) | Product wall, Gallery A, Gallery D | Title and illustration only |
 | Interpretive text for the workshop and courtyard installations: printing tables, dye vats, block archives, wash tank, pigment station, drying lines, cloth rolls, carving bench, rinsing channel | Craft Workshop Hall, Dye Garden Courtyard | Title only |
