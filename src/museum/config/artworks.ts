@@ -24,13 +24,18 @@
  * textiles the workshop photographed and captioned — workshopTextiles.ts, applied by `slot` at the end of
  * this file (real image, maker, region, the team's caption; `placeholder: false`, no stand-in deep zoom).
  *
- * STAND-IN STATUS: every other image below is a procedurally generated design (see
- * scripts/generate-placeholders.mjs) flagged `placeholder: true`; its description says it was made
- * for this exhibition, so nothing is passed off as a documented textile.
+ * MUSEUM OPEN-ACCESS TEXTILES: the other twenty-one slots hold documented Indian printed textiles from the
+ * open-access collections of the Art Institute of Chicago, the Cleveland Museum of Art and Cooper Hewitt (all
+ * CC0) — sourcedTextiles.ts, applied the same way, each crediting its museum, object number and licence.
+ *
+ * STAND-IN STATUS: the stand-in list below keeps every slot's generated design (scripts/generate-placeholders.mjs,
+ * flagged `placeholder: true`, described as made for this exhibition): it is what a slot shows if neither list
+ * fills it, and what scripts/sync-workshop-content.mjs checks a live slot against before replacing it.
  */
 
 import { COURT_CENTER, BAY } from './layout'
 import { WORKSHOP_TEXTILES, type WorkshopTextile } from './workshopTextiles'
+import { SOURCED_TEXTILES, sourcedMetadata, type SourcedTextile } from './sourcedTextiles'
 import type { FrameConfig, FrameStyleId } from './frames'
 import type { SurfaceId } from './layout'
 import { MUSEUM } from './museum'
@@ -163,6 +168,36 @@ function hang(slot: ArtworkConfig, t: WorkshopTextile): ArtworkConfig {
   }
 }
 
+/**
+ * A museum open-access textile in a stand-in's slot: like `hang`, with the record's date, size and credit — but no
+ * printing-block table link (`exhibitId`): no block in this museum printed a centuries-old museum piece.
+ */
+function hangSourced(slot: ArtworkConfig, t: SourcedTextile): ArtworkConfig {
+  const { placement, frame, spotlight, hero, label, maxWidth, maxHeight } = slot
+  return {
+    id: slot.id,
+    title: t.title,
+    tradition: t.tradition,
+    region: t.region,
+    material: t.material,
+    technique: t.technique,
+    year: t.date,
+    description: t.description,
+    alt: t.alt,
+    image: `/artworks/${t.slug}.jpg`,
+    placement,
+    maxWidth,
+    maxHeight,
+    ...(frame !== undefined ? { frame } : {}),
+    ...(spotlight !== undefined ? { spotlight } : {}),
+    ...(hero ? { hero } : {}),
+    ...(label !== undefined ? { label } : {}),
+    placeholder: false,
+    metadata: sourcedMetadata(t),
+    i18n: t.i18n,
+  }
+}
+
 const STAND_INS: ArtworkConfig[] = [
   // ══ Gallery A — south bay ═════════════════════════════════════════
   work('hero-01', 'Hero Textile I', 'hero-01', { surface: 'gallery-a-outer', at: S, centerHeight: 1.75 }, { hero: true, maxWidth: 1.75, maxHeight: 2.3, frame: 'natural-wood', exhibitId: 'block-01' }),
@@ -223,11 +258,14 @@ const STAND_INS: ArtworkConfig[] = [
 ]
 
 const TEXTILE_BY_SLOT = new Map(WORKSHOP_TEXTILES.map((t) => [t.slot, t]))
+const SOURCED_BY_SLOT = new Map(SOURCED_TEXTILES.map((t) => [t.slot, t]))
 
-/** The stand-in hang with the workshop's textiles in their slots (workshopTextiles.ts). */
+/** The hang: the workshop's textiles (workshopTextiles.ts) and the open-access ones (sourcedTextiles.ts) in their slots. */
 export const ARTWORKS: ArtworkConfig[] = STAND_INS.map((a) => {
   const t = TEXTILE_BY_SLOT.get(a.id)
-  return t ? hang(a, t) : a
+  if (t) return hang(a, t)
+  const s = SOURCED_BY_SLOT.get(a.id)
+  return s ? hangSourced(a, s) : a
 })
 
 /** The stand-in a slot held before a workshop textile took it (scripts/sync-workshop-content.mjs compares against it). */

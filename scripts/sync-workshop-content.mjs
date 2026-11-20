@@ -1,7 +1,10 @@
 /**
  * Brings a deployed hand-block museum's database in line with the bundled config for
- *   1. the workshop's twenty textiles (src/museum/config/workshopTextiles.ts) in their artwork slots, and
- *   2. the new descriptions of the workshop team's six 3D pieces in Gallery D (objects.ts TEAM_PIECES)
+ *   1. the forty-one artwork slots: the workshop's twenty textiles (src/museum/config/workshopTextiles.ts) and the
+ *      twenty-one open-access museum textiles (sourcedTextiles.ts);
+ *   2. the printing block whose slot now holds a museum textile (exhibits.ts: it names no artwork any more);
+ *   3. the salon key panel (infographics.ts 'info-salon'), which now introduces its seven fragments;
+ *   4. the new descriptions of the workshop team's six 3D pieces in Gallery D (objects.ts TEAM_PIECES)
  * — touching nothing else.
  *
  *   MUSEUM_URL=https://… MUSEUM_ADMIN_EMAIL=… MUSEUM_ADMIN_PASSWORD=… node scripts/sync-workshop-content.mjs [--dry-run]
@@ -10,12 +13,12 @@
  * Why: the database is seeded from the bundled config once (contentStore seedContent, onlyIfEmpty), so content
  * changes reach a live museum only through the admin API. This script acts as a careful curator would:
  *   - refuses to run until the server serves every textile image (/artworks/<slug>.jpg and its .1024/.2048.webp);
- *   - signs in, reads every item's stamp (GET /api/admin/content/stamps) and the current artworks and objects;
- *   - an artwork slot is replaced by its textile only while it is still the untouched stand-in: the generated
- *     image, title and design note of the bundled stand-in, flagged placeholder, never saved since it was seeded.
- *     The slot's maker link (if any) is kept. One a curator has changed or removed is LEFT and reported (exit 1);
- *   - a team piece gets its new description (and Hindi / Bengali) only while it still carries the previous
- *     bundled description; every other field stays as stored. One a curator has rewritten is LEFT (exit 1);
+ *   - signs in, reads every item's stamp (GET /api/admin/content/stamps) and the current items;
+ *   - changes an item only while it is still exactly what was seeded — never saved by a person (no `updatedBy`
+ *     in its stamp) and still the stand-in: an artwork slot with its generated image, title and stand-in note;
+ *     the block still naming that slot; the key panel still empty; a team piece with its previous description.
+ *     The slot's maker link (if any) is kept, and a team piece keeps every field but its description. Anything
+ *     a curator has changed or removed is LEFT and reported (exit 1);
  *   - every write sends the item's stamp as X-Expected-Updated-At, so an item saved by someone in the meantime
  *     is refused by the server (409): reported, skipped, exit 1;
  *   - a saved tour override (if the exhibition has one) is reported, not rewritten: its captions are the
@@ -41,8 +44,14 @@ if (!base || !email || !password) {
 }
 
 const { WORKSHOP_TEXTILES } = await tsImport('../src/museum/config/workshopTextiles.ts', import.meta.url)
+const { SOURCED_TEXTILES } = await tsImport('../src/museum/config/sourcedTextiles.ts', import.meta.url)
 const { ARTWORKS, standInFor } = await tsImport('../src/museum/config/artworks.ts', import.meta.url)
+const { EXHIBITS } = await tsImport('../src/museum/config/exhibits.ts', import.meta.url)
+const { INFOGRAPHICS } = await tsImport('../src/museum/config/infographics.ts', import.meta.url)
 const { TEAM_PIECES } = await tsImport('../src/museum/config/objects.ts', import.meta.url)
+
+const TEXTILES = [...WORKSHOP_TEXTILES.map((t) => ({ ...t, from: 'workshop' })), ...SOURCED_TEXTILES.map((t) => ({ ...t, from: 'open access' }))]
+const SOURCED_SLOTS = new Set(SOURCED_TEXTILES.map((t) => t.slot))
 
 /** The team pieces' descriptions as first seeded (objects.ts before the workshop's descriptions). */
 const OLD_TEAM_SHARED =
@@ -65,17 +74,30 @@ const canon = (v) =>
   Array.isArray(v) ? `[${v.map(canon).join(',')}]` : v && typeof v === 'object' ? `{${Object.keys(v).sort().filter((k) => v[k] !== undefined).map((k) => `${JSON.stringify(k)}:${canon(v[k])}`).join(',')}}` : JSON.stringify(v ?? null)
 /** Does the stored item hold every field of `want` (and none of `gone`)? Other stored keys are not ours to judge. */
 const holds = (cur, want, gone = []) => Object.keys(want).every((k) => canon(cur[k]) === canon(want[k])) && gone.every((k) => cur[k] === undefined)
-/** Fields a stand-in carried that its textile does not. */
-const STAND_IN_ONLY = ['deepZoom', 'highRes', 'physicalWidth', 'metadata', 'context', 'year']
+/** Fields a stand-in carried that its textile may not. */
+const STAND_IN_ONLY = ['deepZoom', 'highRes', 'physicalWidth', 'metadata', 'context', 'year', 'exhibitId', 'artisan', 'material', 'technique']
 
 let cookie = ''
+/**
+ * One admin API request. A dropped connection is retried (twice); safe for writes too: they carry the item's stamp,
+ * so if a lost response hid a write that did land, the retry is refused (409) and reported, never applied twice.
+ */
 async function call(method, path, body, headers = {}) {
-  const res = await fetch(`${base}${path}`, {
-    method,
-    headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...(cookie ? { cookie } : {}), ...headers },
-    body: body ? JSON.stringify(body) : undefined,
-    redirect: 'manual',
-  })
+  let res
+  for (let attempt = 0; ; attempt++) {
+    try {
+      res = await fetch(`${base}${path}`, {
+        method,
+        headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...(cookie ? { cookie } : {}), ...headers },
+        body: body ? JSON.stringify(body) : undefined,
+        redirect: 'manual',
+      })
+      break
+    } catch (e) {
+      if (attempt >= 2) throw e
+      await new Promise((ok) => setTimeout(ok, 1000 * (attempt + 1)))
+    }
+  }
   const text = await res.text()
   let json
   try {
@@ -90,10 +112,15 @@ const why = (r) => `${r.res.status} ${r.json?.message ?? r.json?.error ?? r.res.
 console.log(`museum: ${base}${exhibition ? `, exhibition ${exhibition}` : ' (default exhibition)'}${dryRun ? ' — dry run' : ''}`)
 
 // 1. the images must be live first, or the slots would show "image unavailable"
-const files = WORKSHOP_TEXTILES.flatMap((t) => [`/artworks/${t.slug}.jpg`, `/artworks/${t.slug}.1024.webp`, `/artworks/${t.slug}.2048.webp`])
+const files = TEXTILES.flatMap((t) => [`/artworks/${t.slug}.jpg`, `/artworks/${t.slug}.1024.webp`, `/artworks/${t.slug}.2048.webp`])
 const missing = []
 for (const f of files) {
-  const r = await fetch(`${base}${f}`, { method: 'HEAD' }).catch(() => null)
+  // a dropped connection is retried (twice); a real 404 is not
+  let r = null
+  for (let attempt = 0; attempt < 3 && !r; attempt++) {
+    r = await fetch(`${base}${f}`, { method: 'HEAD' }).catch(() => null)
+    if (!r) await new Promise((ok) => setTimeout(ok, 1000 * (attempt + 1)))
+  }
   if (!r?.ok) missing.push(`${f} (${r ? r.status : 'fetch failed'})`)
 }
 if (missing.length) {
@@ -114,13 +141,17 @@ cookie = login.res.headers
   .join('; ')
 console.log(`signed in (${login.json?.role ?? 'unknown role'})`)
 
-const counts = { replaced: 0, described: 0, upToDate: 0, left: 0, conflicts: 0, failed: 0 }
+const counts = { written: 0, upToDate: 0, left: 0, conflicts: 0, failed: 0 }
 try {
-  const [stampsR, artR, objR] = await Promise.all([call('GET', `/api/admin/content/stamps${q}`), call('GET', `/api/admin/content/artworks${q}`), call('GET', `/api/admin/content/objects${q}`)])
-  for (const r of [stampsR, artR, objR]) if (!r.res.ok) throw new Error(`reading content failed: ${why(r)}`)
+  const read = async (collection) => {
+    const r = await call('GET', `/api/admin/content/${collection}${q}`)
+    if (!r.res.ok) throw new Error(`reading ${collection} failed: ${why(r)}`)
+    return new Map(r.json.map((x) => [x.id, x]))
+  }
+  const stampsR = await call('GET', `/api/admin/content/stamps${q}`)
+  if (!stampsR.res.ok) throw new Error(`reading stamps failed: ${why(stampsR)}`)
   const stamps = stampsR.json.stamps ?? {}
-  const artworks = new Map(artR.json.map((a) => [a.id, a]))
-  const objects = new Map(objR.json.map((o) => [o.id, o]))
+  const [artworks, exhibits, infographics, objects] = [await read('artworks'), await read('exhibits'), await read('infographics'), await read('objects')]
 
   async function save(collection, item, stamp, verb) {
     if (dryRun) {
@@ -138,47 +169,84 @@ try {
       console.log(`  FAILED    ${label(item)} — ${why(r)}`)
       return
     }
+    counts.written++
     console.log(`  ${verb.padEnd(9)} ${label(item)}`)
+  }
+  const upToDate = (cur) => {
+    counts.upToDate++
+    console.log(`  ok        ${label(cur)}`)
+  }
+  const left = (what, why) => {
+    counts.left++
+    console.log(`  LEFT      ${what} — ${why}`)
   }
 
   // 3. the textiles
-  console.log('the workshop’s textiles:')
-  for (const t of WORKSHOP_TEXTILES) {
+  console.log('the textiles (workshop and open access):')
+  for (const t of TEXTILES) {
     const want = ARTWORKS.find((a) => a.id === t.slot)
     const was = standInFor(t.slot)
     const cur = artworks.get(t.slot)
     const stamp = stamps[`artworks/${t.slot}`]
     if (!cur) {
-      counts.left++
-      console.log(`  LEFT      ${t.slot} — not in the museum (removed by a curator?); hang “${t.title}” from the admin if wanted`)
+      left(t.slot, `not in the museum (removed by a curator?); hang “${t.title}” (${t.slug}.jpg) from the admin if wanted`)
       continue
     }
-    const next = { ...want, ...(cur.artisanId ? { artisanId: cur.artisanId } : {}) }
-    if (holds(cur, next, STAND_IN_ONLY.filter((k) => want[k] === undefined))) {
-      counts.upToDate++
-      console.log(`  ok        ${label(cur)}`)
+    const next = { ...want, ...(cur.artisanId && t.from === 'workshop' ? { artisanId: cur.artisanId } : {}) }
+    if (holds(cur, next, STAND_IN_ONLY.filter((k) => next[k] === undefined))) {
+      upToDate(cur)
       continue
     }
     // the stand-in as seeded (its note is today's DESIGN_NOTE or the earlier calibration note) and never saved since
     const standInNote = cur.description === was.description || /^Placeholder image generated for layout and lighting calibration\./.test(cur.description ?? '')
     const untouched = cur.placeholder === true && cur.image === was.image && cur.title === was.title && standInNote && !stamp?.updatedBy
     if (!untouched) {
-      counts.left++
-      console.log(`  LEFT      ${label(cur)} — a curator has changed this slot; hang “${t.title}” (${t.slug}.jpg) from the admin if wanted`)
+      left(label(cur), `a curator has changed this slot; hang “${t.title}” (${t.slug}.jpg) from the admin if wanted`)
       continue
     }
-    if (!dryRun) counts.replaced++
     await save('artworks', next, stamp?.updatedAt ?? 'new', 'replace')
   }
 
-  // 4. the team pieces' descriptions
+  // 4. a block whose slot now holds a museum textile names no artwork
+  console.log('the printing blocks:')
+  for (const want of EXHIBITS.filter((e) => e.artworkId === '')) {
+    const cur = exhibits.get(want.id)
+    const stamp = stamps[`exhibits/${want.id}`]
+    if (!cur) {
+      left(want.id, 'not in the museum')
+      continue
+    }
+    if (!cur.artworkId) {
+      upToDate(cur)
+      continue
+    }
+    if (!SOURCED_SLOTS.has(cur.artworkId) || cur.placeholder !== true || stamp?.updatedBy) {
+      left(label(cur), `a curator has linked it to “${cur.artworkId}”; kept`)
+      continue
+    }
+    await save('exhibits', { ...cur, artworkId: '' }, stamp.updatedAt, 'unlink')
+  }
+
+  // 5. the salon key panel
+  console.log('the salon key panel:')
+  {
+    const want = INFOGRAPHICS.find((i) => i.id === 'info-salon')
+    const cur = infographics.get('info-salon')
+    const stamp = stamps['infographics/info-salon']
+    if (!cur) left('info-salon', 'not in the museum')
+    else if (holds(cur, want, want.placeholder ? [] : ['placeholder'])) upToDate(cur)
+    // as seeded: an empty body, or the earlier "to be supplied" note
+    else if (cur.placeholder !== true || !/^(|Curatorial text to be supplied by the workshop\..*)$/.test(cur.body ?? '') || stamp?.updatedBy) left(label(cur), 'a curator has written this panel; kept')
+    else await save('infographics', { ...cur, ...want, placeholder: undefined }, stamp.updatedAt, 'write')
+  }
+
+  // 6. the team pieces' descriptions
   console.log('the workshop team’s 3D pieces:')
   for (const want of TEAM_PIECES.filter((o) => o.model)) {
     const cur = objects.get(want.id)
     const stamp = stamps[`objects/${want.id}`]
     if (!cur) {
-      counts.left++
-      console.log(`  LEFT      ${want.id} — not in the museum`)
+      left(want.id, 'not in the museum')
       continue
     }
     const next = {
@@ -187,20 +255,17 @@ try {
       i18n: { ...cur.i18n, hi: { ...cur.i18n?.hi, description: want.i18n.hi.description }, bn: { ...cur.i18n?.bn, description: want.i18n.bn.description } },
     }
     if (holds(cur, { description: next.description, i18n: next.i18n })) {
-      counts.upToDate++
-      console.log(`  ok        ${label(cur)}`)
+      upToDate(cur)
       continue
     }
     if (cur.description !== previousTeamDescription(want.id)) {
-      counts.left++
-      console.log(`  LEFT      ${label(cur)} — its description was rewritten by a curator; kept`)
+      left(label(cur), 'its description was rewritten by a curator; kept')
       continue
     }
-    if (!dryRun) counts.described++
     await save('objects', next, stamp?.updatedAt ?? 'new', 'describe')
   }
 
-  // 5. a saved tour override keeps its own captions
+  // 7. a saved tour override keeps its own captions
   const pub = await call('GET', `/api/content${q}`)
   if (pub.res.ok && Array.isArray(pub.json?.tour) && pub.json.tour.length) {
     console.log(`note: this exhibition has a saved tour (${pub.json.tour.length} stops); its captions are kept — update them in the admin to name the new textiles`)
@@ -213,17 +278,19 @@ try {
   cookie = ''
 }
 
-// 6. what visitors get
+// 8. what visitors get
 const pub = await call('GET', `/api/content${q}`)
 if (pub.res.ok) {
   const arts = new Map((pub.json.artworks ?? []).map((a) => [a.id, a]))
-  const hung = WORKSHOP_TEXTILES.filter((t) => arts.get(t.slot)?.image === `/artworks/${t.slug}.jpg`).length
+  const hung = (list) => list.filter((t) => arts.get(t.slot)?.image === `/artworks/${t.slug}.jpg`).length
   const objs = new Map((pub.json.objects ?? []).map((o) => [o.id, o]))
-  const described = TEAM_PIECES.filter((o) => o.model && objs.get(o.id)?.description === o.description).length
-  console.log(`visitors get ${hung}/${WORKSHOP_TEXTILES.length} workshop textiles and ${described}/${TEAM_PIECES.filter((o) => o.model).length} new team descriptions`)
+  const pieces = TEAM_PIECES.filter((o) => o.model)
+  const described = pieces.filter((o) => objs.get(o.id)?.description === o.description).length
+  const salon = (pub.json.infographics ?? []).find((i) => i.id === 'info-salon')
+  console.log(
+    `visitors get ${hung(WORKSHOP_TEXTILES)}/${WORKSHOP_TEXTILES.length} workshop textiles, ${hung(SOURCED_TEXTILES)}/${SOURCED_TEXTILES.length} open-access textiles, ` +
+      `the salon key panel ${salon?.body ? 'written' : 'empty'}, and ${described}/${pieces.length} new team descriptions`,
+  )
 }
-const verb = dryRun ? 'would ' : ''
-console.log(
-  `${verb}replace ${dryRun ? '(see plan)' : counts.replaced}, ${verb}describe ${dryRun ? '(see plan)' : counts.described}, up to date ${counts.upToDate}, left ${counts.left}, conflicts ${counts.conflicts}, failed ${counts.failed}`,
-)
+console.log(`${dryRun ? 'dry run — nothing written; ' : `written ${counts.written}, `}up to date ${counts.upToDate}, left ${counts.left}, conflicts ${counts.conflicts}, failed ${counts.failed}`)
 process.exit(counts.left || counts.conflicts || counts.failed ? 1 : 0)

@@ -46,8 +46,28 @@ export const INFOGRAPHICS: InfographicConfig[] = [
     height: 1.95,
     placeholder: true,
   },
-  // Key panel for the salon hang in Gallery A-south (the seven studies carry no individual labels).
-  { id: 'info-salon', kicker: 'Salon', title: 'Seven Studies', body: PENDING, icon: 'block', placement: { surface: 'gallery-a-partition', at: -1.75, centerHeight: 1.45 }, width: 0.56, height: 0.75, placeholder: true },
+  // Key panel for the salon hang in Gallery A-south (the seven fragments carry no individual labels; each opens its
+  // own details). They are open-access museum pieces (sourcedTextiles.ts), so this text names only what they share.
+  {
+    id: 'info-salon',
+    kicker: 'Salon',
+    title: 'Seven Fragments',
+    body: 'Seven pieces of cotton printed in India, 14th–19th century, from the open collections of Cooper Hewitt, the Cleveland Museum of Art and the Art Institute of Chicago. Select a piece for its details.',
+    icon: 'block',
+    placement: { surface: 'gallery-a-partition', at: -1.75, centerHeight: 1.45 },
+    width: 0.56,
+    height: 0.75,
+    i18n: {
+      hi: {
+        title: 'सात टुकड़े',
+        body: 'भारत में छपे सूती वस्त्र के सात टुकड़े, चौदहवीं–उन्नीसवीं शताब्दी, कूपर हेविट, क्लीवलैंड म्यूज़ियम ऑफ़ आर्ट और शिकागो के आर्ट इंस्टीट्यूट के खुले संग्रहों से। विवरण के लिए कोई टुकड़ा चुनें।',
+      },
+      bn: {
+        title: 'সাতটি টুকরো',
+        body: 'ভারতে ছাপা সুতির কাপড়ের সাতটি টুকরো, চতুর্দশ–ঊনবিংশ শতক, কুপার হিউইট, ক্লিভল্যান্ড মিউজিয়াম অব আর্ট ও শিকাগোর আর্ট ইনস্টিটিউটের উন্মুক্ত সংগ্রহ থেকে। বিবরণের জন্য একটি টুকরো বেছে নিন।',
+      },
+    },
+  },
   // Gallery D introduction, on the east wall just north of the doorway from Gallery A.
   { id: 'info-gallery-d', kicker: 'Gallery D', title: 'Regional Gallery', body: PENDING, icon: 'map', placement: { surface: 'gallery-d-east', at: -12.4 }, width: 1.2, height: 1.62, placeholder: true },
 ]

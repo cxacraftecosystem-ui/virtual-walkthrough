@@ -11,6 +11,7 @@
 import type { SurfaceId } from './layout'
 import { BAY, COURT_CENTER } from './layout'
 import { TRADITION } from './artworks'
+import { SOURCED_TEXTILES } from './sourcedTextiles'
 import type { ContentI18n } from '../i18n/core'
 
 export type MotifId = 'rosette' | 'teardrop' | 'star-lattice' | 'leaf-trail' | 'diamond'
@@ -56,11 +57,13 @@ const NOTE = 'A carved printing block, modelled for this exhibition.'
 const CZ = COURT_CENTER.z
 const S = BAY.southZ
 const N = BAY.northZ
+/** Slots holding a museum open-access textile: a block here never printed it, so the block names no artwork. */
+const SOURCED_SLOTS = new Set(SOURCED_TEXTILES.map((t) => t.slot))
 const ex = (id: string, title: string, artworkId: string, surface: SurfaceId, at: number, placeholderMotif: MotifId, inkColor: string): ExhibitConfig => ({
   id,
   title,
   tradition: TRADITION,
-  artworkId,
+  artworkId: SOURCED_SLOTS.has(artworkId) ? '' : artworkId,
   placement: { surface, at },
   placeholderMotif,
   inkColor,
