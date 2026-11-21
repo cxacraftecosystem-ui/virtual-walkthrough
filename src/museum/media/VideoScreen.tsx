@@ -736,33 +736,72 @@ function LedSeams({ w, h, z }: { w: number; h: number; z: number }) {
 /* Light spill (one RectAreaLight following the picture's colour)      */
 /* ------------------------------------------------------------------ */
 
-let sampler: { c: HTMLCanvasElement; g: CanvasRenderingContext2D } | null = null
-function sampleColor(el: HTMLVideoElement, out: THREE.Color): boolean {
+/*
+ * The picture's colour. Reading a playing video's pixels on the main thread — a 2D canvas, an async PBO, a
+ * VideoFrame copy alike — waits for the GPU to catch up: 30–60 ms a sample measured in the theatre, five
+ * samples a second, the theatre's stutter. createImageBitmap scales the frame to 16 × 9 without waiting
+ * (≈ 0.4 ms), and a worker does the read, so only the worker waits. Without workers or createImageBitmap
+ * the spill takes a fixed dim neutral instead of following the picture.
+ */
+const NEUTRAL_SPILL = new THREE.Color(0.3, 0.3, 0.32)
+let colourWorker: Worker | null | undefined
+const colourWaiting = new Map<number, (rgb: [number, number, number] | null) => void>()
+let colourIds = 0
+function screenColourWorker(): Worker | null {
+  if (colourWorker !== undefined) return colourWorker
+  colourWorker = null
+  if (typeof Worker === 'undefined' || typeof createImageBitmap === 'undefined' || typeof OffscreenCanvas === 'undefined') return null
   try {
-    if (!sampler) {
-      const c = document.createElement('canvas')
-      c.width = 16
-      c.height = 9
-      const g = c.getContext('2d', { willReadFrequently: true })
-      if (!g) return false
-      sampler = { c, g }
+    const w = new Worker(new URL('./screenColour.worker.ts', import.meta.url), { type: 'module' })
+    w.onmessage = (e: MessageEvent<{ id: number; r?: number; g?: number; b?: number }>) => {
+      const { id, r, g, b } = e.data
+      const done = colourWaiting.get(id)
+      colourWaiting.delete(id)
+      done?.(r === undefined || g === undefined || b === undefined ? null : [r, g, b])
     }
-    const { g } = sampler
-    g.drawImage(el, 0, 0, 16, 9)
-    const d = g.getImageData(0, 0, 16, 9).data
-    let r = 0
-    let gg = 0
-    let b = 0
-    for (let i = 0; i < d.length; i += 4) {
-      r += d[i]
-      gg += d[i + 1]
-      b += d[i + 2]
+    w.onerror = () => {
+      colourWorker = null
+      for (const done of colourWaiting.values()) done(null)
+      colourWaiting.clear()
     }
-    const n = (d.length / 4) * 255
-    out.setRGB(r / n, gg / n, b / n, THREE.SRGBColorSpace)
-    return true
+    colourWorker = w
   } catch {
-    return false
+    colourWorker = null
+  }
+  return colourWorker
+}
+
+class ColourSampler {
+  private pending = false
+  private gone = false
+  /** Start a sample of the film's current frame; `out` takes its mean colour when the worker has it. */
+  sample(el: HTMLVideoElement, out: THREE.Color) {
+    if (this.pending || this.gone) return
+    const w = screenColourWorker()
+    if (!w) {
+      out.copy(NEUTRAL_SPILL)
+      return
+    }
+    this.pending = true
+    createImageBitmap(el, { resizeWidth: 16, resizeHeight: 9, resizeQuality: 'low' })
+      .then(
+        (bmp) =>
+          new Promise<[number, number, number] | null>((resolve) => {
+            const id = ++colourIds
+            colourWaiting.set(id, resolve)
+            w.postMessage({ id, bmp }, [bmp])
+          }),
+      )
+      .then((rgb) => {
+        if (!this.gone && rgb) out.setRGB(rgb[0], rgb[1], rgb[2], THREE.SRGBColorSpace)
+      })
+      .catch(() => {})
+      .finally(() => {
+        this.pending = false
+      })
+  }
+  dispose() {
+    this.gone = true
   }
 }
 
@@ -773,6 +812,8 @@ function ScreenSpill({ m, w, h, z, active }: { m: Media; w: number; h: number; z
   const target = useRef(new THREE.Color(0, 0, 0))
   const current = useRef(new THREE.Color(0, 0, 0))
   const acc = useRef(0)
+  const sampler = useMemo(() => new ColourSampler(), [])
+  useEffect(() => () => sampler.dispose(), [sampler])
   useFrame((_, dt) => {
     const l = light.current
     if (!l) return
@@ -780,9 +821,8 @@ function ScreenSpill({ m, w, h, z, active }: { m: Media; w: number; h: number; z
     acc.current += dt
     if (acc.current >= 0.2) {
       acc.current = 0
-      if (!active || !el || el.paused || !sampleColor(el, target.current)) {
-        if (!active || !el || el.paused) target.current.setRGB(0, 0, 0)
-      }
+      if (!active || !el || el.paused || !m.hasFrame) target.current.setRGB(0, 0, 0)
+      else sampler.sample(el, target.current)
     }
     current.current.lerp(target.current, 1 - Math.exp(-dt * 4))
     const c = current.current

@@ -16,6 +16,7 @@ import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import type { MotifId } from '../config/exhibits'
 import { hashString, motifToShapes, mulberry32 } from './motifs'
+import { oneGroupPerMaterial } from '../utils/geometryGroups'
 
 export interface HandBlockPlaceholderProps {
   motif: MotifId
@@ -145,7 +146,8 @@ export function HandBlockPlaceholder({ motif, size = [0.16, 0.16], inkColor = '#
     g.rotateX(-Math.PI / 2)
     g.translate(0, bevel, 0)
     g.computeVertexNormals()
-    return g
+    // a cap and a side group per shape of the motif: some hundred draw calls a block, unless gathered
+    return oneGroupPerMaterial(g)
   }, [motif, motifSize])
 
   const handleGeo = useMemo(() => {

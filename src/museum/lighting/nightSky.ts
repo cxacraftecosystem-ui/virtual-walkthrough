@@ -95,3 +95,49 @@ export function patchNightSky(mat: THREE.ShaderMaterial) {
   mat.needsUpdate = true
   nightSkyUniforms.add(u)
 }
+
+/**
+ * The sky's flicker: three's clouds are noise projected onto a plane (direction.xz / direction.y), so towards the
+ * horizon one pixel spans several cycles of the finer octaves, and the stars' cores are smaller than a pixel —
+ * both alias into sparkle that crawls as the view turns. Each cloud octave finer than about two pixels a cycle is
+ * faded out (its screen-space derivative), the coverage noise likewise, and a star is never drawn smaller than
+ * about a pixel (its brightness kept). Call after patchNightSky; a changed shader is left as it is.
+ */
+export function patchSkyAntialias(mat: THREE.ShaderMaterial) {
+  const call = 'float cloudNoise = clamp( fbm( cloudUV * 1000.0, evolve ) * 0.7 + 0.5, 0.0, 1.0 );'
+  const region = 'float region = noise( cloudUV * 300.0 ) * 0.37 + 0.5;'
+  const fbmHead = 'float fbm( vec2 p, float drift ) {'
+  const fs = mat.fragmentShader
+  if (!fs.includes(call) || !fs.includes(region) || !fs.includes(fbmHead)) {
+    console.warn('[museum] sky shader layout changed; cloud anti-aliasing not applied')
+    return
+  }
+  mat.fragmentShader = fs
+    .replace(
+      fbmHead,
+      `float museumFbmAA( vec2 p, float drift, float fw ) {
+			float result = 0.0;
+			float amplitude = 1.0;
+			for ( int i = 0; i < 4; i ++ ) {
+				result += amplitude * noise( p ) * clamp( 2.0 - fw * 2.0, 0.0, 1.0 );
+				amplitude *= 0.5;
+				p = p * 2.0 + drift;
+				fw *= 2.0;
+			}
+			return result;
+		}
+		${fbmHead}`,
+    )
+    .replace(
+      call,
+      `vec2 cloudP = cloudUV * 1000.0;
+				float cloudFw = max( length( dFdx( cloudP ) ), length( dFdy( cloudP ) ) );
+				float cloudNoise = clamp( museumFbmAA( cloudP, evolve, cloudFw ) * 0.7 + 0.5, 0.0, 1.0 );`,
+    )
+    .replace(region, 'float region = noise( cloudUV * 300.0 ) * 0.37 * clamp( 2.0 - cloudFw * 0.6, 0.0, 1.0 ) + 0.5;')
+  if (mat.fragmentShader.includes('exp( - d * d * 14.0 )'))
+    mat.fragmentShader = mat.fragmentShader
+      .replace('    vec3 p = dir * scale;\n', '    vec3 p = dir * scale;\n    // a star never smaller than about a pixel (its energy kept): sub-pixel cores twinkle as the view moves\n    float px = length( fwidth( p ) );\n    float s2 = max( 1.0 / 28.0, px * px * 0.36 );\n')
+      .replace('exp( - d * d * 14.0 )', '( exp( - d * d / ( 2.0 * s2 ) ) * ( 1.0 / 28.0 ) / s2 )')
+  mat.needsUpdate = true
+}

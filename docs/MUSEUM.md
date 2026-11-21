@@ -19,6 +19,7 @@ code and the bundled defaults in `src/museum/config`.
 | [Automatic frames](#automatic-frames) | how a frame is sized from the image |
 | [Reveal wall, skylight and light](#reveal-wall-skylight-and-light) | the architectural knobs |
 | [Graphics](#graphics) | time of day, probes, path tracing, arrival flight, WebGPU, tiers |
+| [Performance](#performance) | draw calls, video sampling, the sky, light counts |
 | [Live tours, presence, VR and AR](#live-tours-presence-vr-and-ar) | the social and immersive layer |
 | [Validation scripts](#validation-scripts) | screenshots, interaction, load profile, visual regression |
 | [Design assumptions](#design-assumptions) | what GA-101 does not specify |
@@ -266,7 +267,7 @@ fixtures nearest the visitor with soft cross-fades; every fixture keeps its visi
 
 | Feature | Where | How it works |
 |---|---|---|
-| Time of day | HUD sun icon, **T** | Morning, Midday, Golden hour, Dusk, Night. Dusk and night extend the sky with a blue-hour gradient, moon and stars (`lighting/nightSky.ts`); courtyard lanterns light up as spot-pool requests (`lighting/NightLights.tsx`). Only intensities and uniforms change, so no shader recompiles. |
+| Time of day | HUD sun icon, **T** | Morning, Midday, Golden hour, Dusk, Night. Dusk and night extend the sky with a blue-hour gradient, moon and stars (`lighting/nightSky.ts`, which also keeps cloud and star detail from sparkling, see [Performance](#performance)); courtyard lanterns light up as spot-pool requests (`lighting/NightLights.tsx`). Only intensities and uniforms change, so no shader recompiles. |
 | Zone probes | `?probes`, Medium and up, `lighting/ZoneProbes.tsx` | each zone is captured once into a small cube map, prefiltered with PMREM, and `scene.environment` cross-fades per room. Chosen over lightmap baking: no second UV set, no stale cache, about 0 ms per frame. Experimental. |
 | Ray-traced photos | photo mode, `effects/PathTracer.tsx` | hold still and the view is progressively path-traced with three-gpu-pathtracer. The BVH builds in a worker from the zones currently shown. Off by default on every tier; the photo bar's **Ray-trace** toggle opts in; it is turned off where the GPU backend draws it wrongly. Scene builds time out (25 s in the worker, then a main-thread retry, 60 s and it is disabled); *Capture* waits for convergence, so the PNG is the path-traced image; any failure falls back to raster. |
 | Arrival flight | `navigation/ArrivalFlight.tsx` | about 11 s over the lawns and roof lights, through the entrance, with letterbox and title card; first visit per session only. |
@@ -279,6 +280,18 @@ fixtures nearest the visitor with soft cross-fades; every fixture keeps its visi
 | Medium | 2048, soft | · (native MSAA) | 10 | 1024 | · |
 | High | 4096, soft | AO, bloom, SMAA | 12 | 1024 | · |
 | Ultra | 4096, soft | high AO, bloom, SMAA | 14 | 2048 | ✓ |
+
+## Performance
+
+What keeps a frame cheap, and the traps it once fell into. Figures are headless Chrome on Medium (ANGLE,
+Direct3D 11), before → after.
+
+| Concern | Where | How |
+|---|---|---|
+| Draw calls | `utils/geometryGroups.ts` | `ExtrudeGeometry` gives every shape a cap group and a side group, and three draws each group on its own: a carved block's relief was about 190 calls, the map wall's some 600. Reliefs are gathered into one group per material (`oneGroupPerMaterial`). Calls a frame: Gallery A 2,526 → 493, the theatre 2,677 → 445, Gallery D 1,939 → 253. |
+| Screen spill | `media/VideoScreen.tsx`, `media/screenColour.worker.ts` | the theatre film tints the room with its picture's colour. Reading a playing video's pixels on the main thread waits for the GPU, 30 to 60 ms a sample, five samples a second; `createImageBitmap` scales the frame to 16 × 9 without waiting and a worker averages it. Main-thread time in the theatre: 37 → 17 ms a frame. |
+| Sky | `lighting/nightSky.ts` `patchSkyAntialias` | the clouds are noise projected onto a plane, so near the horizon one pixel spans several cycles of the finer octaves, and stars were smaller than a pixel: both sparkled as the view turned. Octaves finer than about two pixels fade out by their screen-space derivative, and a star is never drawn smaller than a pixel. Flickering sky pixels in a still view: 1.08 % → 0.09 % at midday, 0.08 % → 0.03 % at night. |
+| Light counts | every light | three builds each lit shader for the scene's light counts, so a light that appears or disappears recompiles every material in view. Lights are dimmed rather than hidden, and time of day changes only intensities and uniforms: a walk through every room builds 5 shaders after the 49 compiled at the start. |
 
 ## Live tours, presence, VR and AR
 

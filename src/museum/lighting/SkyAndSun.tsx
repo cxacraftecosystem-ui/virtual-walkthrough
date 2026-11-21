@@ -14,7 +14,7 @@ import { ZONES, zoneAt } from '../config/layout'
 import { visitor } from '../state/visitor'
 import { QUALITY_PRESETS, withDevOverrides } from '../config/quality'
 import { useMuseum } from '../state/store'
-import { patchNightSky } from './nightSky'
+import { patchNightSky, patchSkyAntialias } from './nightSky'
 import { lightAngles } from './timeOfDayState'
 import { isWebGPU, makeWebGPUSky } from '../utils/renderer'
 import { VR_MODE } from '../utils/vr'
@@ -53,7 +53,10 @@ function useSky() {
     u.cloudScale.value = s.clouds.scale
     u.cloudSpeed.value = s.clouds.speed
     u.sunPosition.value.copy(sunDirection())
-    if (!gpuSky) patchNightSky(mat)
+    if (!gpuSky) {
+      patchNightSky(mat)
+      patchSkyAntialias(mat)
+    }
     sky.frustumCulled = false
     sky.renderOrder = -10
     return sky

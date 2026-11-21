@@ -23,6 +23,7 @@ import { INDIA_BOUNDS, indiaRings } from '../exhibits/indiaGeometry'
 import { registerSpot } from '../lighting/SpotPool'
 import { TRACK_COLOR } from '../lighting/TrackLight'
 import { ensureWallFonts } from '../materials/wallGraphics'
+import { oneGroupPerMaterial } from '../utils/geometryGroups'
 import { useAsyncTexture } from '../utils/useAsyncTexture'
 import { Builder, Parts, rbox, useBuilt } from './kit'
 import { useModelMaterials } from './modelMaterials'
@@ -325,7 +326,8 @@ function reliefGeometry(L: MapLayout) {
     for (const h of holes) shape.holes.push(new THREE.Path(h.map(([lon, lat]) => new THREE.Vector2(...project(L, lon, lat)))))
     shapes.push(shape)
   }
-  const g = new THREE.ExtrudeGeometry(shapes, { depth: RELIEF_H, bevelEnabled: false, curveSegments: 1 })
+  // one draw call per material, not a cap and a side per island (some 600)
+  const g = oneGroupPerMaterial(new THREE.ExtrudeGeometry(shapes, { depth: RELIEF_H, bevelEnabled: false, curveSegments: 1 }))
   reliefCache.set(key, g)
   return g
 }
