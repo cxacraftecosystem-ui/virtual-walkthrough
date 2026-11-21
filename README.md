@@ -316,8 +316,11 @@ flowchart LR
 </picture>
 
 Production is [hand-block-museum.vercel.app](https://hand-block-museum.vercel.app), deployed from `main` by
-`deploy.yml`. The workshop's own photographs, scans, films and texts are still to arrive; until they do,
-items show neutral stand-ins that visitors never see labelled as missing. The list is in
+`deploy.yml`. The workshop's twenty textiles hang with their makers and captions, the team's six pieces stand in
+Gallery D with their descriptions, and the other 21 frames hold open-access Indian printed textiles from the Art
+Institute of Chicago, the Cleveland Museum of Art and Cooper Hewitt, credited. The blocks' scans, the films and
+most texts are still to arrive; until they do, items show neutral stand-ins that visitors never see labelled as
+missing. The list is in
 [docs/CONTENT_STILL_NEEDED.md](docs/CONTENT_STILL_NEEDED.md).
 
 <picture>

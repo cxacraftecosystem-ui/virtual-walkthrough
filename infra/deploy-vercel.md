@@ -86,6 +86,24 @@ Build settings come from `vercel.json` (framework **Next.js**, functions in `bom
 Set Project → Settings → Functions → Region to `bom1` (Mumbai) as well, so the project's default
 matches the file and a deployment that ignores it cannot fall back to `iad1`.
 
+## The repository link
+
+Both projects are deployed by GitHub Actions, not by Vercel's Git integration. `deploy.yml` checks out the commit,
+runs typecheck, lint and tests, applies the production migrations, then `vercel build` and
+`vercel deploy --prebuilt` upload the built output with the `VERCEL_TOKEN` secret. Vercel therefore lists each
+deployment as made from the CLI, and the project's **Settings → Git** shows no connected repository. Nothing is
+broken: the order (migrations before the code that needs them, and nothing deployed that fails the checks) is why
+the deploy runs in Actions.
+
+To have the project name its repository in the Vercel dashboard as well, connect it without letting Vercel build:
+
+1. `vercel.json` sets `"git": { "deploymentEnabled": false }`, so a connected repository never starts a second,
+   unchecked build of its own on a push.
+2. **Settings → Git → Connect Git Repository → GitHub** → `cxacraftecosystem-ui/virtual-walkthrough` (the clay
+   pavilion: `cxacraftecosystem-ui/virtual-walkthrough-clay`). The Vercel GitHub app must be installed on the
+   `cxacraftecosystem-ui` organisation with access to the repository; an organisation owner approves that.
+3. Deploys keep coming from Actions, exactly as before.
+
 ## After the first deploy
 
 1. Open `https://<app>/api/health` → `{ ok: true, db: "postgres" }`.

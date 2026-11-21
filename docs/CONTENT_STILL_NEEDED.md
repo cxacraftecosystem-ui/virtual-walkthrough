@@ -41,14 +41,12 @@ The admin's **Checklist** page lists, per item, what is still missing and export
 | Capture guide and publications (links) | Reading Room, Resources board | Only the text guide is listed |
 | Final partner credit wording | Reception partners wall | Logos with "Presented by" / "In collaboration with" |
 
-## The live database still serves the old wording
+## What the live database holds
 
-The live database was seeded with the wording from before 10 October. On 4 November 2026 `GET /api/content`
-still returned it, for example "Placeholder image generated for layout and lighting calibration" in 41
-descriptions. Visitors keep seeing that wording until an admin opens **Content → Reset to defaults…** for the
-default exhibition, which replaces it with the current defaults ("A design made for this exhibition, in the
-manner of a hand block print.").
-
-The content version has moved from 4 (10 October) to 7 since, so read **Activity** for curator edits before
-resetting. The reset keeps every item it replaces in the trash, where it can be restored. The two maker profiles
-are not part of the reset: rename them or fill them in on **Makers**. Visitors cannot see them in the meantime.
+The live database was brought in line with the bundled content through the admin API on 20 and 21 November 2026:
+the 41 frames (`scripts/sync-workshop-content.mjs`, after `import-workshop-textiles.mjs` and
+`import-sourced-textiles.mjs` wrote the images), the salon's key panel and the six team pieces' descriptions.
+On 21 November `GET /api/content` carried no stand-in wording in any artwork; what is still a stand-in there is
+what the table above lists (the 9 blocks, 5 of the 6 panels, the 6 films and 65 of the 138 objects). The scripts
+only replace an item while it is still exactly as seeded, so a curator's edit is never overwritten; running them
+again changes nothing.

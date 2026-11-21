@@ -168,6 +168,18 @@ The five hero works are `hero-01` to `hero-05` (the brief asks for exactly five 
 > [!WARNING]
 > `scripts/generate-placeholders.mjs` regenerates the placeholder JPGs and overwrites files with the same names.
 
+### The textiles that hang now
+
+Every frame holds a real textile. The workshop's twenty (`config/workshopTextiles.ts`: slot, title in three
+languages, tradition, artisan, region, technique, material and the deck's caption) take the five heroes, the
+reveal wall and Galleries A to D; `node scripts/import-workshop-textiles.mjs` crops them from the deck's images
+into `public/artworks/`. The other 21 slots hold documented Indian printed textiles from the Art Institute of
+Chicago, the Cleveland Museum of Art and Cooper Hewitt, all CC0 (`config/sourcedTextiles.ts`: each with its
+museum's record, object number, real size and credit; `node scripts/import-sourced-textiles.mjs` fetches and crops
+them). `artworks.ts` hangs both by slot, and `node scripts/optimize-assets.mjs --artworks` writes the WebP
+variants. A live museum gets them, with the team pieces' descriptions (`TEAM_SHARED` in `config/objects.ts`),
+through `scripts/sync-workshop-content.mjs`, which replaces an item only while it is still as seeded.
+
 ### Place it on a wall
 
 `placement.surface` is a display-surface id from `SURFACES` in `config/layout.ts`; `placement.at` is the world
