@@ -272,7 +272,7 @@ fixtures nearest the visitor with soft cross-fades; every fixture keeps its visi
 | Ray-traced photos | photo mode, `effects/PathTracer.tsx` | hold still and the view is progressively path-traced with three-gpu-pathtracer. The BVH builds in a worker from the zones currently shown. Off by default on every tier; the photo bar's **Ray-trace** toggle opts in; it is turned off where the GPU backend draws it wrongly. Scene builds time out (25 s in the worker, then a main-thread retry, 60 s and it is disabled); *Capture* waits for convergence, so the PNG is the path-traced image; any failure falls back to raster. |
 | Arrival flight | `navigation/ArrivalFlight.tsx` | about 11 s over the lawns and roof lights, through the entrance, with letterbox and title card; first visit per session only. |
 | WebGPU | `?renderer=webgpu`, `utils/renderer.ts` | `three/webgpu` with the TSL sky and WebGPU PMREM; the composer, probes, path tracer and GLSL patches are WebGL-only and skipped. Experimental. |
-| Adaptive quality | `config/quality.ts`, `App.tsx` | `detectInitialTier()` picks the start; the museum steps down below about 32 fps. |
+| Adaptive quality | `config/quality.ts`, `App.tsx` | `detectInitialTier()` picks the start, or the tier an earlier visit on this browser settled on; the resolution follows the frame rate. A device with headroom is not stepped up during the visit, since a tier change rebuilds the canvas and recompiles every shader: the next visit starts higher, up to the device class's ceiling. Below about 32 fps the museum steps down once, and the next visit starts there. |
 
 | Tier | Shadows | Composer | Spot pool | Texture size | Floor reflections |
 |---|---|---|---:|---:|:---:|

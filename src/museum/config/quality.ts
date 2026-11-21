@@ -137,8 +137,37 @@ export const QUALITY_PRESETS: Record<QualityTier, QualityPreset> = {
 
 export const QUALITY_ORDER: QualityTier[] = ['low', 'medium', 'high', 'ultra']
 
-/** Pick a starting tier for "auto" from coarse device signals. */
+/**
+ * Pick a starting tier for "auto": the device's own signals, unless an earlier visit learnt better
+ * (App.tsx AdaptiveQuality remembers the tier a device could hold, up to autoCeiling(), so the
+ * tier is settled at the start and never changed during a visit, which rebuilds the canvas).
+ */
 export function detectInitialTier(): QualityTier {
+  if (typeof window === 'undefined') return 'high'
+  const remembered = rememberedAutoTier()
+  return remembered && QUALITY_ORDER.indexOf(remembered) <= QUALITY_ORDER.indexOf(autoCeiling()) ? remembered : detectDeviceTier()
+}
+
+const AUTO_TIER_KEY = 'museum.autoTier'
+/** The tier the next visit on this browser should start on (App.tsx AdaptiveQuality). */
+export function rememberAutoTier(t: QualityTier) {
+  try {
+    localStorage.setItem(AUTO_TIER_KEY, t)
+  } catch {
+    /* storage unavailable */
+  }
+}
+function rememberedAutoTier(): QualityTier | null {
+  try {
+    const t = localStorage.getItem(AUTO_TIER_KEY)
+    return t && (QUALITY_ORDER as readonly string[]).includes(t) ? (t as QualityTier) : null
+  } catch {
+    return null
+  }
+}
+
+/** The starting tier from coarse device signals alone. */
+function detectDeviceTier(): QualityTier {
   if (typeof window === 'undefined') return 'high'
   const coarse = window.matchMedia?.('(pointer: coarse)').matches
   const small = Math.min(window.screen.width, window.screen.height) < 820
@@ -173,7 +202,7 @@ export function gpuClass(): GpuClass {
 export function autoCeiling(): QualityTier {
   // Touch devices (phones/tablets; iOS reports an 'unknown' "Apple GPU") never climb: each tier
   // change rebuilds the WebGL context, and repeated rebuilds get the tab killed on iOS Safari.
-  if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) return detectInitialTier()
+  if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) return detectDeviceTier()
   const c = gpuClass()
   if (c === 'flagship' || c === 'discrete') return 'ultra'
   if (c === 'integrated') return 'medium'

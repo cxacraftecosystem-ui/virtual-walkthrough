@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import * as THREE from 'three'
 import { LIGHTING } from './museum/config/lighting'
 import { MUSEUM } from './museum/config/museum'
-import { autoCeiling, QUALITY_ORDER, QUALITY_PRESETS, withDevOverrides } from './museum/config/quality'
+import { autoCeiling, QUALITY_ORDER, QUALITY_PRESETS, rememberAutoTier, withDevOverrides } from './museum/config/quality'
 import { DebugOverlay } from './museum/debug/DebugOverlay'
 import { MuseumScene } from './museum/MuseumScene'
 import { useArrival } from './museum/navigation/ArrivalFlight'
@@ -29,12 +29,12 @@ window.__museum = { teleport, visitor, store: useMuseum }
 /**
  * Adaptive quality ("auto"):
  *  • continuous resolution scaling inside the tier's DPR range (no reload, every ~1 s),
- *  • step UP a tier when the device holds the display's refresh rate with headroom,
- *  • step DOWN when it can't hold ~32 fps.
- * Tier changes rebuild the renderer (~1–2 s), so they are rationed: at most 3 per session,
- * never above the device-class ceiling, and never back up after a step down (no ping-pong).
+ *  • a device with headroom is not stepped UP during the visit: a tier change remounts the canvas
+ *    and recompiles every shader, a freeze just after the visitor walked in. The higher tier (up to
+ *    the device-class ceiling) is remembered and the next visit starts on it (config/quality.ts),
+ *  • a device that can't hold ~32 fps steps DOWN once, and the next visit starts there too.
  */
-const adaptive = { changes: 0, declined: false }
+const adaptive = { declined: false }
 
 function AdaptiveQuality() {
   const quality = useMuseum((s) => s.quality)
@@ -60,19 +60,17 @@ function AdaptiveQuality() {
       flipflops={4}
       onChange={({ factor }) => setDpr(Math.round((lo + (Math.max(lo, deviceMax) - lo) * factor) * 20) / 20)}
       onIncline={() => {
-        const st = useMuseum.getState()
-        const i = QUALITY_ORDER.indexOf(st.tier)
+        const i = QUALITY_ORDER.indexOf(useMuseum.getState().tier)
         const ceiling = QUALITY_ORDER.indexOf(autoCeiling())
-        if (adaptive.declined || adaptive.changes >= 3 || i >= ceiling) return
-        adaptive.changes++
-        st.setTier(QUALITY_ORDER[i + 1])
+        if (adaptive.declined || i >= ceiling) return
+        rememberAutoTier(QUALITY_ORDER[i + 1])
       }}
       onDecline={() => {
         const st = useMuseum.getState()
         const i = QUALITY_ORDER.indexOf(st.tier)
-        if (i <= 0 || adaptive.changes >= 3) return
-        adaptive.changes++
+        if (i <= 0 || adaptive.declined) return
         adaptive.declined = true
+        rememberAutoTier(QUALITY_ORDER[i - 1])
         st.setTier(QUALITY_ORDER[i - 1])
       }}
     />

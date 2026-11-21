@@ -149,8 +149,10 @@ flowchart TD
 | High | discrete GPUs | 4096 px, soft | AO, bloom, SMAA | 12 | |
 | Ultra | flagship GPUs | 4096 px, soft | high AO, bloom, SMAA | 14 | floor reflections, 2048 px textures |
 
-The starting tier comes from `detectInitialTier()` (pointer, screen, memory and the WebGL renderer string), and
-the museum steps down a tier when it cannot hold about 32 fps. Visitors can switch tiers from the HUD at any time.
+The starting tier comes from `detectInitialTier()` (pointer, screen, memory and the WebGL renderer string, or the
+tier an earlier visit settled on). A tier change rebuilds the canvas and recompiles every shader, so a device with
+headroom starts higher on its next visit rather than mid-walk; one that cannot hold about 32 fps steps down once.
+Visitors can switch tiers from the HUD at any time.
 
 ## <img src="docs/readme-kit/assets/icons/layers.svg" width="32" align="top" alt="">&nbsp; Built with
 
